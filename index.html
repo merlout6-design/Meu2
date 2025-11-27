@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>App Delivery</title>
+    
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&family=Chewy&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Poppins', sans-serif; background-color: #f3f4f6; transition: background-color 0.3s; }
+        .font-chewy { font-family: 'Chewy', cursive; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .loader { border-top-color: currentColor; -webkit-animation: spinner 1s linear infinite; animation: spinner 1s linear infinite; }
+        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .animate-fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        html { scroll-behavior: smooth; }
+        .leaflet-container { z-index: 0; border-radius: 0.5rem; }
+        .cart-bump { animation: bump 300ms cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes bump { 0% { transform: scale(1); } 50% { transform: scale(1.15); box-shadow: 0 10px 25px rgba(0,0,0,0.3); } 100% { transform: scale(1); } }
+        .flying-img { position: fixed; z-index: 10000; pointer-events: none; border-radius: 50%; box-shadow: 0 5px 15px rgba(0,0,0,0.2); transition: all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1); }
+        
+        /* Modal */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 9999; animation: fadeIn 0.2s; }
+        .modal-box { background: white; padding: 25px; border-radius: 15px; width: 90%; max-width: 350px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+    </style>
+</head>
+<body>
+    <div id="root">
+        <div style="height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+            <div class="loader" style="width: 50px; height: 50px; border-radius: 50%; border: 4px solid #ddd; color: #555;"></div>
+            <p style="margin-top: 20px; color: #666;">Carregando...</p>
+        </div>
+    </div>
+
+    <script type="text/babel">
+        // --- CONFIGURAÇÃO FIREBASE ---
+        const firebaseConfig = {
+  apiKey: "AIzaSyCb5objdMVR1HupEIh3vuNFKnh5LSODNCg",
+  authDomain: "rodao-f93c2.firebaseapp.com",
+  projectId: "rodao-f93c2",
+  storageBucket: "rodao-f93c2.firebasestorage.app",
+  messagingSenderId: "867137990526",
+  appId: "1:867137990526:web:1b8d351588d0ea869a0d2f"
+};
+
+        if (!firebase.apps.length) { try { firebase.initializeApp(firebaseConfig); } catch (e) {} }
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const APP_ID = "ajuda-2217b"; 
+        const getCol = (n) => db.collection('artifacts').doc(APP_ID).collection('public').doc('data').collection(n);
+
+        const { useState, useEffect, useRef, useMemo } = React;
+        const formatMoney = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+        // --- PADRÕES INICIAIS ---
+        const DEFAULT_COORDS = { lat: -25.0015570, lng: -53.4628300 };
+        const WHATSAPP_NUMBER = "5545988166885";
+        const PIX_KEY = "63.149.169/0001-28";
+
+        // --- HELPER: VERIFICAÇÃO DE HORÁRIO ---
+        const isStoreOpen = (start, end) => {
+            if(!start || !end) return true; 
+            const now = new Date();
+            const current = now.getHours() * 60 + now.getMinutes();
+            const [sH, sM] = start.split(':').map(Number);
+            const startMin = sH * 60 + sM;
+            const [eH, eM] = end.split(':').map(Number);
+            const endMin = eH * 60 + eM;
+            if (endMin < startMin) return current >= startMin || current <= endMin;
+            else return current >= startMin && current <= endMin;
+        };
+
+        // --- APP ---
+        const App = () => {
+            const [view, setView] = useState("menu");
+            const [cart, setCart] = useState(() => {
+                try { return JSON.parse(localStorage.getItem('fritzza_cart')) || []; } catch(e) { return []; }
+            });
+            const [isCartAnimating, setIsCartAnimating] = useState(false);
+
+            useEffect(() => { localStorage.setItem('fritzza_cart', JSON.stringify(cart)); }, [cart]);
+
+            const [products, setProducts] = useState([]);
+            const [categories, setCategories] = useState([]);
+            
+            // CONFIGURAÇÃO PADRÃO
+            const [settings, setSettings] = useState({ 
+                appName: "Fritzza", appSubtitle: "Delivery", headerPhrase: "", pricePerKm: 2.00, 
+                themeColor: "#dc2626", cartColor: "#16a34a", appNameColor: "#ffffff", bgColor: "#f3f4f6",
+                logoUrl: "", logoSize: 60, logoStyle: "circle", bannerUrl: "", adminPassword: "admin",
+                openTime: "18:00", closeTime: "23:00", restLat: DEFAULT_COORDS.lat, restLng: DEFAULT_COORDS.lng
+            });
+            
+            const [restLocation, setRestLocation] = useState(DEFAULT_COORDS);
+            const [catSel, setCatSel] = useState("Todas");
+            const [loginOpen, setLoginOpen] = useState(false);
+            const [loading, setLoading] = useState(true);
+            const [neighborhoods, setNeighborhoods] = useState([]);
+            const isOpen = isStoreOpen(settings.openTime, settings.closeTime);
+
+            useEffect(() => { if (settings.bgColor) document.body.style.backgroundColor = settings.bgColor; }, [settings.bgColor]);
+
+            const themeStyle = { backgroundColor: settings.themeColor || '#dc2626' };
+            const cartStyle = { backgroundColor: settings.cartColor || '#16a34a' };
+            const textThemeStyle = { color: settings.themeColor || '#dc2626' };
+            const borderThemeStyle = { borderColor: settings.themeColor || '#dc2626' };
+            const appNameStyle = { color: settings.appNameColor || '#ffffff', fontFamily: "'Chewy', cursive", fontSize: '1.8rem' };
+            
+            const getLogoStyle = () => {
+                const size = `${settings.logoSize || 60}px`;
+                const base = { height: size, width: 'auto', objectFit: 'contain', maxWidth: '150px' }; 
+                if (settings.logoStyle === 'none') return { ...base, borderRadius: '0', background: 'transparent', border: 'none' };
+                if (settings.logoStyle === 'square') return { ...base, width: size, objectFit: 'cover', borderRadius: '8px', backgroundColor: 'white', border: '2px solid white' };
+                return { ...base, width: size, objectFit: 'cover', borderRadius: '50%', backgroundColor: 'white', border: '2px solid white' };
+            };
+
+            useEffect(() => {
+                const init = async () => {
+                    if (!auth.currentUser) await auth.signInAnonymously();
+                    const root = db.collection('artifacts').doc(APP_ID).collection('public').doc('data');
+                    
+                    const pProd = new Promise(res => root.collection('products').onSnapshot(s => { setProducts(s.docs.map(d => ({ id: d.id, ...d.data() }))); res(); }));
+                    const pCat = new Promise(res => root.collection('categories').orderBy('order').onSnapshot(s => { 
+                        const c = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                        if(c.length===0) seedCategories(); else setCategories(c);
+                        res(); 
+                    }));
+                    const pConf = new Promise(res => root.collection('config').doc('main').onSnapshot(d => {
+                        if (d.exists) {
+                            const data = d.data();
+                            setSettings(prev => ({...prev, ...data}));
+                            if(data.restLat && data.restLng) setRestLocation({ lat: parseFloat(data.restLat), lng: parseFloat(data.restLng) });
+                            if(data.bgColor) document.body.style.backgroundColor = data.bgColor;
+                        } else { root.collection('config').doc('main').set(settings); }
+                        res();
+                    }));
+                    const pNeigh = new Promise(res => root.collection('neighborhoods').onSnapshot(s => { setNeighborhoods(s.docs.map(d => ({ id: d.id, ...d.data() }))); res(); }));
+                    await Promise.all([pProd, pCat, pConf, pNeigh]);
+                    setLoading(false);
+                };
+                init();
+            }, []);
+
+            const seedCategories = () => {
+                const batch = db.batch();
+                ["Pizzas", "Bebidas", "Combos"].forEach((n, i) => batch.set(getCol('categories').doc(), { name: n, order: i }));
+                batch.commit();
+            };
+
+            const addToCart = (p, e) => {
+                const performUpdate = () => {
+                    setCart(prev => {
+                        const ex = prev.find(i => i.id === p.id);
+                        return ex ? prev.map(i => i.id === p.id ? { ...i, quantity: i.quantity + 1 } : i) : [...prev, { ...p, quantity: 1 }];
+                    });
+                    setIsCartAnimating(true);
+                    setTimeout(() => setIsCartAnimating(false), 300);
+                };
+
+                if(e) {
+                    const btn = e.currentTarget;
+                    const card = btn.closest('.product-card');
+                    let srcElement = card ? card.querySelector('img') : null;
+                    let isIcon = false;
+                    if (!srcElement && card) { srcElement = card.querySelector('.product-icon-placeholder'); isIcon = true; }
+
+                    if (srcElement) {
+                        const rect = srcElement.getBoundingClientRect();
+                        const clone = srcElement.cloneNode(true);
+                        clone.style.position = 'fixed'; clone.style.left = rect.left + 'px'; clone.style.top = rect.top + 'px'; clone.style.width = rect.width + 'px'; clone.style.height = rect.height + 'px'; clone.style.zIndex = '9999'; clone.style.opacity = '0.9'; clone.className = 'flying-img';
+                        if(isIcon) { clone.style.backgroundColor = '#f3f4f6'; clone.style.display = 'flex'; clone.style.alignItems = 'center'; clone.style.justifyContent = 'center'; }
+                        document.body.appendChild(clone);
+
+                        const cartFab = document.getElementById('cart-fab');
+                        let destX, destY;
+                        if (cartFab) {
+                            const counter = cartFab.querySelector('span.cart-counter'); 
+                            const targetEl = counter || cartFab;
+                            const targetRect = targetEl.getBoundingClientRect();
+                            destX = targetRect.left + (targetRect.width / 2) - (rect.width / 2);
+                            destY = targetRect.top + (targetRect.height / 2) - (rect.height / 2);
+                        } else { destX = window.innerWidth / 2 - 25; destY = window.innerHeight - 80; }
+
+                        requestAnimationFrame(() => { clone.style.left = destX + 'px'; clone.style.top = destY + 'px'; clone.style.transform = 'scale(0.05) rotate(360deg)'; clone.style.opacity = '0.2'; });
+                        setTimeout(() => { clone.remove(); performUpdate(); }, 600);
+                    } else { performUpdate(); }
+                } else { performUpdate(); }
+            };
+
+            const removeFromCart = (id) => {
+                setCart(prev => prev.filter(item => item.id !== id));
+            };
+
+            const total = cart.reduce((a,b)=>a+(b.price*b.quantity),0);
+
+            if (loading) return <div className="fixed inset-0 bg-white z-50 flex flex-col items-center justify-center"><div className="loader" style={{width:'50px', height:'50px', borderRadius:'50%', border:'4px solid #ddd', color:'#555'}}></div><p className="mt-4 text-gray-500">Carregando...</p></div>;
+
+            return (
+                <div className="min-h-screen pb-24 font-sans">
+                    <header style={themeStyle} className="text-white p-4 sticky top-0 z-40 shadow-md flex flex-col transition-colors duration-300">
+                        <div className="flex justify-between items-center w-full">
+                            <div className="flex items-center gap-3">
+                                {settings.logoUrl ? (
+                                    <img src={settings.logoUrl} alt="Logo" style={getLogoStyle()} />
+                                ) : (
+                                    <div className="bg-white text-current flex items-center justify-center font-bold text-xl" style={{...textThemeStyle, ...getLogoStyle()}}>
+                                        {settings.appName ? settings.appName.charAt(0) : "F"}
+                                    </div>
+                                )}
+                                {settings.bannerUrl ? (
+                                    <img src={settings.bannerUrl} alt="Banner" className="h-10 object-contain" />
+                                ) : (
+                                    <div><h1 className="leading-tight" style={appNameStyle}>{settings.appName}</h1><p className="text-xs opacity-90">{settings.appSubtitle}</p></div>
+                                )}
+                            </div>
+                            {settings.headerPhrase && ( <div className="hidden md:block bg-white/20 px-3 py-1 rounded-full text-sm font-semibold backdrop-blur-sm">{settings.headerPhrase}</div> )}
+                            {view === "admin" ? 
+                                <button onClick={()=>setView("menu")} className="text-xs bg-white text-gray-800 px-3 py-1 rounded-full font-bold">Sair Admin</button> :
+                                <button onClick={()=>setLoginOpen(true)}><i className="fa-solid fa-lock text-xl opacity-80 hover:opacity-100"></i></button>
+                            }
+                        </div>
+                        {settings.headerPhrase && ( <div className="md:hidden mt-2 text-center bg-white/20 py-1 rounded text-xs font-medium backdrop-blur-sm w-full">{settings.headerPhrase}</div> )}
+                    </header>
+                    
+                    {view === 'menu' && (
+                        <div className={`w-full text-center py-2 text-sm font-bold text-white shadow-sm transition-colors duration-300 ${isOpen ? 'bg-green-500' : 'bg-red-500'}`}>
+                            {isOpen ? 
+                                <span><i className="fa-solid fa-check-circle mr-1"></i> Aberto - Recebendo Pedidos</span> : 
+                                <span><i className="fa-solid fa-clock mr-1"></i> Fechado - Abre às {settings.openTime}. <span className="underline cursor-pointer">Agende seu pedido agora!</span></span>
+                            }
+                        </div>
+                    )}
+
+                    {loginOpen && <AdminLogin theme={themeStyle} savedPassword={settings.adminPassword} onLogin={()=>{setLoginOpen(false);setView("admin")}} onCancel={()=>setLoginOpen(false)} />}
+
+                    <main className="container mx-auto p-4 max-w-4xl">
+                        {view === "menu" && <MenuView products={products} categories={categories} catSel={catSel} setCatSel={setCatSel} addToCart={addToCart} theme={themeStyle} border={borderThemeStyle} text={textThemeStyle} />}
+                        {view === "checkout" && <CheckoutView cart={cart} setCart={setCart} total={total} settings={settings} neighborhoods={neighborhoods} restLocation={restLocation} products={products} onBack={()=>setView("menu")} onClear={()=>setCart([])} onRemove={removeFromCart} theme={themeStyle} cartColor={cartStyle} text={textThemeStyle} />}
+                        {view === "admin" && <AdminPanel products={products} categories={categories} settings={settings} neighborhoods={neighborhoods} restLocation={restLocation} theme={themeStyle} />}
+                    </main>
+
+                    {view === "menu" && cart.length > 0 && (
+                        <div id="cart-fab" className={`fixed bottom-4 left-0 right-0 px-4 flex justify-center z-50 ${isCartAnimating ? 'cart-bump' : ''}`}>
+                            <button onClick={()=>setView("checkout")} style={cartStyle} className="text-white w-full max-w-md p-4 rounded-xl shadow-xl flex justify-between items-center hover:opacity-90 transition transform hover:scale-105">
+                                <div className="flex items-center gap-2"><span className="cart-counter bg-white text-black w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold">{cart.reduce((a,b)=>a+b.quantity,0)}</span><span>Ver Carrinho</span></div>
+                                <span className="font-bold text-lg">{formatMoney(total)}</span>
+                            </button>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // --- VIEWS ---
+        const MenuView = ({ products, categories, catSel, setCatSel, addToCart, theme, border, text }) => {
+            const handleCat = (n) => { setCatSel(n); if(n==="Todas") window.scrollTo(0,0); };
+            const ProductCard = ({ p }) => (
+                <div className="bg-white p-3 rounded-xl shadow-sm border flex gap-3 hover:shadow-md transition product-card group">
+                    <div className="product-icon-placeholder w-24 h-24 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 relative">
+                        {p.imageUrl ? <img src={p.imageUrl} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center text-gray-300"><i className="fa-solid fa-utensils text-2xl"></i></div>}
+                    </div>
+                    <div className="flex-1 flex flex-col justify-between">
+                        <div><h3 className="font-bold text-gray-800 leading-tight">{p.name}</h3><p className="text-xs text-gray-500 line-clamp-2 mt-1">{p.description}</p></div>
+                        <div className="flex justify-between items-end mt-2">
+                            <span className="font-bold text-lg" style={{color: 'green'}}>{formatMoney(p.price)}</span>
+                            <button onClick={(e)=>addToCart(p, e)} style={{...theme, color: 'white'}} className="w-9 h-9 rounded-full flex items-center justify-center hover:opacity-90 active:scale-90 transition-transform shadow-sm"><i className="fa-solid fa-plus"></i></button>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            return (
+                <div>
+                    <div className="flex overflow-x-auto gap-2 pb-4 mb-4 hide-scrollbar sticky top-24 z-30 bg-gray-50 py-2" style={{backgroundColor: 'rgba(255,255,255,0.9)'}}>
+                        <button onClick={()=>handleCat("Todas")} style={catSel==="Todas" ? theme : {}} className={`px-5 py-2 rounded-full whitespace-nowrap text-sm font-bold transition shadow-sm ${catSel==="Todas"?"text-white shadow-md":"bg-white text-gray-600 border"}`}>Todas</button>
+                        {categories.map(c => <button key={c.id} onClick={()=>handleCat(c.name)} style={catSel===c.name ? theme : {}} className={`px-5 py-2 rounded-full whitespace-nowrap text-sm font-bold transition shadow-sm ${catSel===c.name?"text-white shadow-md":"bg-white text-gray-600 border"}`}>{c.name}</button>)}
+                    </div>
+                    <div className="space-y-8">
+                        {catSel === "Todas" ? categories.map(cat => {
+                            const cp = products.filter(p => p.category === cat.name);
+                            if (cp.length === 0) return null;
+                            return <div key={cat.id}><h3 className="font-bold text-xl text-gray-800 mb-3 pl-1 border-l-4" style={border}>{cat.name}</h3><div className="grid grid-cols-1 md:grid-cols-2 gap-4">{cp.map(p=><ProductCard key={p.id} p={p}/>)}</div></div>
+                        }) : <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{products.filter(p=>p.category===catSel).length===0?<div className="col-span-full text-center text-gray-400 py-10">Nada aqui.</div>:products.filter(p=>p.category===catSel).map(p=><ProductCard key={p.id} p={p}/>)}</div>}
+                    </div>
+                </div>
+            );
+        };
+
+        const CheckoutView = ({ cart, setCart, total, settings, neighborhoods, restLocation, products, onBack, onClear, onRemove, theme, cartColor, text }) => {
+            const [form, setForm] = useState({ name: "", phone: "", cep: "", address: "", number: "", bairro: "", complement: "" });
+            const [del, setDel] = useState({ fee: 0, km: 0, loading: false, lat: null, lon: null, method: 'pendente' });
+            const [payMethod, setPayMethod] = useState("");
+            const [change, setChange] = useState("");
+            const [couponCode, setCouponCode] = useState("");
+            const [appliedCoupon, setAppliedCoupon] = useState(null);
+            const [typingTimer, setTypingTimer] = useState(null);
+            const [cepLoading, setCepLoading] = useState(false);
+            const [showScheduleModal, setShowScheduleModal] = useState(false);
+
+            useEffect(() => {
+                if (form.cep.length >= 8 && form.number) {
+                    setDel(p => ({ ...p, loading: true }));
+                    if (typingTimer) clearTimeout(typingTimer);
+                    const timer = setTimeout(() => calculateFinalShipping(), 1000);
+                    setTypingTimer(timer);
+                }
+            }, [form.number, form.cep]);
+
+            const check = async () => {
+                const clean = form.phone.replace(/\D/g, '');
+                if(clean.length<8) return;
+                const snap = await getCol('customers').where('phoneRaw','==',clean).limit(1).get();
+                if(!snap.empty) {
+                    const d = snap.docs[0].data();
+                    if(d.cep) fetchCep(d.cep, false); 
+                    setForm(p => ({...p, name:d.name, phone: d.phone, cep: d.cep || "", number: d.number || "", complement: d.complement || ""}));
+                }
+            };
+
+            const handleCepChange = (e) => {
+                let val = e.target.value.replace(/\D/g, '');
+                if (val.length > 8) val = val.slice(0, 8);
+                setForm({ ...form, cep: val });
+                if (val.length === 8) fetchCep(val, true);
+            };
+
+            const fetchCep = async (cep, autoFocusNumber) => {
+                setCepLoading(true);
+                try {
+                    const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+                    const data = await res.json();
+                    if (data.erro) { alert("CEP não encontrado!"); setForm(p => ({ ...p, address: "", bairro: "" })); } 
+                    else {
+                        if (data.localidade !== "Cascavel") { alert("Desculpe, entregamos apenas em Cascavel - PR."); setForm(p => ({ ...p, cep: "", address: "", bairro: "" })); setCepLoading(false); return; }
+                        setForm(p => ({ ...p, address: data.logradouro, bairro: data.bairro }));
+                        if (autoFocusNumber && document.getElementById('input-number')) document.getElementById('input-number').focus();
+                    }
+                } catch (e) { alert("Erro ao buscar CEP."); } finally { setCepLoading(false); }
+            };
+
+            const calculateFinalShipping = async () => {
+                const bairroMatch = neighborhoods.find(n => n.name.toLowerCase().trim() === form.bairro.toLowerCase().trim());
+                if (bairroMatch) { setDel({ fee: parseFloat(bairroMatch.price), km: 0, loading: false, method: 'bairro_fixo', lat: null, lon: null }); return; }
+                try {
+                    const query = `${form.address}, ${form.number}, Cascavel, PR, Brazil`;
+                    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`);
+                    const data = await res.json();
+                    if(data.length > 0) {
+                        const lat = parseFloat(data[0].lat);
+                        const lon = parseFloat(data[0].lon);
+                        const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${restLocation.lng},${restLocation.lat};${lon},${lat}?overview=false`;
+                        const rRes = await fetch(osrmUrl);
+                        const rData = await rRes.json();
+                        if (rData.routes && rData.routes.length > 0) {
+                            const meters = rData.routes[0].distance;
+                            const km = (meters / 1000).toFixed(1);
+                            const fee = Math.max(5, km * settings.pricePerKm);
+                            setDel({ fee, km, loading: false, lat, lon, method: 'gps_auto' });
+                        } else { fallbackCalc(lat, lon); }
+                    } else { setDel({ fee: 0, km: 0, loading: false, method: 'erro' }); alert("Rota não encontrada. Verifique o número."); }
+                } catch(e) { setDel({ fee: 0, km: 0, loading: false, method: 'erro' }); }
+            };
+
+            const fallbackCalc = (lat, lon) => {
+                const R=6371; const dLat=(lat-restLocation.lat)*Math.PI/180; const dLon=(lon-restLocation.lng)*Math.PI/180;
+                const a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(restLocation.lat*Math.PI/180)*Math.cos(lat*Math.PI/180) * Math.sin(dLon/2)*Math.sin(dLon/2);
+                const km = (R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)) * 1.3).toFixed(1);
+                const fee = Math.max(5, km * settings.pricePerKm);
+                setDel({ fee, km, loading: false, lat, lon, method: 'fallback' });
+            };
+
+            const handleCouponChange = (e) => { setCouponCode(e.target.value.replace(/\s/g, '').toUpperCase()); };
+            const applyCoupon = async () => {
+                if(!couponCode) return;
+                const q = await getCol('coupons').where('code', '==', couponCode).where('active', '==', true).get();
+                if(q.empty) return alert("Cupom inválido!");
+                const coup = { id: q.docs[0].id, ...q.docs[0].data() };
+                const limit = parseInt(coup.limit || 0);
+                const usage = parseInt(coup.usageCount || 0);
+                if(usage >= limit) return alert("Cupom esgotado!");
+                if(coup.type === 'item') {
+                    const prod = products.find(p => p.id === coup.value);
+                    if(prod) { setCart(prev => [...prev, { ...prod, price: 0, isBonus: true, quantity: 1 }]); alert(`Item Grátis Adicionado: ${prod.name}`); }
+                }
+                setAppliedCoupon(coup); setCouponCode("");
+            };
+
+            const getDiscountVal = () => {
+                if(!appliedCoupon) return 0;
+                if(appliedCoupon.type === 'fixed') return parseFloat(appliedCoupon.value);
+                if(appliedCoupon.type === 'percent') {
+                    let val = total * (parseFloat(appliedCoupon.value)/100);
+                    if(appliedCoupon.maxDiscount && val > parseFloat(appliedCoupon.maxDiscount)) val = parseFloat(appliedCoupon.maxDiscount);
+                    return val;
+                }
+                return 0;
+            };
+
+            const finalTotal = Math.max(0, total - getDiscountVal() + del.fee);
+
+            const finish = async (isScheduled = false) => {
+                if(!form.name || !form.phone || !form.cep || !form.number || !payMethod) return alert("Preencha todos os campos obrigatórios!");
+                if(form.phone.length !== 11) return alert("O telefone deve ter exatamente 11 números.");
+                if(del.fee === 0 && del.method !== 'bairro_fixo') return alert("Aguardando cálculo do frete...");
+                
+                if (!isScheduled && !isStoreOpen(settings.openTime, settings.closeTime)) {
+                    setShowScheduleModal(true);
+                    return;
+                }
+
+                try {
+                    const batch = db.batch();
+                    const clean = form.phone.replace(/\D/g,'');
+                    batch.set(getCol('orders').doc(), {
+                        customer: form, items: cart,
+                        totals: { sub: total, del: del.fee, discount: getDiscountVal(), total: finalTotal },
+                        payment: { method: payMethod, change: change },
+                        coupon: appliedCoupon ? appliedCoupon.code : null,
+                        location: { lat: del.lat, lon: del.lon, method: del.method },
+                        isScheduled: isScheduled,
+                        createdAt: new Date().toISOString(), status: 'pendente'
+                    });
+                    const cRef = getCol('customers');
+                    const cSnap = await cRef.where('phoneRaw','==',clean).limit(1).get();
+                    const userData = { ...form, phoneRaw:clean, lastOrder:new Date().toISOString() };
+                    if(cSnap.empty) batch.set(cRef.doc(), { ...userData, orderCount:1 });
+                    else batch.update(cSnap.docs[0].ref, { ...userData, orderCount: firebase.firestore.FieldValue.increment(1) });
+                    if(appliedCoupon) batch.update(getCol('coupons').doc(appliedCoupon.id), { usageCount: firebase.firestore.FieldValue.increment(1) });
+                    await batch.commit();
+                    localStorage.removeItem('fritzza_cart');
+                    let msg = `*NOVO PEDIDO${isScheduled ? ' (AGENDADO)' : ''}*\n👤 ${form.name}\n📞 ${form.phone}\n📍 ${form.address}, ${form.number}\nBairro: ${form.bairro} (${form.cep})\n${form.complement}\n\n🛒 *ITENS:*\n${cart.map(i=>`${i.quantity}x ${i.name} ${i.isBonus?'(GRÁTIS)':''}`).join('\n')}\n\n💰 ${payMethod} ${change?`(Troco: ${change})`:''}`;
+                    if(appliedCoupon) msg += `\n🎟️ Cupom: ${appliedCoupon.code}`;
+                    msg += `\n🛵 Entrega: ${formatMoney(del.fee)}\n✅ *TOTAL: ${formatMoney(finalTotal)}*`;
+                    if(isScheduled) msg += `\n⚠️ *PEDIDO AGENDADO PARA ABERTURA*`;
+                    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`);
+                    onClear(); onBack();
+                } catch(e) { alert("Erro: "+e.message); }
+            };
+
+            return (
+                <div className="bg-white rounded-xl shadow p-4 min-h-screen relative">
+                    <div className="flex items-center gap-2 mb-4 font-bold border-b pb-2" style={text}><button onClick={onBack}><i className="fa-solid fa-arrow-left"></i></button><h2>Checkout</h2></div>
+                    <div className="mb-6 border-b pb-4"><h3 className="font-bold text-gray-700 mb-3">Seu Pedido</h3>
+                        {cart.map(i => (
+                            <div key={i.id} className="flex justify-between py-2 border-b text-sm items-center">
+                                <span className="text-gray-600 flex-1">{i.quantity}x {i.name} {i.isBonus && <b className="text-green-600">GRÁTIS</b>}</span>
+                                <div className="flex items-center gap-3">
+                                    <span className="font-medium">{formatMoney(i.price * i.quantity)}</span>
+                                    <button onClick={() => onRemove(i.id)} className="text-red-500 hover:text-red-700 transition"><i className="fa-solid fa-trash"></i></button>
+                                </div>
+                            </div>
+                        ))}
+                        <div className="flex justify-between font-bold text-lg mt-2 pt-2 border-t text-gray-800"><span>Subtotal</span><span>{formatMoney(total)}</span></div>
+                    </div>
+                    <div className="space-y-4">
+                        <div className="space-y-2"><h3 className="font-bold text-gray-700 border-b pb-1">Entrega</h3><input type="tel" placeholder="WhatsApp (45...)" className="w-full border p-3 rounded bg-gray-50" value={form.phone} onChange={(e)=>{let v=e.target.value.replace(/\D/g,'').slice(0,11); setForm({...form, phone:v}); if(v.length===11) check();}} onBlur={check} /><input placeholder="Nome" className="w-full border p-3 rounded bg-gray-50" value={form.name} onChange={e=>setForm({...form, name:e.target.value})} /><div className="grid grid-cols-3 gap-2"><div className="col-span-2 relative"><input type="tel" placeholder="CEP (85803360)" className="w-full border p-3 rounded bg-gray-50 font-bold" value={form.cep} onChange={handleCepChange} maxLength={9} />{cepLoading && <i className="fa-solid fa-spinner fa-spin absolute right-3 top-4 text-gray-400"></i>}</div><div><input type="tel" id="input-number" placeholder="Nº" className="w-full border p-3 rounded bg-gray-50" value={form.number} onChange={(e)=>setForm({...form, number:e.target.value.replace(/\D/g,'')})} /></div></div><div className={`space-y-2 ${form.address ? 'animate-fade-in' : 'hidden'}`}><input placeholder="Rua" className="w-full border p-3 rounded bg-gray-100 text-gray-600" value={form.address} readOnly /><input placeholder="Bairro" className="w-full border p-3 rounded bg-gray-100 text-gray-600" value={form.bairro} readOnly /></div><input placeholder="Complemento (Opcional)" className="w-full border p-3 rounded bg-gray-50" value={form.complement} onChange={e=>setForm({...form, complement:e.target.value})} /></div>
+                        <div className="space-y-2"><h3 className="font-bold text-gray-700 border-b pb-1">Pagamento</h3><div className="grid grid-cols-2 gap-2">{['Dinheiro','Pix','Cartão Crédito','Cartão Débito'].map(m=><button key={m} onClick={()=>setPayMethod(m)} className={`p-2 rounded text-sm border ${payMethod===m?'text-white':'text-gray-600'}`} style={payMethod===m?theme:{}}>{m}</button>)}</div>{payMethod==='Dinheiro'&&<input type="number" placeholder="Troco para?" className="w-full border p-2 rounded bg-yellow-50" value={change} onChange={e=>setChange(e.target.value)}/>}
+                        {payMethod==='Pix'&&<div className="text-xs text-blue-600 bg-blue-50 p-2 rounded">Chave Pix será enviada na mensagem.</div>}</div>
+                        <div className="bg-gray-100 p-3 rounded border"><div className="flex justify-between text-sm"><span>Entrega {del.km > 0 ? `(${del.km}km)` : ''}</span><span className="font-bold">{del.loading ? 'Calculando...' : formatMoney(del.fee)}</span></div>{appliedCoupon ? (<div className="flex justify-between text-sm text-green-600 font-bold animate-fade-in border-t pt-2 mt-2"><span>Cupom: {appliedCoupon.code}</span><span>- {formatMoney(getDiscountVal())}</span></div>) : (<div className="mt-2 border-t pt-2"><div className="flex gap-2 animate-fade-in"><input placeholder="CUPOM (OPCIONAL)" className="border p-2 rounded text-sm w-full uppercase bg-white" value={couponCode} onChange={handleCouponChange} /><button onClick={applyCoupon} className="text-white text-xs px-4 rounded font-bold" style={theme}>APLICAR</button></div></div>)}<div className="flex justify-between font-bold text-xl mt-2 border-t pt-2" style={text}><span>Total Final</span><span>{formatMoney(finalTotal)}</span></div></div>
+                        <button onClick={()=>finish(false)} disabled={del.loading || (del.fee===0 && del.method!=='bairro_fixo')} className="w-full text-white py-4 rounded font-bold shadow text-lg flex justify-center gap-2 disabled:opacity-50" style={cartColor}><span>Enviar Pedido</span><i className="fa-brands fa-whatsapp"></i></button>
+                    </div>
+
+                    {showScheduleModal && (
+                        <div className="modal-overlay">
+                            <div className="modal-box">
+                                <h3 className="text-xl font-bold text-red-600 mb-2"><i className="fa-solid fa-clock"></i> Estamos Fechados</h3>
+                                <p className="text-gray-600 text-sm mb-4">
+                                    Nosso horário de atendimento é das <b>{settings.openTime}</b> às <b>{settings.closeTime}</b>.
+                                </p>
+                                <p className="text-gray-800 font-bold mb-6">Gostaria de agendar seu pedido para quando abrirmos?</p>
+                                <div className="flex gap-2 justify-center">
+                                    <button onClick={()=>setShowScheduleModal(false)} className="px-4 py-2 border rounded text-gray-600">Cancelar</button>
+                                    <button onClick={()=>{setShowScheduleModal(false); finish(true);}} className="px-4 py-2 bg-green-600 text-white rounded font-bold">Sim, Agendar</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // --- ADMIN ---
+        const AdminLogin = ({onLogin, onCancel, theme, savedPassword}) => { const [p,setP]=useState(""); return <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"><div className="bg-white p-6 rounded-lg w-full max-w-sm"><h3 className="font-bold mb-4">Admin</h3><input type="password" placeholder="Senha" className="w-full border p-2 mb-4 rounded" value={p} onChange={e=>setP(e.target.value)}/><div className="flex justify-end gap-2"><button onClick={onCancel}>Cancelar</button><button onClick={()=>p===(savedPassword||"admin")?onLogin():alert("Erro")} className="text-white px-4 py-2 rounded" style={theme}>Entrar</button></div></div></div> };
+        const AdminPanel = ({ products, categories, settings, neighborhoods, restLocation, theme }) => { const [tab, setTab] = useState("produtos"); return (<div className="bg-white p-4 rounded shadow min-h-screen"><h2 className="font-bold text-xl mb-4">Admin</h2><div className="flex gap-2 mb-4 overflow-x-auto">{["produtos","cupons","bairros","pedidos","clientes","config"].map(t=><button key={t} onClick={()=>setTab(t)} className={`px-3 py-1 rounded capitalize ${tab===t?'text-white':'bg-gray-100'}`} style={tab===t?theme:{}}>{t}</button>)}</div>{tab==="produtos" && <AdminProducts products={products} categories={categories} theme={theme} />}{tab==="cupons" && <AdminCoupons products={products} theme={theme} />}{tab==="bairros" && <AdminNeighborhoods neighborhoods={neighborhoods} theme={theme} />}{tab==="pedidos" && <AdminOrders />}{tab==="clientes" && <AdminCustomers />}{tab==="config" && <AdminConfig settings={settings} categories={categories} restLocation={restLocation} theme={theme} />}</div>); };
+        
+        // ADMIN CUSTOMERS - COM BOTÃO EXCLUIR TODOS
+        const AdminCustomers = () => { 
+            const [all, setAll] = useState([]); 
+            const [filter, setFilter] = useState("all"); 
+            
+            useEffect(() => { 
+                const u = getCol('customers').limit(2000).onSnapshot(s => setAll(s.docs.map(d => ({ id: d.id, ...d.data() })))); 
+                return () => u(); 
+            }, []); 
+            
+            const filtered = useMemo(() => { 
+                let list = [...all]; 
+                if (filter === "top") return list.filter(c => (c.orderCount || 0) >= 2).sort((a, b) => (b.orderCount || 0) - (a.orderCount || 0)).slice(0, 50); 
+                if (filter === "recent") return list.sort((a, b) => new Date(b.lastOrder) - new Date(a.lastOrder)).slice(0, 100); 
+                if (filter === "inactive") { const d = new Date(); d.setDate(d.getDate() - 30); return list.filter(c => new Date(c.lastOrder) < d); } 
+                return list.sort((a, b) => new Date(b.lastOrder) - new Date(a.lastOrder)); 
+            }, [all, filter]); 
+            
+            const exp = () => { 
+                const t = "Nome;Tel;End\n" + filtered.map(x => `${x.name};${x.phone};${x.address}`).join('\n'); 
+                const a = document.createElement('a'); 
+                a.href = 'data:text/csv;charset=utf-8,' + encodeURI("\uFEFF"+t); 
+                a.download = `clientes_${filter}.csv`; 
+                a.click(); 
+            };
+
+            const deleteAll = async () => {
+                if(confirm("⚠️ PERIGO: Você está prestes a apagar TODOS os clientes do banco de dados.\n\nIsso não pode ser desfeito.\n\nDeseja continuar?")) {
+                    const code = prompt("Para confirmar, digite a palavra DELETAR em maiúsculo:");
+                    if(code === "DELETAR") {
+                        try {
+                            const snap = await getCol('customers').get();
+                            // Deletar em lotes
+                            const batch = db.batch();
+                            snap.docs.forEach(doc => batch.delete(doc.ref));
+                            await batch.commit();
+                            alert("Todos os clientes foram excluídos com sucesso.");
+                        } catch(e) {
+                            alert("Erro ao excluir: " + e.message);
+                        }
+                    } else {
+                        alert("Código incorreto. Ação cancelada.");
+                    }
+                }
+            };
+            
+            return (
+                <div>
+                    <div className="flex flex-wrap gap-2 mb-4 bg-gray-50 p-2 rounded">
+                        <button onClick={()=>setFilter("all")} className={`px-3 py-1 rounded text-sm font-bold ${filter==="all"?"bg-red-600 text-white":"bg-white border"}`}>Todos</button>
+                        <button onClick={()=>setFilter("top")} className={`px-3 py-1 rounded text-sm font-bold ${filter==="top"?"bg-red-600 text-white":"bg-white border"}`}>Top 50</button>
+                        <button onClick={()=>setFilter("recent100")} className={`px-3 py-1 rounded text-sm font-bold ${filter==="recent100"?"bg-red-600 text-white":"bg-white border"}`}>Últimos 100</button>
+                        <button onClick={()=>setFilter("inactive")} className={`px-3 py-1 rounded text-sm font-bold ${filter==="inactive"?"bg-red-600 text-white":"bg-white border"}`}>Inativos 30d</button>
+                    </div>
+                    <div className="flex gap-2 mb-2">
+                        <button onClick={exp} className="bg-green-600 text-white px-3 py-2 rounded text-sm font-bold hover:bg-green-700 flex-1">
+                            <i className="fa-solid fa-file-excel mr-1"></i> Exportar
+                        </button>
+                        <button onClick={deleteAll} className="bg-red-600 text-white px-3 py-2 rounded text-sm font-bold hover:bg-red-700 flex-1">
+                            <i className="fa-solid fa-trash mr-1"></i> Excluir Todos
+                        </button>
+                    </div>
+                    <div className="h-64 overflow-y-auto space-y-2 border rounded p-2 bg-gray-50">
+                        {filtered.map(x=><div key={x.id} className="border p-2 text-sm bg-white flex justify-between">
+                            <div><b>{x.name}</b> <br/>{x.phone}</div>
+                            <div className="text-xs text-gray-500 text-right">{x.orderCount||1} pedidos<br/>{x.lastOrder?new Date(x.lastOrder).toLocaleDateString():"-"}</div>
+                        </div>)}
+                    </div>
+                </div>
+            ); 
+        };
+
+        const AdminNeighborhoods = ({ neighborhoods, theme }) => { const [data, setData] = useState({ name: "", price: "" }); const save = async (e) => { e.preventDefault(); if(!data.name || !data.price) return; await getCol('neighborhoods').add({...data, price: parseFloat(data.price)}); setData({name:"", price:""}); }; const del = async (id) => { if(confirm("Apagar?")) { try { await getCol('neighborhoods').doc(id).delete(); } catch(e) { console.error(e); alert("Erro ao apagar: "+e.message); } } }; return <div><form onSubmit={save} className="bg-gray-50 p-3 rounded mb-3 flex gap-2"><input placeholder="Nome do Bairro (ex: Centro)" className="border p-2 flex-1 rounded" value={data.name} onChange={e=>setData({...data, name:e.target.value})} /><input type="number" placeholder="Preço (10.00)" className="border p-2 w-24 rounded" value={data.price} onChange={e=>setData({...data, price:e.target.value})} /><button className="text-white px-4 rounded font-bold" style={theme}>Add</button></form><div className="space-y-2">{neighborhoods.map(n=><div key={n.id} className="flex justify-between border p-2 rounded bg-white"><span>{n.name}</span><span>{formatMoney(n.price)} <button onClick={(e)=>{e.stopPropagation(); del(n.id)}} className="text-red-500 ml-2 font-bold">X</button></span></div>)}</div></div> };
+        const AdminCoupons = ({ products, theme }) => { const [coupons, setCoupons] = useState([]); const [form, setForm] = useState({ code: "", type: "fixed", value: "", limit: 100, maxDiscount: "" }); useEffect(() => { const u = getCol('coupons').onSnapshot(s => setCoupons(s.docs.map(d => ({ id: d.id, ...d.data() })))); return () => u(); }, []); const save = async (e) => { e.preventDefault(); if(!form.code || !form.value) return alert("Preencha tudo"); const payload = { ...form, code: form.code.toUpperCase(), usageCount: 0, active: true, createdAt: new Date().toISOString() }; if(form.type !== 'percent') delete payload.maxDiscount; else if(form.maxDiscount) payload.maxDiscount = parseFloat(form.maxDiscount); await getCol('coupons').add(payload); setForm({ code: "", type: "fixed", value: "", limit: 100, maxDiscount: "" }); }; const del = async (id) => { if(confirm("Apagar cupom?")) { try { await getCol('coupons').doc(id).delete(); } catch(e) { console.error(e); alert("Erro ao apagar"); } } }; return (<div><form onSubmit={save} className="bg-gray-50 p-3 rounded mb-4 border space-y-2"><h3 className="font-bold">Novo Cupom</h3><div className="flex gap-2"><input placeholder="Código" className="border p-2 rounded w-1/2 uppercase" value={form.code} onChange={e=>setForm({...form, code:e.target.value})} /><input type="number" placeholder="Limite" className="border p-2 rounded w-1/2" value={form.limit} onChange={e=>setForm({...form, limit:parseInt(e.target.value)})} /></div><div className="flex gap-2 flex-wrap"><select className="border p-2 rounded w-1/3" value={form.type} onChange={e=>setForm({...form, type:e.target.value})}><option value="fixed">R$</option><option value="percent">%</option><option value="item">Item</option></select>{form.type === 'item' ? (<select className="border p-2 rounded flex-1" value={form.value} onChange={e=>setForm({...form, value:e.target.value})}><option value="">Produto...</option>{products.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select>) : (<input type="number" placeholder={form.type==='percent'?"10, 20...":"10.00"} className="border p-2 rounded flex-1" value={form.value} onChange={e=>setForm({...form, value:e.target.value})} />)}{form.type === 'percent' && (<input type="number" placeholder="Teto Máx R$" className="border p-2 rounded w-full" value={form.maxDiscount} onChange={e=>setForm({...form, maxDiscount:e.target.value})} />)}</div><button className="w-full text-white py-2 rounded font-bold" style={theme}>Criar Cupom</button></form><div className="space-y-2">{coupons.map(c => (<div key={c.id} className="flex justify-between items-center border p-2 rounded bg-white"><div><b className="text-green-700">{c.code}</b> <span className="text-xs ml-2 bg-gray-200 px-1 rounded">{c.type === 'item' ? 'Item' : c.type==='percent' ? `${c.value}%` : `R$ ${c.value}`}</span></div><button onClick={(e)=>{e.stopPropagation(); del(c.id)}} className="text-red-500 px-2 font-bold">X</button></div>))}</div></div>); };
+        
+        const AdminProducts = ({products, categories, theme}) => { 
+            const [edit, setEdit] = useState(false); 
+            const [data, setData] = useState({name:"", price:"", category:"", imageUrl:"", description:""}); 
+            const save = async (e) => { e.preventDefault(); const p = {...data, price:parseFloat(data.price)}; if(data.id) await getCol('products').doc(data.id).update(p); else await getCol('products').add(p); setEdit(false); setData({name:"", price:"", category:"", imageUrl:"", description:""}); }; 
+            const del = async (id) => { if(confirm("Tem certeza que deseja EXCLUIR este produto?")) { try { await getCol('products').doc(id).delete(); } catch(e) { console.error(e); alert("Erro ao excluir."); } } }; 
+            return (<div><button onClick={()=>{setData({name:"", price:"", category:categories[0]?.name||"", imageUrl:"", description:""}); setEdit(true)}} className="text-white px-3 py-2 rounded mb-3 font-bold" style={theme}>+ Produto</button>{edit && <form onSubmit={save} className="bg-gray-100 p-3 rounded mb-3 space-y-2 border"><input required placeholder="Nome" className="w-full border p-2" value={data.name} onChange={e=>setData({...data, name:e.target.value})} /><div className="flex gap-2"><input type="number" step="0.01" className="w-1/2 border p-2" value={data.price} onChange={e=>setData({...data, price:e.target.value})} /><select className="w-1/2 border p-2" value={data.category} onChange={e=>setData({...data, category:e.target.value})}>{categories.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}</select></div><input placeholder="URL Imagem" className="w-full border p-2" value={data.imageUrl} onChange={e=>setData({...data, imageUrl:e.target.value})} /><textarea placeholder="Desc" className="w-full border p-2" value={data.description} onChange={e=>setData({...data, description:e.target.value})} /><button className="w-full text-white py-2 rounded" style={theme}>Salvar</button></form>}<div className="space-y-2">{products.map(p => (<div key={p.id} className="flex justify-between border p-3 rounded bg-white items-center shadow-sm"><div><b>{p.name}</b><br/><span className="text-xs text-gray-500">{formatMoney(p.price)}</span></div><div className="flex gap-2"><button onClick={()=>{setData(p);setEdit(true)}} className="text-blue-500 font-bold p-2 hover:bg-blue-50 rounded">✎</button><button onClick={(e)=>{e.stopPropagation(); e.preventDefault(); del(p.id)}} className="bg-red-50 text-red-500 font-bold px-3 py-1 rounded hover:bg-red-100 border border-red-200">X</button></div></div>))}</div></div>); 
+        };
+        
+        const AdminOrders = () => { const [o, setO] = useState([]); useEffect(() => { const u = getCol('orders').orderBy('createdAt', 'desc').limit(20).onSnapshot(s => setO(s.docs.map(d => ({ id: d.id, ...d.data() })))); return () => u(); }, []); const del = async (id) => { if(confirm("Excluir este pedido?")) { try { await getCol('orders').doc(id).delete(); } catch(e) { console.error(e); alert("Erro ao excluir"); } } }; return <div className="space-y-3">{o.map(x => <div key={x.id} className="border p-3 rounded bg-white"><div className="flex justify-between"><div><b>{x.customer.name}</b> <span className="text-green-600 font-bold ml-2">{formatMoney(x.totals.total)}</span></div><button onClick={(e)=>{e.stopPropagation(); del(x.id)}} className="text-red-500 px-2 hover:bg-red-50 rounded"><i className="fa-solid fa-trash"></i></button></div><div className="text-xs text-gray-500">{new Date(x.createdAt).toLocaleString()} {x.coupon && <span className="text-green-600 ml-2">Cupom: {x.coupon}</span>} {x.isScheduled && <span className="bg-yellow-200 px-1 rounded ml-2 text-yellow-800 font-bold">AGENDADO</span>}</div><div className="text-sm mt-1 bg-gray-50 p-1 rounded">Pagamento: <b>{x.payment?.method}</b> {x.payment?.changeFor ? `(Troco p/ ${x.payment.changeFor})` : ''}</div></div>)}</div>; };
+        
+        const AdminConfig = ({ settings, categories, restLocation, theme }) => { 
+            const [data, setData] = useState(settings); 
+            const [nC, setNC] = useState(""); 
+            useEffect(() => { setData(settings); }, [settings]);
+
+            const handleChange = (k, v) => setData(p=>({...p, [k]:v})); 
+            const save = () => { db.collection('artifacts').doc(APP_ID).collection('public').doc('data').collection('config').doc('main').set(data, {merge:true}); alert("Salvo!"); }; 
+            const addC = () => { if(nC) getCol('categories').add({ name: nC, order: categories.length }); setNC(""); }; 
+            const delC = (id) => { if(confirm("Excluir categoria?")) { try { getCol('categories').doc(id).delete(); } catch(e) { alert("Erro"); } } }; 
+            const move = (idx, dir) => { if((dir===-1&&idx===0)||(dir===1&&idx===categories.length-1))return; const items = [...categories]; const temp = items[idx]; items[idx] = items[idx+dir]; items[idx+dir] = temp; const b = db.batch(); items.forEach((cat, i) => { b.update(getCol('categories').doc(cat.id), {order: i}); }); b.commit(); }; 
+
+            return (
+                <div className="space-y-4">
+                    <div className="border p-3 rounded bg-white space-y-3"><h3 className="font-bold">Aparência & Dados</h3>
+                        <div><label>Nome App:</label><input className="border w-full p-1 rounded" value={data.appName||""} onChange={e=>handleChange("appName",e.target.value)} /></div>
+                        <div className="flex gap-2 items-center"><label>Cor Nome:</label><input type="color" className="w-8 h-8 border rounded" value={data.appNameColor || "#ffffff"} onChange={e => handleChange("appNameColor", e.target.value)} /></div>
+                        <div><label>Subtítulo:</label><input className="border w-full p-1 rounded" value={data.appSubtitle||""} onChange={e=>handleChange("appSubtitle",e.target.value)} /></div>
+                        <div><label>Frase Topo:</label><input className="border w-full p-1 rounded" value={data.headerPhrase||""} onChange={e=>handleChange("headerPhrase",e.target.value)} /></div>
+                        <div className="grid grid-cols-1 gap-2">
+                            <div><label>Cor Principal:</label><div className="flex gap-2"><input type="color" className="h-8 w-12" value={data.themeColor||"#dc2626"} onChange={e=>handleChange("themeColor",e.target.value)} /><input className="border p-1 rounded flex-1" value={data.themeColor||"#dc2626"} onChange={e=>handleChange("themeColor",e.target.value)} /></div></div>
+                            <div><label>Cor Carrinho:</label><div className="flex gap-2"><input type="color" className="h-8 w-12" value={data.cartColor||"#16a34a"} onChange={e=>handleChange("cartColor",e.target.value)} /><input className="border p-1 rounded flex-1" value={data.cartColor||"#16a34a"} onChange={e=>handleChange("cartColor",e.target.value)} /></div></div>
+                            <div><label>Cor Fundo Site:</label><div className="flex gap-2"><input type="color" className="h-8 w-12" value={data.bgColor||"#f3f4f6"} onChange={e=>handleChange("bgColor",e.target.value)} /><input className="border p-1 rounded flex-1" value={data.bgColor||"#f3f4f6"} onChange={e=>handleChange("bgColor",e.target.value)} /></div></div>
+                        </div>
+                        <div className="space-y-2 border-t pt-2">
+                            <label className="font-bold">Logomarca</label>
+                            <input className="border w-full p-1 rounded mb-2" value={data.logoUrl||""} onChange={e=>handleChange("logoUrl",e.target.value)} placeholder="URL..." />
+                            <div className="flex items-center gap-2 mb-2"><label className="text-sm">Tamanho:</label><input type="range" min="30" max="150" value={data.logoSize || 60} onChange={e => handleChange("logoSize", e.target.value)} className="flex-1" /><span className="text-sm w-8">{data.logoSize || 60}px</span></div>
+                            <div className="flex items-center gap-2"><label className="text-sm">Estilo:</label><select className="border p-1 rounded flex-1 text-sm" value={data.logoStyle || "circle"} onChange={e => handleChange("logoStyle", e.target.value)}><option value="circle">Circular</option><option value="square">Quadrada</option><option value="none">Sem Moldura</option></select></div>
+                        </div>
+                        <div className="border-t pt-2"><label>URL Banner:</label><input className="border w-full p-1 rounded" value={data.bannerUrl||""} onChange={e=>handleChange("bannerUrl",e.target.value)} /></div>
+                        <div className="flex gap-2 border-t pt-2"><div className="w-1/2"><label>Abertura:</label><input type="time" className="border w-full p-1 rounded" value={data.openTime||"18:00"} onChange={e=>handleChange("openTime",e.target.value)} /></div><div className="w-1/2"><label>Fechamento:</label><input type="time" className="border w-full p-1 rounded" value={data.closeTime||"23:00"} onChange={e=>handleChange("closeTime",e.target.value)} /></div></div>
+                        <div className="border-t pt-2"><label>R$ / Km:</label><input type="number" className="border w-20 p-1 rounded" value={data.pricePerKm||""} onChange={e=>handleChange("pricePerKm",e.target.value)} /></div>
+                        <div className="border-t pt-2"><label className="font-bold">GPS Restaurante</label><div className="flex gap-2"><input placeholder="Lat" className="border w-1/2 p-1" value={data.restLat||""} onChange={e=>handleChange("restLat",e.target.value)} /><input placeholder="Lng" className="border w-1/2 p-1" value={data.restLng||""} onChange={e=>handleChange("restLng",e.target.value)} /></div></div>
+                        <div className="border-t pt-2"><label className="font-bold text-red-600">Senha Admin</label><input type="text" className="border w-full p-2 rounded mt-1" value={data.adminPassword||""} onChange={e=>handleChange("adminPassword",e.target.value)} /></div>
+                        <button onClick={save} className="text-white px-4 py-2 rounded w-full font-bold" style={theme}>Salvar Tudo</button>
+                    </div>
+                    <div className="border p-3 rounded bg-white"><h3>Categorias</h3><div className="flex gap-2 mb-2"><input className="border p-1 flex-1" value={nC} onChange={e=>setNC(e.target.value)} /><button onClick={addC} className="text-white px-2 rounded" style={theme}>+</button></div>{categories.map((c,i)=><div key={c.id} className="flex justify-between border-b py-1"><span>{c.name}</span><div className="flex gap-1"><button onClick={()=>move(i,-1)}>⬆️</button><button onClick={()=>move(i,1)}>⬇️</button><button onClick={(e)=>{e.stopPropagation(); delC(c.id)}} className="text-red-500 font-bold px-2">X</button></div></div>)}</div></div>
+        ); };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
+
+
