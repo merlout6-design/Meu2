@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fritzza - Delivery</title>
+    
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&family=Chewy&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Poppins', sans-serif; background-color: #f3f4f6; transition: background-color 0.3s; }
+        .font-chewy { font-family: 'Chewy', cursive; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .loader { border-top-color: currentColor; -webkit-animation: spinner 1s linear infinite; animation: spinner 1s linear infinite; }
+        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .animate-fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        html { scroll-behavior: smooth; }
+        .leaflet-container { z-index: 0; border-radius: 0.5rem; }
+        .cart-bump { animation: bump 300ms cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes bump { 0% { transform: scale(1); } 50% { transform: scale(1.15); box-shadow: 0 10px 25px rgba(0,0,0,0.3); } 100% { transform: scale(1); } }
+        .flying-img { position: fixed; z-index: 10000; pointer-events: none; border-radius: 50%; box-shadow: 0 5px 15px rgba(0,0,0,0.2); transition: all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1); }
+        .pulse-green { animation: pulse-green 2s infinite; }
+        @keyframes pulse-green { 0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.7); } 70% { transform: scale(1.02); box-shadow: 0 0 0 10px rgba(22, 163, 74, 0); } 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); } }
+        
+        /* Modal & Pix */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 9999; animation: fadeIn 0.2s; backdrop-filter: blur(2px); }
+        .modal-box { background: white; padding: 25px; border-radius: 15px; width: 90%; max-width: 350px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); max-height: 90vh; overflow-y: auto; transform: scale(1); animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes popIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .pix-code-area { background: #f0f9ff; border: 1px dashed #0ea5e9; padding: 10px; border-radius: 8px; font-family: monospace; word-break: break-all; font-size: 0.75rem; margin: 10px 0; color: #0369a1; user-select: all; }
+    </style>
+</head>
+<body>
+    <div id="root">
+        <div style="height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+            <div class="loader" style="width: 50px; height: 50px; border-radius: 50%; border: 4px solid #ddd; color: #555;"></div>
+            <p style="margin-top: 20px; color: #666;">Carregando...</p>
+        </div>
+    </div>
+
+    <script type="text/babel">
+        // --- CONFIGURAÇÃO FIREBASE ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyAg2kfoWsvWWyEXQGe8v6jZZqKepgButUk",
+            authDomain: "ajuda-2217b.firebaseapp.com",
+            projectId: "ajuda-2217b",
+            storageBucket: "ajuda-2217b.firebasestorage.app",
+            messagingSenderId: "421083897636",
+            appId: "1:421083897636:web:18bd6097b5c0169427ddb1"
+        };
+
+        if (!firebase.apps.length) { try { firebase.initializeApp(firebaseConfig); } catch (e) {} }
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const APP_ID = "ajuda-2217b"; 
+        const getCol = (n) => db.collection('artifacts').doc(APP_ID).collection('public').doc('data').collection(n);
+
+        const { useState, useEffect, useRef, useMemo } = React;
+        const formatMoney = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+        // --- PADRÕES INICIAIS ---
+        const DEFAULT_COORDS = { lat: -25.0015570, lng: -53.4628300 };
+        const WHATSAPP_NUMBER = "5545988166885";
+
+        const calculateSmartPrice = (cost, cmvPercent) => {
+            if (!cost || cost <= 0) return 0;
+            const cmv = cmvPercent || 35;
+            const targetPrice = cost / (cmv / 100); 
+            return Math.ceil(targetPrice) - 0.01;
+        };
+
+        const isStoreOpen = (start, end) => {
+            if(!start || !end) return true; 
+            const now = new Date();
+            const current = now.getHours() * 60 + now.getMinutes();
+            const [sH, sM] = start.split(':').map(Number);
+            const startMin = sH * 60 + sM;
+            const [eH, eM] = end.split(':').map(Number);
+            const endMin = eH * 60 + eM;
+            if (endMin < startMin) return current >= startMin || current <= endMin;
+            else return current >= startMin && current <= endMin;
+        };
+
+        // --- GLOBAL MODAL COMPONENT ---
+        const GlobalModal = ({ modal, close }) => {
+            if (!modal.isOpen) return null;
+            return (
+                <div className="modal-overlay" onClick={modal.type === 'alert' ? close : undefined}>
+                    <div className="modal-box" onClick={e => e.stopPropagation()}>
+                        {modal.type === 'loading' ? (
+                            <div className="flex flex-col items-center py-4">
+                                <div className="loader w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full mb-3"></div>
+                                <h3 className="text-lg font-bold text-gray-700">{modal.title || 'Carregando...'}</h3>
+                                {modal.message && <p className="text-sm text-gray-500 mt-2">{modal.message}</p>}
+                            </div>
+                        ) : (
+                            <>
+                                <div className={`text-4xl mb-3 ${modal.type === 'error' ? 'text-red-500' : modal.type === 'success' ? 'text-green-500' : 'text-blue-500'}`}>
+                                    {modal.icon ? <i className={modal.icon}></i> : 
+                                     modal.type === 'error' ? <i className="fa-solid fa-circle-xmark"></i> :
+                                     modal.type === 'success' ? <i className="fa-solid fa-circle-check"></i> :
+                                     <i className="fa-solid fa-circle-info"></i>}
+                                </div>
+                                <h3 className="text-xl font-bold text-gray-800 mb-2">{modal.title}</h3>
+                                <p className="text-gray-600 text-sm mb-6 leading-relaxed">{modal.message}</p>
+                                <div className="flex gap-2 justify-center">
+                                    {modal.type === 'confirm' && (
+                                        <button onClick={close} className="px-4 py-2 border rounded-lg text-gray-600 font-bold hover:bg-gray-50 flex-1">
+                                            {modal.cancelText || 'Cancelar'}
+                                        </button>
+                                    )}
+                                    <button 
+                                        onClick={() => { if(modal.onConfirm) modal.onConfirm(); close(); }} 
+                                        className={`px-4 py-2 rounded-lg text-white font-bold shadow-md flex-1 ${modal.type === 'error' ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-600 hover:bg-blue-700'}`}
+                                        style={modal.confirmStyle || {}}
+                                    >
+                                        {modal.confirmText || 'OK'}
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- APP ---
+        const App = () => {
+            const [view, setView] = useState("menu");
+            const [cart, setCart] = useState(() => {
+                try { return JSON.parse(localStorage.getItem('fritzza_cart')) || []; } catch(e) { return []; }
+            });
+            const [isCartAnimating, setIsCartAnimating] = useState(false);
+
+            // --- MODAL STATE ---
+            const [modal, setModal] = useState({ isOpen: false, type: 'alert', title: '', message: '' });
+            
+            const showAlert = (title, message, type='alert', icon=null) => {
+                setModal({ isOpen: true, type, title, message, icon });
+            };
+            
+            const showConfirm = (title, message, onConfirm, confirmText='Sim', cancelText='Não') => {
+                setModal({ isOpen: true, type: 'confirm', title, message, onConfirm, confirmText, cancelText });
+            };
+            
+            const showLoading = (title='Aguarde', message='') => {
+                 setModal({ isOpen: true, type: 'loading', title, message });
+            };
+
+            const closeModal = () => setModal(prev => ({...prev, isOpen: false}));
+
+            useEffect(() => { localStorage.setItem('fritzza_cart', JSON.stringify(cart)); }, [cart]);
+
+            const [products, setProducts] = useState([]);
+            const [categories, setCategories] = useState([]);
+            const [ingredients, setIngredients] = useState([]);
+            
+            const [settings, setSettings] = useState({ 
+                appName: "Fritzza", appSubtitle: "Delivery", headerPhrase: "", pricePerKm: 2.00, 
+                themeColor: "#dc2626", cartColor: "#16a34a", appNameColor: "#ffffff", bgColor: "#f3f4f6",
+                logoUrl: "", logoSize: 60, logoStyle: "circle", bannerUrl: "", adminPassword: "admin",
+                openTime: "18:00", closeTime: "23:00", restLat: DEFAULT_COORDS.lat, restLng: DEFAULT_COORDS.lng,
+                targetCMV: 35, mercadoPagoToken: ""
+            });
+            
+            const [restLocation, setRestLocation] = useState(DEFAULT_COORDS);
+            const [catSel, setCatSel] = useState("Todas");
+            const [loginOpen, setLoginOpen] = useState(false);
+            const [loading, setLoading] = useState(true);
+            const [neighborhoods, setNeighborhoods] = useState([]);
+            const isOpen = isStoreOpen(settings.openTime, settings.closeTime);
+
+            useEffect(() => { if (settings.bgColor) document.body.style.backgroundColor = settings.bgColor; }, [settings.bgColor]);
+
+            const themeStyle = { backgroundColor: settings.themeColor || '#dc2626' };
+            const cartStyle = { backgroundColor: settings.cartColor || '#16a34a' };
+            const textThemeStyle = { color: settings.themeColor || '#dc2626' };
+            const borderThemeStyle = { borderColor: settings.themeColor || '#dc2626' };
+            const appNameStyle = { color: settings.appNameColor || '#ffffff', fontFamily: "'Chewy', cursive", fontSize: '1.8rem' };
+            
+            const getLogoStyle = () => {
+                const size = `${settings.logoSize || 60}px`;
+                const base = { height: size, width: 'auto', objectFit: 'contain', maxWidth: '150px' }; 
+                if (settings.logoStyle === 'none') return { ...base, borderRadius: '0', background: 'transparent', border: 'none' };
+                if (settings.logoStyle === 'square') return { ...base, width: size, objectFit: 'cover', borderRadius: '8px', backgroundColor: 'white', border: '2px solid white' };
+                return { ...base, width: size, objectFit: 'cover', borderRadius: '50%', backgroundColor: 'white', border: '2px solid white' };
+            };
+
+            useEffect(() => {
+                const init = async () => {
+                    if (!auth.currentUser) await auth.signInAnonymously();
+                    const root = db.collection('artifacts').doc(APP_ID).collection('public').doc('data');
+                    
+                    const pConf = new Promise(res => root.collection('config').doc('main').onSnapshot(d => {
+                        if (d.exists) {
+                            const data = d.data();
+                            setSettings(prev => ({...prev, ...data}));
+                            if(data.restLat && data.restLng) setRestLocation({ lat: parseFloat(data.restLat), lng: parseFloat(data.restLng) });
+                            if(data.bgColor) document.body.style.backgroundColor = data.bgColor;
+                        } else { root.collection('config').doc('main').set(settings); }
+                        res();
+                    }));
+
+                    const pCat = new Promise(res => root.collection('categories').orderBy('order').onSnapshot(s => { 
+                        const c = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                        if(c.length===0) seedCategories(); else setCategories(c);
+                        res(); 
+                    }));
+
+                    const pProd = new Promise(res => root.collection('products').onSnapshot(s => { setProducts(s.docs.map(d => ({ id: d.id, ...d.data() }))); res(); }));
+                    root.collection('neighborhoods').onSnapshot(s => setNeighborhoods(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+                    root.collection('ingredients').onSnapshot(s => setIngredients(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+
+                    await Promise.all([pConf, pCat, pProd]);
+                    setLoading(false);
+                };
+                init();
+            }, []);
+
+            const seedCategories = () => {
+                const batch = db.batch();
+                ["Pizzas", "Bebidas", "Combos"].forEach((n, i) => batch.set(getCol('categories').doc(), { name: n, order: i }));
+                batch.commit();
+            };
+
+            const addToCart = (p, e) => {
+                const performUpdate = () => {
+                    setCart(prev => {
+                        const ex = prev.find(i => i.id === p.id);
+                        return ex ? prev.map(i => i.id === p.id ? { ...i, quantity: i.quantity + 1 } : i) : [...prev, { ...p, quantity: 1 }];
+                    });
+                    setIsCartAnimating(true);
+                    setTimeout(() => setIsCartAnimating(false), 300);
+                };
+
+                if(e) {
+                    const btn = e.currentTarget;
+                    const card = btn.closest('.product-card');
+                    let srcElement = card ? card.querySelector('img') : null;
+                    if (!srcElement && card) { srcElement = card.querySelector('.product-icon-placeholder'); }
+
+                    if (srcElement) {
+                        const rect = srcElement.getBoundingClientRect();
+                        const clone = srcElement.cloneNode(true);
+                        clone.style.position = 'fixed'; clone.style.left = rect.left + 'px'; clone.style.top = rect.top + 'px'; clone.style.width = rect.width + 'px'; clone.style.height = rect.height + 'px'; clone.style.zIndex = '9999'; clone.style.opacity = '0.9'; clone.className = 'flying-img';
+                        document.body.appendChild(clone);
+                        const cartFab = document.getElementById('cart-fab');
+                        let destX, destY;
+                        if (cartFab) {
+                            const counter = cartFab.querySelector('span.cart-counter'); 
+                            const targetEl = counter || cartFab;
+                            const targetRect = targetEl.getBoundingClientRect();
+                            destX = targetRect.left + (targetRect.width / 2) - (rect.width / 2);
+                            destY = targetRect.top + (targetRect.height / 2) - (rect.height / 2);
+                        } else { destX = window.innerWidth / 2 - 25; destY = window.innerHeight - 80; }
+                        requestAnimationFrame(() => { clone.style.left = destX + 'px'; clone.style.top = destY + 'px'; clone.style.transform = 'scale(0.05) rotate(360deg)'; clone.style.opacity = '0.2'; });
+                        setTimeout(() => { clone.remove(); performUpdate(); }, 600);
+                    } else { performUpdate(); }
+                } else { performUpdate(); }
+            };
+
+            const removeFromCart = (id) => { setCart(prev => prev.filter(item => item.id !== id)); };
+            const total = cart.reduce((a,b)=>a+(b.price*b.quantity),0);
+
+            if (loading) return <div className="fixed inset-0 bg-white z-50 flex flex-col items-center justify-center"><div className="loader" style={{width:'50px', height:'50px', borderRadius:'50%', border:'4px solid #ddd', color:'#555'}}></div><p className="mt-4 text-gray-500">Carregando...</p></div>;
+
+            return (
+                <div className="min-h-screen pb-24 font-sans">
+                    <GlobalModal modal={modal} close={closeModal} />
+
+                    <header style={themeStyle} className="text-white p-4 sticky top-0 z-40 shadow-md flex flex-col transition-colors duration-300">
+                        <div className="flex justify-between items-center w-full">
+                            <div className="flex items-center gap-3">
+                                {settings.logoUrl ? <img src={settings.logoUrl} alt="Logo" style={getLogoStyle()} /> : <div className="bg-white text-current flex items-center justify-center font-bold text-xl" style={{...textThemeStyle, ...getLogoStyle()}}>{settings.appName ? settings.appName.charAt(0) : "F"}</div>}
+                                {settings.bannerUrl ? <img src={settings.bannerUrl} alt="Banner" className="h-10 object-contain" /> : <div><h1 className="leading-tight" style={appNameStyle}>{settings.appName}</h1><p className="text-xs opacity-90">{settings.appSubtitle}</p></div>}
+                            </div>
+                            {settings.headerPhrase && ( <div className="hidden md:block bg-white/20 px-3 py-1 rounded-full text-sm font-semibold backdrop-blur-sm">{settings.headerPhrase}</div> )}
+                            {view === "admin" ? <button onClick={()=>setView("menu")} className="text-xs bg-white text-gray-800 px-3 py-1 rounded-full font-bold">Sair Admin</button> : <button onClick={()=>setLoginOpen(true)}><i className="fa-solid fa-lock text-xl opacity-80 hover:opacity-100"></i></button>}
+                        </div>
+                        {settings.headerPhrase && ( <div className="md:hidden mt-2 text-center bg-white/20 py-1 rounded text-xs font-medium backdrop-blur-sm w-full">{settings.headerPhrase}</div> )}
+                    </header>
+                    {view === 'menu' && (<div className={`w-full text-center py-2 text-sm font-bold text-white shadow-sm transition-colors duration-300 ${isOpen ? 'bg-green-500' : 'bg-red-500'}`}>{isOpen ? <span><i className="fa-solid fa-check-circle mr-1"></i> Aberto - Recebendo Pedidos</span> : <span><i className="fa-solid fa-clock mr-1"></i> Fechado - Abre às {settings.openTime}. <span className="underline cursor-pointer">Agende seu pedido agora!</span></span>}</div>)}
+                    {loginOpen && <AdminLogin theme={themeStyle} savedPassword={settings.adminPassword} onLogin={()=>{setLoginOpen(false);setView("admin")}} onCancel={()=>setLoginOpen(false)} showAlert={showAlert} />}
+                    <main className="container mx-auto p-4 max-w-4xl">
+                        {view === "menu" && <MenuView products={products} categories={categories} catSel={catSel} setCatSel={setCatSel} addToCart={addToCart} theme={themeStyle} border={borderThemeStyle} text={textThemeStyle} />}
+                        {view === "checkout" && <CheckoutView cart={cart} setCart={setCart} total={total} settings={settings} neighborhoods={neighborhoods} restLocation={restLocation} products={products} onBack={()=>setView("menu")} onClear={()=>setCart([])} onRemove={removeFromCart} theme={themeStyle} cartColor={cartStyle} text={textThemeStyle} showAlert={showAlert} showConfirm={showConfirm} showLoading={showLoading} closeModal={closeModal} />}
+                        {view === "admin" && <AdminPanel products={products} categories={categories} settings={settings} neighborhoods={neighborhoods} restLocation={restLocation} ingredients={ingredients} theme={themeStyle} showAlert={showAlert} showConfirm={showConfirm} />}
+                    </main>
+                    {view === "menu" && cart.length > 0 && (<div id="cart-fab" className={`fixed bottom-4 left-0 right-0 px-4 flex justify-center z-50 ${isCartAnimating ? 'cart-bump' : ''}`}><button onClick={()=>setView("checkout")} style={cartStyle} className="text-white w-full max-w-md p-4 rounded-xl shadow-xl flex justify-between items-center hover:opacity-90 transition transform hover:scale-105"><div className="flex items-center gap-2"><span className="cart-counter bg-white text-black w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold">{cart.reduce((a,b)=>a+b.quantity,0)}</span><span>Ver Carrinho</span></div><span className="font-bold text-lg">{formatMoney(total)}</span></button></div>)}
+                </div>
+            );
+        };
+
+        const MenuView = ({ products, categories, catSel, setCatSel, addToCart, theme, border, text }) => {
+            const handleCat = (n) => { setCatSel(n); if(n==="Todas") window.scrollTo(0,0); };
+            const ProductCard = ({ p }) => (
+                <div className="bg-white p-3 rounded-xl shadow-sm border flex gap-3 hover:shadow-md transition product-card group">
+                    <div className="product-icon-placeholder w-24 h-24 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 relative">
+                        {p.imageUrl ? <img src={p.imageUrl} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center text-gray-300"><i className="fa-solid fa-utensils text-2xl"></i></div>}
+                    </div>
+                    <div className="flex-1 flex flex-col justify-between">
+                        <div><h3 className="font-bold text-gray-800 leading-tight">{p.name}</h3><p className="text-xs text-gray-500 line-clamp-2 mt-1">{p.description}</p></div>
+                        <div className="flex justify-between items-end mt-2">
+                            <span className="font-bold text-lg" style={{color: 'green'}}>{formatMoney(p.price)}</span>
+                            <button onClick={(e)=>addToCart(p, e)} style={{...theme, color: 'white'}} className="w-9 h-9 rounded-full flex items-center justify-center hover:opacity-90 active:scale-90 transition-transform shadow-sm"><i className="fa-solid fa-plus"></i></button>
+                        </div>
+                    </div>
+                </div>
+            );
+            return (
+                <div>
+                    <div className="flex overflow-x-auto gap-2 pb-4 mb-4 hide-scrollbar sticky top-24 z-30 bg-gray-50 py-2" style={{backgroundColor: 'rgba(255,255,255,0.9)'}}>
+                        <button onClick={()=>handleCat("Todas")} style={catSel==="Todas" ? theme : {}} className={`px-5 py-2 rounded-full whitespace-nowrap text-sm font-bold transition shadow-sm ${catSel==="Todas"?"text-white shadow-md":"bg-white text-gray-600 border"}`}>Todas</button>
+                        {categories.map(c => <button key={c.id} onClick={()=>handleCat(c.name)} style={catSel===c.name ? theme : {}} className={`px-5 py-2 rounded-full whitespace-nowrap text-sm font-bold transition shadow-sm ${catSel===c.name?"text-white shadow-md":"bg-white text-gray-600 border"}`}>{c.name}</button>)}
+                    </div>
+                    <div className="space-y-8">{catSel === "Todas" ? categories.map(cat => { const cp = products.filter(p => p.category === cat.name); if (cp.length === 0) return null; return <div key={cat.id}><h3 className="font-bold text-xl text-gray-800 mb-3 pl-1 border-l-4" style={border}>{cat.name}</h3><div className="grid grid-cols-1 md:grid-cols-2 gap-4">{cp.map(p=><ProductCard key={p.id} p={p}/>)}</div></div> }) : <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{products.filter(p=>p.category===catSel).length===0?<div className="col-span-full text-center text-gray-400 py-10">Nada aqui.</div>:products.filter(p=>p.category===catSel).map(p=><ProductCard key={p.id} p={p}/>)}</div>}</div>
+                </div>
+            );
+        };
+
+        const CheckoutView = ({ cart, setCart, total, settings, neighborhoods, restLocation, products, onBack, onClear, onRemove, theme, cartColor, text, showAlert, showConfirm, showLoading, closeModal }) => {
+            const [form, setForm] = useState({ name: "", phone: "", cep: "", address: "", number: "", bairro: "", complement: "" });
+            const [del, setDel] = useState({ fee: 0, km: 0, loading: false, lat: null, lon: null, method: 'pendente' });
+            const [payMethod, setPayMethod] = useState("");
+            const [change, setChange] = useState("");
+            const [couponCode, setCouponCode] = useState("");
+            const [appliedCoupon, setAppliedCoupon] = useState(null);
+            const [typingTimer, setTypingTimer] = useState(null);
+            const [cepLoading, setCepLoading] = useState(false);
+            const [showScheduleModal, setShowScheduleModal] = useState(false);
+            
+            // PIX STATES
+            const [pixData, setPixData] = useState(null);
+            const [pixStatus, setPixStatus] = useState("none"); // none, loading, pending, approved
+            const pollRef = useRef(null);
+
+            // Calcula frete quando CEP/Num muda - COM CORREÇÃO DE DEPENDÊNCIA DE ENDEREÇO
+            useEffect(() => {
+                // SÓ CALCULA SE TIVER ENDEREÇO E BAIRRO PREENCHIDOS
+                if (form.cep.length >= 8 && form.number && form.address && form.bairro) {
+                    setDel(p => ({ ...p, loading: true }));
+                    if (typingTimer) clearTimeout(typingTimer);
+                    const timer = setTimeout(() => calculateFinalShipping(), 1000);
+                    setTypingTimer(timer);
+                }
+            }, [form.number, form.cep, form.address, form.bairro]); 
+            
+            // Auto-gera Pix se o usuário já tiver clicado em Pix e o cálculo terminar
+            useEffect(() => {
+                if (payMethod === 'Pix' && settings.mercadoPagoToken && !del.loading && (del.fee > 0 || del.method === 'bairro_fixo') && pixStatus === 'none') {
+                    createPixPayment(true);
+                }
+            }, [del.loading, del.fee, payMethod]);
+
+            // Limpa o intervalo de polling ao sair
+            useEffect(() => {
+                return () => { if(pollRef.current) clearInterval(pollRef.current); };
+            }, []);
+
+            const check = async () => {
+                const clean = form.phone.replace(/\D/g, '');
+                if(clean.length<8) return;
+                const snap = await getCol('customers').where('phoneRaw','==',clean).limit(1).get();
+                if(!snap.empty) {
+                    const d = snap.docs[0].data();
+                    
+                    // PREENCHE TUDO O QUE TIVER NO BANCO PRIMEIRO
+                    setForm(p => ({
+                        ...p, 
+                        name: d.name, 
+                        phone: d.phone, 
+                        cep: d.cep || "", 
+                        number: d.number || "", 
+                        complement: d.complement || "",
+                        address: d.address || "", // Recupera Rua salva
+                        bairro: d.bairro || ""    // Recupera Bairro salvo
+                    }));
+
+                    // Só busca CEP se não tiver endereço salvo (para dados antigos)
+                    if(d.cep && !d.address) fetchCep(d.cep, false); 
+                }
+            };
+
+            const handleCepChange = (e) => {
+                let val = e.target.value.replace(/\D/g, '');
+                if (val.length > 8) val = val.slice(0, 8);
+                setForm({ ...form, cep: val });
+                if (val.length === 8) fetchCep(val, true);
+            };
+
+            const fetchCep = async (cep, autoFocusNumber) => {
+                setCepLoading(true);
+                try {
+                    const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+                    const data = await res.json();
+                    if (data.erro) { showAlert("Atenção", "CEP não encontrado!", 'error'); setForm(p => ({ ...p, address: "", bairro: "" })); } 
+                    else {
+                        if (data.localidade !== "Cascavel") { showAlert("Atenção", "Desculpe, entregamos apenas em Cascavel - PR.", 'alert'); setForm(p => ({ ...p, cep: "", address: "", bairro: "" })); setCepLoading(false); return; }
+                        setForm(p => ({ ...p, address: data.logradouro, bairro: data.bairro }));
+                        if (autoFocusNumber && document.getElementById('input-number')) document.getElementById('input-number').focus();
+                    }
+                } catch (e) { showAlert("Erro", "Erro ao buscar CEP.", 'error'); } finally { setCepLoading(false); }
+            };
+
+            const calculateFinalShipping = async () => {
+                // TRAVA DE SEGURANÇA: Se não tiver endereço completo, aborta para evitar bug de 500km
+                if(!form.address || !form.bairro) return;
+
+                const bairroMatch = neighborhoods.find(n => n.name.toLowerCase().trim() === form.bairro.toLowerCase().trim());
+                if (bairroMatch) { setDel({ fee: parseFloat(bairroMatch.price), km: 0, loading: false, method: 'bairro_fixo', lat: null, lon: null }); return; }
+                try {
+                    const query = `${form.address}, ${form.number}, Cascavel, PR, Brazil`;
+                    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`);
+                    const data = await res.json();
+                    if(data.length > 0) {
+                        const lat = parseFloat(data[0].lat);
+                        const lon = parseFloat(data[0].lon);
+                        const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${restLocation.lng},${restLocation.lat};${lon},${lat}?overview=false`;
+                        const rRes = await fetch(osrmUrl);
+                        const rData = await rRes.json();
+                        if (rData.routes && rData.routes.length > 0) {
+                            const meters = rData.routes[0].distance;
+                            const km = (meters / 1000).toFixed(1);
+                            const fee = Math.max(5, km * settings.pricePerKm);
+                            setDel({ fee, km, loading: false, lat, lon, method: 'gps_auto' });
+                        } else { fallbackCalc(lat, lon); }
+                    } else { setDel({ fee: 0, km: 0, loading: false, method: 'erro' }); showAlert("Atenção", "Rota não encontrada. Verifique o número.", 'alert'); }
+                } catch(e) { setDel({ fee: 0, km: 0, loading: false, method: 'erro' }); }
+            };
+
+            const fallbackCalc = (lat, lon) => {
+                const R=6371; const dLat=(lat-restLocation.lat)*Math.PI/180; const dLon=(lon-restLocation.lng)*Math.PI/180;
+                const a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(restLocation.lat*Math.PI/180)*Math.cos(lat*Math.PI/180) * Math.sin(dLon/2)*Math.sin(dLon/2);
+                const km = (R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)) * 1.3).toFixed(1);
+                const fee = Math.max(5, km * settings.pricePerKm);
+                setDel({ fee, km, loading: false, lat, lon, method: 'fallback' });
+            };
+
+            const handleCouponChange = (e) => { setCouponCode(e.target.value.replace(/\s/g, '').toUpperCase()); };
+            const applyCoupon = async () => {
+                if(!couponCode) return;
+                const q = await getCol('coupons').where('code', '==', couponCode).where('active', '==', true).get();
+                if(q.empty) return showAlert("Erro", "Cupom inválido!", 'error');
+                const coup = { id: q.docs[0].id, ...q.docs[0].data() };
+                const limit = parseInt(coup.limit || 0);
+                const usage = parseInt(coup.usageCount || 0);
+                if(usage >= limit) return showAlert("Erro", "Cupom esgotado!", 'error');
+                if(coup.type === 'item') {
+                    const prod = products.find(p => p.id === coup.value);
+                    if(prod) { setCart(prev => [...prev, { ...prod, price: 0, isBonus: true, quantity: 1 }]); showAlert("Sucesso", `Item Grátis Adicionado: ${prod.name}`, 'success'); }
+                }
+                setAppliedCoupon(coup); setCouponCode("");
+            };
+
+            const getDiscountVal = () => {
+                if(!appliedCoupon) return 0;
+                if(appliedCoupon.type === 'fixed') return parseFloat(appliedCoupon.value);
+                if(appliedCoupon.type === 'percent') {
+                    let val = total * (parseFloat(appliedCoupon.value)/100);
+                    if(appliedCoupon.maxDiscount && val > parseFloat(appliedCoupon.maxDiscount)) val = parseFloat(appliedCoupon.maxDiscount);
+                    return val;
+                }
+                return 0;
+            };
+
+            const finalTotal = Math.max(0, total - getDiscountVal() + del.fee);
+            
+            // --- REGENERAR PIX SE TOTAL MUDAR ---
+            useEffect(() => {
+                if (payMethod === 'Pix' && settings.mercadoPagoToken) {
+                    setPixStatus('none');
+                    setPixData(null);
+                }
+            }, [finalTotal]);
+
+            // --- PIX INTEGRATION (VIA CORS PROXY) ---
+            const createPixPayment = async (isAuto = false) => {
+                if (isAuto && (!form.name || !form.phone || !form.cep || !form.number)) return;
+                
+                if(!form.name || !form.phone || !form.cep || !form.number) return showAlert("Dados Incompletos", "Preencha todos os dados (Nome, Telefone e Endereço) para gerar o Pix.", 'alert');
+                
+                setPixStatus('loading');
+                try {
+                    const cleanPhone = form.phone.replace(/\D/g,'');
+                    const dummyEmail = `pedido${cleanPhone}@fritzza.com`;
+                    const firstName = form.name.split(" ")[0];
+                    const lastName = form.name.split(" ").slice(1).join(" ") || "Cliente";
+
+                    const body = {
+                        transaction_amount: Number(finalTotal.toFixed(2)),
+                        description: `Pedido ${settings.appName} - ${form.name}`,
+                        payment_method_id: "pix",
+                        payer: {
+                            email: dummyEmail,
+                            first_name: firstName,
+                            last_name: lastName,
+                            address: {
+                                zip_code: form.cep.replace(/\D/g,''),
+                                street_name: form.address,
+                                street_number: form.number,
+                                neighborhood: form.bairro,
+                                city: "Cascavel",
+                                federal_unit: "PR"
+                            }
+                        }
+                    };
+
+                    const mpUrl = "https://api.mercadopago.com/v1/payments";
+                    const proxyUrl = "https://corsproxy.io/?" + encodeURIComponent(mpUrl);
+
+                    const response = await fetch(proxyUrl, {
+                        method: "POST",
+                        headers: {
+                            "Authorization": `Bearer ${settings.mercadoPagoToken}`,
+                            "Content-Type": "application/json",
+                            "X-Idempotency-Key": new Date().getTime().toString()
+                        },
+                        body: JSON.stringify(body)
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.error || data.status === 400 || data.status === 401) {
+                         console.error(data);
+                         setPixStatus('none');
+                         showAlert("Erro API Mercado Pago", `Erro: ${data.message || 'Verifique o token no painel Admin.'}`, 'error');
+                         return;
+                    }
+                    
+                    if (data.point_of_interaction) {
+                        setPixData({
+                            qrCode: data.point_of_interaction.transaction_data.qr_code,
+                            qrCodeBase64: data.point_of_interaction.transaction_data.qr_code_base64,
+                            id: data.id
+                        });
+                        setPixStatus('pending');
+                        startPolling(data.id);
+                    }
+                } catch (e) {
+                    setPixStatus('none');
+                    showAlert("Erro de Rede", `Erro ao conectar com Mercado Pago via Proxy: ${e.message}`, 'error');
+                }
+            };
+
+            const startPolling = (id) => {
+                if(pollRef.current) clearInterval(pollRef.current);
+                pollRef.current = setInterval(async () => {
+                    try {
+                        const mpUrl = `https://api.mercadopago.com/v1/payments/${id}`;
+                        const proxyUrl = "https://corsproxy.io/?" + encodeURIComponent(mpUrl);
+
+                        const res = await fetch(proxyUrl, {
+                            headers: { "Authorization": `Bearer ${settings.mercadoPagoToken}` }
+                        });
+                        const data = await res.json();
+                        if(data.status === 'approved') {
+                            setPixStatus('approved');
+                            clearInterval(pollRef.current);
+                            // REMOVIDO ALERT MANUAL - AGORA É AUTOMÁTICO NA TELA
+                        }
+                    } catch(e) {}
+                }, 4000); 
+            };
+
+            const preFinish = (isScheduled = false) => {
+                if(!form.name || !form.phone || !form.cep || !form.number || !payMethod) return showAlert("Atenção", "Preencha todos os campos obrigatórios!", 'alert');
+                if(form.phone.length !== 11) return showAlert("Atenção", "O telefone deve ter exatamente 11 números.", 'alert');
+                if(del.fee === 0 && del.method !== 'bairro_fixo') return showAlert("Atenção", "Aguardando cálculo do frete...", 'alert');
+                
+                if (payMethod === 'Pix' && settings.mercadoPagoToken && pixStatus !== 'approved') {
+                    return showAlert("Aguarde", "Aguarde a confirmação do pagamento Pix.", 'alert');
+                }
+
+                if (!isScheduled && !isStoreOpen(settings.openTime, settings.closeTime)) {
+                    setShowScheduleModal(true);
+                    return;
+                }
+                
+                finish(isScheduled);
+            };
+
+            const finish = async (isScheduled = false) => {
+                showLoading("Enviando Pedido...");
+                try {
+                    const batch = db.batch();
+                    const clean = form.phone.replace(/\D/g,'');
+                    
+                    const isPixAuto = payMethod === 'Pix' && settings.mercadoPagoToken && pixStatus === 'approved';
+                    const orderStatus = isPixAuto ? 'confirmado' : 'pendente';
+                    
+                    const paymentInfo = isPixAuto 
+                        ? { method: 'Pix Automático', pixId: pixData.id, status: 'approved' } 
+                        : { method: payMethod, change: change };
+
+                    batch.set(getCol('orders').doc(), {
+                        customer: form, items: cart,
+                        totals: { sub: total, del: del.fee, discount: getDiscountVal(), total: finalTotal },
+                        payment: paymentInfo,
+                        coupon: appliedCoupon ? appliedCoupon.code : null,
+                        location: { lat: del.lat, lon: del.lon, method: del.method },
+                        isScheduled: isScheduled,
+                        createdAt: new Date().toISOString(), status: orderStatus
+                    });
+                    
+                    const cRef = getCol('customers');
+                    const cSnap = await cRef.where('phoneRaw','==',clean).limit(1).get();
+                    
+                    // SAVE ADDRESS AND BAIRRO
+                    const userData = { 
+                        ...form, 
+                        phoneRaw:clean, 
+                        lastOrder:new Date().toISOString(),
+                        address: form.address, 
+                        bairro: form.bairro
+                    };
+                    
+                    if(cSnap.empty) batch.set(cRef.doc(), { ...userData, orderCount:1 });
+                    else batch.update(cSnap.docs[0].ref, { ...userData, orderCount: firebase.firestore.FieldValue.increment(1) });
+                    if(appliedCoupon) batch.update(getCol('coupons').doc(appliedCoupon.id), { usageCount: firebase.firestore.FieldValue.increment(1) });
+                    
+                    await batch.commit();
+                    localStorage.removeItem('fritzza_cart');
+                    closeModal(); // Fecha loading
+                    
+                    let msg = `*NOVO PEDIDO${isScheduled ? ' (AGENDADO)' : ''}*\n👤 ${form.name}\n📞 ${form.phone}\n📍 ${form.address}, ${form.number}\nBairro: ${form.bairro} (${form.cep})\n${form.complement}\n\n🛒 *ITENS:*\n${cart.map(i=>`${i.quantity}x ${i.name} ${i.isBonus?'(GRÁTIS)':''}`).join('\n')}\n\n💰 `;
+                    
+                    if(isPixAuto) msg += `*PAGAMENTO PIX CONFIRMADO* (ID: ${pixData.id})`;
+                    else msg += `${payMethod} ${change?`(Troco: ${change})`:''}`;
+
+                    if(appliedCoupon) msg += `\n🎟️ Cupom: ${appliedCoupon.code}`;
+                    msg += `\n🛵 Entrega: ${formatMoney(del.fee)}\n✅ *TOTAL: ${formatMoney(finalTotal)}*`;
+                    if(isScheduled) msg += `\n⚠️ *PEDIDO AGENDADO PARA ABERTURA*`;
+                    
+                    if(payMethod === 'Pix' && !isPixAuto) msg += `\n\n🔑 Chave Pix: ${settings.pixKey || "Solicite ao atendente"}`;
+
+                    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`);
+                    onClear(); onBack();
+                } catch(e) { closeModal(); showAlert("Erro", "Erro ao enviar pedido: "+e.message, 'error'); }
+            };
+
+            const copyPix = () => {
+                if(pixData && pixData.qrCode) {
+                    navigator.clipboard.writeText(pixData.qrCode);
+                    showAlert("Copiado", "Código Pix copiado para a área de transferência!", "success");
+                }
+            };
+            
+            const isPixMode = payMethod === 'Pix' && settings.mercadoPagoToken;
+            const isSubmitDisabled = del.loading || (del.fee===0 && del.method!=='bairro_fixo') || (isPixMode && pixStatus !== 'approved');
+
+            return (
+                <div className="bg-white rounded-xl shadow p-4 min-h-screen relative">
+                    <div className="flex items-center gap-2 mb-4 font-bold border-b pb-2" style={text}><button onClick={onBack}><i className="fa-solid fa-arrow-left"></i></button><h2>Checkout</h2></div>
+                    <div className="mb-6 border-b pb-4"><h3 className="font-bold text-gray-700 mb-3">Seu Pedido</h3>
+                        {cart.map(i => (
+                            <div key={i.id} className="flex justify-between py-2 border-b text-sm items-center">
+                                <span className="text-gray-600 flex-1">{i.quantity}x {i.name} {i.isBonus && <b className="text-green-600">GRÁTIS</b>}</span>
+                                <div className="flex items-center gap-3">
+                                    <span className="font-medium">{formatMoney(i.price * i.quantity)}</span>
+                                    <button onClick={() => onRemove(i.id)} className="text-red-500 hover:text-red-700 transition"><i className="fa-solid fa-trash"></i></button>
+                                </div>
+                            </div>
+                        ))}
+                        <div className="flex justify-between font-bold text-lg mt-2 pt-2 border-t text-gray-800"><span>Subtotal</span><span>{formatMoney(total)}</span></div>
+                    </div>
+                    <div className="space-y-4">
+                        <div className="space-y-2"><h3 className="font-bold text-gray-700 border-b pb-1">Entrega</h3><input type="tel" placeholder="WhatsApp (45...)" className="w-full border p-3 rounded bg-gray-50" value={form.phone} onChange={(e)=>{let v=e.target.value.replace(/\D/g,'').slice(0,11); setForm({...form, phone:v}); if(v.length===11) check();}} onBlur={check} /><input placeholder="Nome" className="w-full border p-3 rounded bg-gray-50" value={form.name} onChange={e=>setForm({...form, name:e.target.value})} /><div className="grid grid-cols-3 gap-2"><div className="col-span-2 relative"><input type="tel" placeholder="CEP (85803360)" className="w-full border p-3 rounded bg-gray-50 font-bold" value={form.cep} onChange={handleCepChange} maxLength={9} />{cepLoading && <i className="fa-solid fa-spinner fa-spin absolute right-3 top-4 text-gray-400"></i>}</div><div><input type="tel" id="input-number" placeholder="Nº" className="w-full border p-3 rounded bg-gray-50" value={form.number} onChange={(e)=>setForm({...form, number:e.target.value.replace(/\D/g,'')})} /></div></div><div className={`space-y-2 ${form.address ? 'animate-fade-in' : 'hidden'}`}><input placeholder="Rua" className="w-full border p-3 rounded bg-gray-100 text-gray-600" value={form.address} readOnly /><input placeholder="Bairro" className="w-full border p-3 rounded bg-gray-100 text-gray-600" value={form.bairro} readOnly /></div><input placeholder="Complemento (Opcional)" className="w-full border p-3 rounded bg-gray-50" value={form.complement} onChange={e=>setForm({...form, complement:e.target.value})} /></div>
+                        
+                        <div className="space-y-2">
+                            <h3 className="font-bold text-gray-700 border-b pb-1">Pagamento</h3>
+                            
+                            {/* AREA DO CUPOM MOVIDA PARA CÁ */}
+                            <div className="mb-3">
+                                {appliedCoupon ? (
+                                    <div className="flex justify-between items-center text-sm text-green-600 font-bold animate-fade-in bg-green-50 p-2 rounded border border-green-200">
+                                        <span><i className="fa-solid fa-ticket mr-1"></i> Cupom: {appliedCoupon.code}</span>
+                                        <span>- {formatMoney(getDiscountVal())}</span>
+                                    </div>
+                                ) : (
+                                    <div className="flex gap-2 animate-fade-in">
+                                        <input placeholder="CUPOM (OPCIONAL)" className="border p-2 rounded text-sm w-full uppercase bg-white" value={couponCode} onChange={handleCouponChange} />
+                                        <button onClick={applyCoupon} className="text-white text-xs px-4 rounded font-bold" style={theme}>APLICAR</button>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">{['Dinheiro','Pix','Cartão Crédito','Cartão Débito'].map(m=><button key={m} onClick={()=>{setPayMethod(m); if(m!=='Pix') setPixStatus('none');}} className={`p-2 rounded text-sm border ${payMethod===m?'text-white':'text-gray-600'}`} style={payMethod===m?theme:{}}>{m}</button>)}</div>
+                        
+                        {payMethod==='Dinheiro'&&<input type="number" placeholder="Troco para?" className="w-full border p-2 rounded bg-yellow-50" value={change} onChange={e=>setChange(e.target.value)}/>}
+                        
+                        {payMethod==='Pix' && settings.mercadoPagoToken && (
+                            <div className="animate-fade-in border rounded p-3 bg-blue-50 mt-2">
+                                {pixStatus === 'none' && (
+                                    <div className="text-center">
+                                        {del.loading ? (
+                                            <div className="text-sm text-gray-500 py-2"><i className="fa-solid fa-spinner fa-spin mr-2"></i> Calculando entrega...</div>
+                                        ) : (del.fee > 0 || del.method === 'bairro_fixo') ? (
+                                            <div className="py-2">
+                                                <p className="text-xs text-gray-500 mb-2">Valor final calculado: <b>{formatMoney(finalTotal)}</b></p>
+                                                <button onClick={()=>createPixPayment(false)} className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-bold shadow hover:bg-blue-700 transition">
+                                                    <i className="fa-brands fa-pix mr-1"></i> Gerar QR Code Pix
+                                                </button>
+                                                <p className="text-[10px] text-gray-400 mt-2">Serve para Nubank, PicPay, Inter, etc.</p>
+                                            </div>
+                                        ) : (
+                                            <div className="text-sm text-gray-500 py-2">Preencha o endereço completo para calcular a entrega e gerar o Pix.</div>
+                                        )}
+                                    </div>
+                                )}
+                                {pixStatus === 'loading' && <div className="text-center py-4 text-blue-600 font-bold"><i className="fa-solid fa-spinner fa-spin text-2xl mb-2"></i><br/>Gerando Pix...</div>}
+                                {pixStatus === 'pending' && pixData && (
+                                    <div className="text-center">
+                                        <h4 className="font-bold text-gray-800 text-sm mb-2">Escaneie para pagar:</h4>
+                                        <div className="flex justify-center mb-2"><img src={pixData.qrCodeBase64 ? `data:image/png;base64,${pixData.qrCodeBase64}` : "https://upload.wikimedia.org/wikipedia/commons/2/2f/Rickrolling_QR_code.png"} className="w-40 h-40 object-contain border rounded bg-white" alt="QR Pix" /></div>
+                                        <div className="pix-code-area" onClick={copyPix}>{pixData.qrCode.substring(0, 30)}...</div>
+                                        <button onClick={copyPix} className="w-full py-1 bg-white text-blue-600 text-xs font-bold rounded border border-blue-200 mb-2"><i className="fa-regular fa-copy"></i> Copiar Código</button>
+                                        <div className="text-xs text-orange-600 font-bold animate-pulse"><i className="fa-solid fa-circle-notch fa-spin mr-1"></i> Aguardando confirmação do banco...</div>
+                                    </div>
+                                )}
+                                {pixStatus === 'approved' && (
+                                    <div className="bg-green-100 p-4 rounded text-center border border-green-300">
+                                        <i className="fa-solid fa-circle-check text-4xl text-green-600 mb-2"></i>
+                                        <h3 className="text-green-800 font-bold">Pagamento Confirmado!</h3>
+                                        <p className="text-sm text-green-700 font-bold mt-2">
+                                            Por favor, clique no botão <br/>"Enviar Pedido" abaixo para concluir.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        {payMethod==='Pix' && !settings.mercadoPagoToken && <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded">Chave Pix será enviada na mensagem.</div>}
+                        </div>
+                        
+                        <div className="bg-gray-100 p-3 rounded border"><div className="flex justify-between text-sm"><span>Entrega</span><span className="font-bold">{del.loading ? 'Calculando...' : formatMoney(del.fee)}</span></div><div className="flex justify-between font-bold text-xl mt-2 border-t pt-2" style={text}><span>Total Final</span><span>{formatMoney(finalTotal)}</span></div></div>
+                        
+                        <button onClick={()=>preFinish(false)} disabled={isSubmitDisabled} className={`w-full py-4 rounded font-bold shadow text-lg flex justify-center gap-2 transition-all duration-300 ${isSubmitDisabled ? 'bg-gray-400 text-gray-200 cursor-not-allowed' : 'text-white pulse-green'}`} style={!isSubmitDisabled ? {backgroundColor: '#16a34a'} : {}}>
+                            <span>Enviar Pedido</span><i className="fa-brands fa-whatsapp"></i>
+                        </button>
+                    </div>
+
+                    {showScheduleModal && (
+                        <div className="modal-overlay">
+                            <div className="modal-box">
+                                <h3 className="text-xl font-bold text-red-600 mb-2"><i className="fa-solid fa-clock"></i> Estamos Fechados</h3>
+                                <p className="text-gray-600 text-sm mb-4">
+                                    Nosso horário de atendimento é das <b>{settings.openTime}</b> às <b>{settings.closeTime}</b>.
+                                </p>
+                                <p className="text-gray-800 font-bold mb-6">Gostaria de agendar seu pedido para quando abrirmos?</p>
+                                <div className="flex gap-2 justify-center">
+                                    <button onClick={()=>setShowScheduleModal(false)} className="px-4 py-2 border rounded text-gray-600">Cancelar</button>
+                                    <button onClick={()=>{setShowScheduleModal(false); preFinish(true);}} className="px-4 py-2 bg-green-600 text-white rounded font-bold">Sim, Agendar</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // --- ADMIN ---
+        const AdminLogin = ({onLogin, onCancel, theme, savedPassword, showAlert}) => { const [p,setP]=useState(""); return <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"><div className="bg-white p-6 rounded-lg w-full max-w-sm"><h3 className="font-bold mb-4">Admin</h3><input type="password" placeholder="Senha" className="w-full border p-2 mb-4 rounded" value={p} onChange={e=>setP(e.target.value)}/><div className="flex justify-end gap-2"><button onClick={onCancel}>Cancelar</button><button onClick={()=>p===(savedPassword||"admin")?onLogin():showAlert("Erro","Senha incorreta",'error')} className="text-white px-4 py-2 rounded" style={theme}>Entrar</button></div></div></div> };
+        const AdminPanel = ({ products, categories, settings, neighborhoods, restLocation, ingredients, theme, showAlert, showConfirm }) => { const [tab, setTab] = useState("produtos"); return (<div className="bg-white p-4 rounded shadow min-h-screen"><h2 className="font-bold text-xl mb-4">Admin</h2><div className="flex gap-2 mb-4 overflow-x-auto">{["produtos","insumos","cupons","bairros","pedidos","clientes","config"].map(t=><button key={t} onClick={()=>setTab(t)} className={`px-3 py-1 rounded capitalize ${tab===t?'text-white':'bg-gray-100'}`} style={tab===t?theme:{}}>{t}</button>)}</div>{tab==="produtos" && <AdminProducts products={products} categories={categories} ingredients={ingredients} settings={settings} theme={theme} showAlert={showAlert} showConfirm={showConfirm} />}{tab==="insumos" && <AdminIngredients ingredients={ingredients} products={products} settings={settings} theme={theme} showAlert={showAlert} showConfirm={showConfirm} />}{tab==="cupons" && <AdminCoupons products={products} theme={theme} showAlert={showAlert} showConfirm={showConfirm} />}{tab==="bairros" && <AdminNeighborhoods neighborhoods={neighborhoods} theme={theme} showAlert={showAlert} showConfirm={showConfirm} />}{tab==="pedidos" && <AdminOrders showConfirm={showConfirm} showAlert={showAlert} />}{tab==="clientes" && <AdminCustomers showAlert={showAlert} showConfirm={showConfirm} />}{tab==="config" && <AdminConfig settings={settings} categories={categories} restLocation={restLocation} theme={theme} showAlert={showAlert} showConfirm={showConfirm} />}</div>); };
+        
+        // NOVO: ADMIN INSUMOS (Com atualização em cadeia)
+        const AdminIngredients = ({ ingredients, products, settings, theme, showAlert, showConfirm }) => {
+            const [data, setData] = useState({ name: "", unit: "kg", cost: "" });
+            
+            const edit = (i) => setData(i);
+
+            const save = async (e) => { 
+                e.preventDefault(); 
+                if(!data.name || !data.cost) return; 
+                const cost = parseFloat(data.cost);
+                const payload = {...data, cost};
+                const cmv = settings.targetCMV || 35; // Pega o CMV da configuração
+
+                if(data.id) {
+                    await getCol('ingredients').doc(data.id).update(payload);
+                    const batch = db.batch();
+                    let hasUpdates = false;
+                    products.forEach(p => {
+                        if (p.recipe && p.recipe.some(r => r.id === data.id)) {
+                            const newRecipe = p.recipe.map(r => r.id === data.id ? {...r, cost: cost} : r);
+                            const newTotalCost = newRecipe.reduce((acc, item) => {
+                                const currentIng = ingredients.find(i => i.id === item.id);
+                                const itemCost = (item.id === data.id) ? cost : (currentIng ? currentIng.cost : item.cost);
+                                return acc + (itemCost * item.qty);
+                            }, 0);
+                            const finalPrice = calculateSmartPrice(newTotalCost, cmv);
+                            batch.update(getCol('products').doc(p.id), { recipe: newRecipe, price: finalPrice });
+                            hasUpdates = true;
+                        }
+                    });
+                    if(hasUpdates) { await batch.commit(); showAlert("Sucesso", "Insumo atualizado e preços recalculados!", 'success'); } 
+                    else { showAlert("Sucesso", "Insumo atualizado!", 'success'); }
+
+                } else {
+                    await getCol('ingredients').add(payload);
+                    showAlert("Sucesso", "Insumo adicionado!", 'success');
+                }
+                setData({name:"", unit:"kg", cost:""}); 
+            };
+
+            const del = (id) => showConfirm("Excluir", "Apagar este insumo?", async () => await getCol('ingredients').doc(id).delete());
+            
+            const forceUpdateAll = () => {
+                showConfirm("Atualização Geral", "Recalcular preços de TODOS os produtos baseados nos custos atuais?", async () => {
+                    const batch = db.batch();
+                    let updatedCount = 0;
+                    const cmv = settings.targetCMV || 35;
+                    products.forEach(p => {
+                        if (p.recipe && p.recipe.length > 0) {
+                            let newTotalCost = 0;
+                            const newRecipe = p.recipe.map(r => {
+                                const realIng = ingredients.find(i => i.id === r.id);
+                                if (realIng) {
+                                    newTotalCost += (realIng.cost * r.qty);
+                                    return { ...r, cost: realIng.cost, name: realIng.name, unit: realIng.unit };
+                                } else {
+                                    newTotalCost += (r.cost * r.qty);
+                                    return r;
+                                }
+                            });
+                            const newPrice = calculateSmartPrice(newTotalCost, cmv);
+                            batch.update(getCol('products').doc(p.id), { recipe: newRecipe, price: newPrice });
+                            updatedCount++;
+                        }
+                    });
+                    if (updatedCount > 0) { await batch.commit(); showAlert("Sucesso", `${updatedCount} produtos atualizados!`, 'success'); } 
+                    else { showAlert("Aviso", "Nenhum produto com receita encontrado.", 'alert'); }
+                });
+            };
+
+            return (
+                <div>
+                    <div className="flex justify-end mb-2">
+                         <button onClick={forceUpdateAll} className="text-xs bg-blue-100 text-blue-600 px-3 py-1 rounded hover:bg-blue-200 border border-blue-200">
+                            <i className="fa-solid fa-sync mr-1"></i> Forçar Atualização Geral de Preços
+                         </button>
+                    </div>
+                    <form onSubmit={save} className="bg-gray-50 p-3 rounded mb-3 space-y-2">
+                        <div className="flex gap-2">
+                            <input placeholder="Nome (Ex: Farinha)" className="border p-2 flex-1 rounded" value={data.name} onChange={e=>setData({...data, name:e.target.value})} />
+                            <select className="border p-2 rounded" value={data.unit} onChange={e=>setData({...data, unit:e.target.value})}><option value="kg">Kg</option><option value="lt">Litro</option><option value="un">Unid.</option></select>
+                        </div>
+                        <div className="flex gap-2">
+                            <input type="number" step="0.01" placeholder="Custo (R$)" className="border p-2 flex-1 rounded" value={data.cost} onChange={e=>setData({...data, cost:e.target.value})} />
+                            <button className="text-white px-4 rounded font-bold" style={theme}>Salvar</button>
+                        </div>
+                    </form>
+                    <div className="space-y-2">{ingredients.map(i => (
+                        <div key={i.id} className="flex justify-between border p-2 rounded bg-white items-center">
+                            <div><b>{i.name}</b> <span className="text-xs text-gray-500">({i.unit})</span><br/><span className="text-green-600 font-bold">R$ {formatMoney(i.cost)}</span></div>
+                            <div className="flex gap-2">
+                                <button onClick={()=>edit(i)} className="text-blue-500 font-bold p-2 hover:bg-blue-50 rounded">✎</button>
+                                <button onClick={()=>del(i.id)} className="text-red-500 font-bold px-2">X</button>
+                            </div>
+                        </div>
+                    ))}</div>
+                </div>
+            );
+        };
+
+        // ADMIN PRODUTOS (COM FICHA TÉCNICA E PREÇO IFOOD)
+        const AdminProducts = ({products, categories, ingredients, settings, theme, showAlert, showConfirm}) => { 
+            const [edit, setEdit] = useState(false); 
+            const [data, setData] = useState({name:"", price:"", category:"", imageUrl:"", description:"", recipe: [], profitMargin: 0}); 
+            const [newIng, setNewIng] = useState({ id: "", qty: "" });
+            
+            // Preço inline com salvamento automático (onBlur)
+            const updatePrice = async (id, val) => {
+                if(!val) return;
+                try { await getCol('products').doc(id).update({ price: parseFloat(val) }); } 
+                catch(e) { console.error("Erro auto-save"); }
+            };
+
+            const addIngToRecipe = () => {
+                if(!newIng.id || !newIng.qty) return;
+                const ing = ingredients.find(i => i.id === newIng.id);
+                // Calcula novo custo total temporário
+                const currentRecipe = [...(data.recipe || []), { id: newIng.id, name: ing.name, unit: ing.unit, cost: ing.cost, qty: parseFloat(newIng.qty) }];
+                const currentCost = currentRecipe.reduce((acc, item) => acc + (item.cost * item.qty), 0);
+                
+                const cmv = settings.targetCMV || 35;
+                const autoPrice = calculateSmartPrice(currentCost, cmv);
+                
+                setData(prev => ({ 
+                    ...prev, 
+                    price: autoPrice, 
+                    recipe: currentRecipe 
+                }));
+                setNewIng({ id: "", qty: "" });
+            };
+
+            const removeIngFromRecipe = (idx) => {
+                const newRecipe = [...data.recipe];
+                newRecipe.splice(idx, 1);
+                
+                const currentCost = newRecipe.reduce((acc, item) => acc + (item.cost * item.qty), 0);
+                const cmv = settings.targetCMV || 35;
+                const autoPrice = calculateSmartPrice(currentCost, cmv);
+                
+                setData({ ...data, recipe: newRecipe, price: autoPrice });
+            };
+
+            // Calcula Custo Total e Sugestão (LIVE)
+            const calculateMetrics = (prod) => {
+                const recipe = prod.recipe || [];
+                const totalCost = recipe.reduce((acc, item) => {
+                    const currentIng = ingredients.find(i => i.id === item.id);
+                    const cost = currentIng ? currentIng.cost : item.cost;
+                    return acc + (cost * item.qty);
+                }, 0);
+                
+                const cmv = settings.targetCMV || 35;
+                const suggested = calculateSmartPrice(totalCost, cmv);
+                const ifoodPrice = prod.price / 0.73; 
+                
+                return { totalCost, suggested, ifoodPrice };
+            };
+
+            const formMetrics = calculateMetrics(data);
+
+            const save = async (e) => { 
+                e.preventDefault(); 
+                const p = {...data, price:parseFloat(data.price)}; 
+                if(data.id) await getCol('products').doc(data.id).update(p); 
+                else await getCol('products').add(p); 
+                setEdit(false); 
+                setData({name:"", price:"", category:"", imageUrl:"", description:"", recipe: [], profitMargin: 0}); 
+                showAlert("Sucesso", "Produto Salvo!", "success");
+            }; 
+            
+            const del = (id) => showConfirm("Excluir?", "Apagar este produto?", async () => { try { await getCol('products').doc(id).delete(); } catch(e) { showAlert("Erro", "Falha ao apagar", 'error'); } });
+            
+            return (
+                <div>
+                    <button onClick={()=>{setData({name:"", price:"", category:categories[0]?.name||"", imageUrl:"", description:"", recipe: [], profitMargin: 0}); setEdit(true)}} className="text-white px-3 py-2 rounded mb-3 font-bold" style={theme}>+ Produto</button>
+                    {edit && <form onSubmit={save} className="bg-gray-100 p-3 rounded mb-3 space-y-2 border">
+                        <input required placeholder="Nome" className="w-full border p-2" value={data.name} onChange={e=>setData({...data, name:e.target.value})} />
+                        <div className="flex gap-2"><input type="number" step="0.01" className="w-1/2 border p-2" value={data.price} onChange={e=>setData({...data, price:e.target.value})} /><select className="w-1/2 border p-2" value={data.category} onChange={e=>setData({...data, category:e.target.value})}>{categories.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}</select></div>
+                        <input placeholder="URL Imagem" className="w-full border p-2" value={data.imageUrl} onChange={e=>setData({...data, imageUrl:e.target.value})} /><textarea placeholder="Desc" className="w-full border p-2" value={data.description} onChange={e=>setData({...data, description:e.target.value})} />
+                        
+                        {/* FICHA TÉCNICA */}
+                        <div className="bg-white p-2 rounded border border-gray-300">
+                            <h4 className="font-bold text-sm mb-2 text-gray-700">Ficha Técnica (CMV: {settings.targetCMV || 35}%)</h4>
+                            <div className="flex gap-2 mb-2">
+                                <select className="border p-1 flex-1 text-sm" value={newIng.id} onChange={e=>setNewIng({...newIng, id:e.target.value})}>
+                                    <option value="">+ Insumo</option>
+                                    {ingredients.map(i=><option key={i.id} value={i.id}>{i.name} ({formatMoney(i.cost)}/{i.unit})</option>)}
+                                </select>
+                                <input type="number" step="0.001" placeholder="Qtd" className="border p-1 w-16 text-sm" value={newIng.qty} onChange={e=>setNewIng({...newIng, qty:e.target.value})} />
+                                <button type="button" onClick={addIngToRecipe} className="bg-blue-500 text-white px-2 rounded font-bold">+</button>
+                            </div>
+                            <div className="space-y-1 mb-2 max-h-32 overflow-y-auto">
+                                {(data.recipe || []).map((ing, idx) => (
+                                    <div key={idx} className="flex justify-between text-xs bg-gray-50 p-1 rounded border border-gray-100">
+                                        <span>{ing.name} ({ing.qty} {ing.unit})</span>
+                                        <span>{formatMoney((ingredients.find(i=>i.id===ing.id)?.cost || ing.cost) * ing.qty)} <button type="button" onClick={()=>removeIngFromRecipe(idx)} className="text-red-500 ml-1 font-bold">x</button></span>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="flex justify-between items-center border-t pt-2 text-sm">
+                                <span>Custo: <b>{formatMoney(formMetrics.totalCost)}</b></span>
+                                <span className="text-blue-600">Sugerido: <b>{formatMoney(formMetrics.suggested)}</b></span>
+                            </div>
+                        </div>
+
+                        <button className="w-full text-white py-2 rounded" style={theme}>Salvar</button>
+                    </form>}
+
+                    <div className="space-y-2">
+                        {products.map(p => {
+                            const metrics = calculateMetrics(p);
+                            return (
+                                <div key={p.id} className="flex flex-col border p-3 rounded bg-white shadow-sm">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <b>{p.name}</b>
+                                        <div className="flex gap-2 items-center">
+                                            <div className="flex items-center bg-gray-100 rounded px-2 border border-gray-200">
+                                                <span className="text-xs mr-1 text-gray-500">R$</span>
+                                                <input 
+                                                    type="number" 
+                                                    step="0.01"
+                                                    defaultValue={p.price} 
+                                                    className="w-16 bg-transparent text-sm font-bold outline-none text-gray-800"
+                                                    onBlur={(e)=>updatePrice(p.id, e.target.value)}
+                                                />
+                                            </div>
+                                            <button onClick={()=>{setData(p);setEdit(true)}} className="text-blue-500 font-bold p-2 hover:bg-blue-50 rounded"><i className="fa-solid fa-pencil"></i></button>
+                                            <button onClick={(e)=>{e.stopPropagation(); e.preventDefault(); del(p.id)}} className="bg-red-50 text-red-500 font-bold p-2 hover:bg-red-50 rounded"><i className="fa-solid fa-trash"></i></button>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2 text-xs text-gray-500 border-t pt-2">
+                                        <div>Custo:<br/><b className="text-red-600">{formatMoney(metrics.totalCost)}</b></div>
+                                        <div>Margem:<br/><b className="text-blue-600">{((1 - (metrics.totalCost/p.price))*100).toFixed(0)}%</b></div>
+                                        <div>iFood:<br/><b className="text-orange-600">{formatMoney(metrics.ifoodPrice)}</b></div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            ); 
+        };
+        
+        const AdminNeighborhoods = ({ neighborhoods, theme, showAlert, showConfirm }) => { const [data, setData] = useState({ name: "", price: "" }); const save = async (e) => { e.preventDefault(); if(!data.name || !data.price) return; await getCol('neighborhoods').add({...data, price: parseFloat(data.price)}); setData({name:"", price:""}); showAlert("Sucesso","Bairro adicionado","success"); }; const del = (id) => showConfirm("Excluir", "Apagar este bairro?", async () => { try { await getCol('neighborhoods').doc(id).delete(); } catch(e) { console.error(e); showAlert("Erro", "Erro ao apagar: "+e.message, "error"); } }); return <div><form onSubmit={save} className="bg-gray-50 p-3 rounded mb-3 flex gap-2"><input placeholder="Nome do Bairro (ex: Centro)" className="border p-2 flex-1 rounded" value={data.name} onChange={e=>setData({...data, name:e.target.value})} /><input type="number" placeholder="Preço (10.00)" className="border p-2 w-24 rounded" value={data.price} onChange={e=>setData({...data, price:e.target.value})} /><button className="text-white px-4 rounded font-bold" style={theme}>Add</button></form><div className="space-y-2">{neighborhoods.map(n=><div key={n.id} className="flex justify-between border p-2 rounded bg-white"><span>{n.name}</span><span>{formatMoney(n.price)} <button onClick={(e)=>{e.stopPropagation(); del(n.id)}} className="text-red-500 ml-2 font-bold">X</button></span></div>)}</div></div> };
+        const AdminCoupons = ({ products, theme, showAlert, showConfirm }) => { const [coupons, setCoupons] = useState([]); const [form, setForm] = useState({ code: "", type: "fixed", value: "", limit: 100, maxDiscount: "" }); useEffect(() => { const u = getCol('coupons').onSnapshot(s => setCoupons(s.docs.map(d => ({ id: d.id, ...d.data() })))); return () => u(); }, []); const save = async (e) => { e.preventDefault(); if(!form.code || !form.value) return showAlert("Erro", "Preencha tudo", 'error'); const payload = { ...form, code: form.code.toUpperCase(), usageCount: 0, active: true, createdAt: new Date().toISOString() }; if(form.type !== 'percent') delete payload.maxDiscount; else if(form.maxDiscount) payload.maxDiscount = parseFloat(form.maxDiscount); await getCol('coupons').add(payload); setForm({ code: "", type: "fixed", value: "", limit: 100, maxDiscount: "" }); showAlert("Sucesso","Cupom criado",'success'); }; const del = (id) => showConfirm("Excluir", "Apagar este cupom?", async () => { try { await getCol('coupons').doc(id).delete(); } catch(e) { showAlert("Erro","Erro ao apagar",'error'); } }); return (<div><form onSubmit={save} className="bg-gray-50 p-3 rounded mb-4 border space-y-2"><h3 className="font-bold">Novo Cupom</h3><div className="flex gap-2"><input placeholder="Código" className="border p-2 rounded w-1/2 uppercase" value={form.code} onChange={e=>setForm({...form, code:e.target.value})} /><input type="number" placeholder="Limite" className="border p-2 rounded w-1/2" value={form.limit} onChange={e=>setForm({...form, limit:parseInt(e.target.value)})} /></div><div className="flex gap-2 flex-wrap"><select className="border p-2 rounded w-1/3" value={form.type} onChange={e=>setForm({...form, type:e.target.value})}><option value="fixed">R$</option><option value="percent">%</option><option value="item">Item</option></select>{form.type === 'item' ? (<select className="border p-2 rounded flex-1" value={form.value} onChange={e=>setForm({...form, value:e.target.value})}><option value="">Produto...</option>{products.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select>) : (<input type="number" placeholder={form.type==='percent'?"10, 20...":"10.00"} className="border p-2 rounded flex-1" value={form.value} onChange={e=>setForm({...form, value:e.target.value})} />)}{form.type === 'percent' && (<input type="number" placeholder="Teto Máx R$" className="border p-2 rounded w-full" value={form.maxDiscount} onChange={e=>setForm({...form, maxDiscount:e.target.value})} />)}</div><button className="w-full text-white py-2 rounded font-bold" style={theme}>Criar Cupom</button></form><div className="space-y-2">{coupons.map(c => (<div key={c.id} className="flex justify-between items-center border p-2 rounded bg-white"><div><b className="text-green-700">{c.code}</b> <span className="text-xs ml-2 bg-gray-200 px-1 rounded">{c.type === 'item' ? 'Item' : c.type==='percent' ? `${c.value}%` : `R$ ${c.value}`}</span></div><button onClick={(e)=>{e.stopPropagation(); del(c.id)}} className="text-red-500 px-2 font-bold">X</button></div>))}</div></div>); };
+        const AdminOrders = ({ showConfirm, showAlert }) => { const [o, setO] = useState([]); useEffect(() => { const u = getCol('orders').orderBy('createdAt', 'desc').limit(20).onSnapshot(s => setO(s.docs.map(d => ({ id: d.id, ...d.data() })))); return () => u(); }, []); const del = (id) => showConfirm("Excluir", "Excluir este pedido?", async () => { try { await getCol('orders').doc(id).delete(); } catch(e) { showAlert("Erro", "Erro ao excluir", 'error'); } }); return <div className="space-y-3">{o.map(x => <div key={x.id} className="border p-3 rounded bg-white"><div className="flex justify-between"><div><b>{x.customer.name}</b> <span className="text-green-600 font-bold ml-2">{formatMoney(x.totals.total)}</span></div><button onClick={(e)=>{e.stopPropagation(); del(x.id)}} className="text-red-500 px-2 hover:bg-red-50 rounded"><i className="fa-solid fa-trash"></i></button></div><div className="text-xs text-gray-500">{new Date(x.createdAt).toLocaleString()} {x.coupon && <span className="text-green-600 ml-2">Cupom: {x.coupon}</span>} {x.isScheduled && <span className="bg-yellow-200 px-1 rounded ml-2 text-yellow-800 font-bold">AGENDADO</span>}</div><div className="text-sm mt-1 bg-gray-50 p-1 rounded">Pagamento: <b>{x.payment?.method}</b> {x.payment?.changeFor ? `(Troco p/ ${x.payment.changeFor})` : ''} {x.status==='confirmado' && <span className="bg-green-100 text-green-700 px-1 rounded font-bold text-xs ml-2">PAGO</span>}</div></div>)}</div>; };
+        
+        const AdminCustomers = ({ showAlert, showConfirm }) => { 
+            const [all, setAll] = useState([]); 
+            const [filter, setFilter] = useState("all"); 
+            
+            useEffect(() => { 
+                const u = getCol('customers').limit(2000).onSnapshot(s => setAll(s.docs.map(d => ({ id: d.id, ...d.data() })))); 
+                return () => u(); 
+            }, []); 
+            
+            const filtered = useMemo(() => { 
+                let list = [...all]; 
+                if (filter === "top") return list.filter(c => (c.orderCount || 0) >= 2).sort((a, b) => (b.orderCount || 0) - (a.orderCount || 0)).slice(0, 50); 
+                if (filter === "recent") return list.sort((a, b) => new Date(b.lastOrder) - new Date(a.lastOrder)).slice(0, 100); 
+                if (filter === "inactive") { const d = new Date(); d.setDate(d.getDate() - 30); return list.filter(c => new Date(c.lastOrder) < d); } 
+                return list.sort((a, b) => new Date(b.lastOrder) - new Date(a.lastOrder)); 
+            }, [all, filter]); 
+            
+            const exp = () => { 
+                const t = "Nome;Tel;End\n" + filtered.map(x => `${x.name};${x.phone};${x.address}`).join('\n'); 
+                const a = document.createElement('a'); a.href = 'data:text/csv;charset=utf-8,' + encodeURI("\uFEFF"+t); a.download = `clientes_${filter}.csv`; a.click(); 
+            }; 
+
+            const deleteAll = async () => {
+                showConfirm(
+                    "ATENÇÃO: Apagar TUDO?",
+                    "Isso apagará TODOS os clientes cadastrados. Essa ação não pode ser desfeita. Tem certeza absoluta?",
+                    async () => {
+                        try {
+                            const snap = await getCol('customers').get();
+                            if (snap.empty) return showAlert("Aviso", "Nenhum cliente para apagar.", "info");
+
+                            const batchSize = 400; 
+                            let batch = db.batch();
+                            let count = 0;
+                            let totalDeleted = 0;
+
+                            for (const doc of snap.docs) {
+                                batch.delete(doc.ref);
+                                count++;
+                                if (count >= batchSize) {
+                                    await batch.commit();
+                                    batch = db.batch();
+                                    totalDeleted += count;
+                                    count = 0;
+                                }
+                            }
+
+                            if (count > 0) {
+                                await batch.commit();
+                                totalDeleted += count;
+                            }
+
+                            showAlert("Sucesso", `${totalDeleted} clientes foram removidos.`, "success");
+                        } catch (e) {
+                            console.error(e);
+                            showAlert("Erro", "Erro ao apagar clientes: " + e.message, "error");
+                        }
+                    },
+                    "Sim, APAGAR TUDO",
+                    "Cancelar"
+                );
+            };
+
+            return (
+                <div>
+                    <div className="flex flex-wrap gap-2 mb-4 bg-gray-50 p-2 rounded">
+                        <button onClick={()=>setFilter("all")} className={`px-3 py-1 rounded text-sm font-bold ${filter==="all"?"bg-red-600 text-white":"bg-white border"}`}>Todos</button>
+                        <button onClick={()=>setFilter("top")} className={`px-3 py-1 rounded text-sm font-bold ${filter==="top"?"bg-red-600 text-white":"bg-white border"}`}>Top 50</button>
+                        <button onClick={()=>setFilter("recent100")} className={`px-3 py-1 rounded text-sm font-bold ${filter==="recent100"?"bg-red-600 text-white":"bg-white border"}`}>Últimos 100</button>
+                        <button onClick={()=>setFilter("inactive")} className={`px-3 py-1 rounded text-sm font-bold ${filter==="inactive"?"bg-red-600 text-white":"bg-white border"}`}>Inativos 30d</button>
+                    </div>
+                    <div className="flex gap-2 mb-2">
+                        <button onClick={exp} className="bg-green-600 text-white px-3 py-1 rounded font-bold shadow-sm hover:bg-green-700 transition">Exportar CSV</button>
+                        <button onClick={deleteAll} className="bg-red-600 text-white px-3 py-1 rounded font-bold shadow-sm hover:bg-red-700 transition flex items-center gap-2"><i className="fa-solid fa-trash"></i> Apagar Todos</button>
+                    </div>
+                    <div className="h-64 overflow-y-auto space-y-2">
+                        {filtered.map(x=><div key={x.id} className="border p-2 text-sm bg-white"><b>{x.name}</b> ({x.orderCount||1}x)<br/>{x.phone}</div>)}
+                    </div>
+                </div>
+            ); 
+        };
+
+        const AdminConfig = ({ settings, categories, restLocation, theme, showAlert, showConfirm }) => { const [data, setData] = useState(settings); const [nC, setNC] = useState(""); const handleChange = (k, v) => setData(p=>({...p, [k]:v})); const save = () => { db.collection('artifacts').doc(APP_ID).collection('public').doc('data').collection('config').doc('main').set(data, {merge:true}); showAlert("Sucesso", "Configurações salvas!", "success"); }; const addC = () => { if(nC) getCol('categories').add({ name: nC, order: categories.length }); setNC(""); }; const delC = (id) => showConfirm("Excluir", "Excluir categoria?", async () => { try { getCol('categories').doc(id).delete(); } catch(e) { showAlert("Erro", "Erro ao excluir", 'error'); } }); const move = (idx, dir) => { if((dir===-1&&idx===0)||(dir===1&&idx===categories.length-1))return; const items = [...categories]; const temp = items[idx]; items[idx] = items[idx+dir]; items[idx+dir] = temp; const b = db.batch(); items.forEach((cat, i) => { b.update(getCol('categories').doc(cat.id), {order: i}); }); b.commit(); }; return (
+            <div className="space-y-4"><div className="border p-3 rounded bg-white space-y-3"><h3 className="font-bold">Aparência & Dados</h3>
+            <div><label>Nome App:</label><input className="border w-full p-1 rounded" value={data.appName||""} onChange={e=>handleChange("appName",e.target.value)} /></div>
+            <div className="flex gap-2 items-center"><label>Cor Nome:</label><input type="color" className="w-8 h-8 border rounded" value={data.appNameColor || "#ffffff"} onChange={e => handleChange("appNameColor", e.target.value)} /></div>
+            <div><label>Subtítulo:</label><input className="border w-full p-1 rounded" value={data.appSubtitle||""} onChange={e=>handleChange("appSubtitle",e.target.value)} /></div>
+            <div><label>Frase Topo:</label><input className="border w-full p-1 rounded" value={data.headerPhrase||""} onChange={e=>handleChange("headerPhrase",e.target.value)} /></div>
+            <div className="grid grid-cols-1 gap-2">
+                <div><label>Cor Principal:</label><div className="flex gap-2"><input type="color" className="h-8 w-12" value={data.themeColor||"#dc2626"} onChange={e=>handleChange("themeColor",e.target.value)} /><input className="border p-1 rounded flex-1" value={data.themeColor||"#dc2626"} onChange={e=>handleChange("themeColor",e.target.value)} /></div></div>
+                <div><label>Cor Carrinho:</label><div className="flex gap-2"><input type="color" className="h-8 w-12" value={data.cartColor||"#16a34a"} onChange={e=>handleChange("cartColor",e.target.value)} /><input className="border p-1 rounded flex-1" value={data.cartColor||"#16a34a"} onChange={e=>handleChange("cartColor",e.target.value)} /></div></div>
+                <div><label>Cor Fundo Site:</label><div className="flex gap-2"><input type="color" className="h-8 w-12" value={data.bgColor||"#f3f4f6"} onChange={e=>handleChange("bgColor",e.target.value)} /><input className="border p-1 rounded flex-1" value={data.bgColor||"#f3f4f6"} onChange={e=>handleChange("bgColor",e.target.value)} /></div></div>
+            </div>
+            <div className="space-y-2 border-t pt-2">
+                <label className="font-bold">Logomarca</label>
+                <input className="border w-full p-1 rounded mb-2" value={data.logoUrl||""} onChange={e=>handleChange("logoUrl",e.target.value)} placeholder="URL..." />
+                <div className="flex items-center gap-2 mb-2"><label className="text-sm">Tamanho:</label><input type="range" min="30" max="150" value={data.logoSize || 60} onChange={e => handleChange("logoSize", e.target.value)} className="flex-1" /><span className="text-sm w-8">{data.logoSize || 60}px</span></div>
+                <div className="flex items-center gap-2"><label className="text-sm">Estilo:</label><select className="border p-1 rounded flex-1 text-sm" value={data.logoStyle || "circle"} onChange={e => handleChange("logoStyle", e.target.value)}><option value="circle">Circular</option><option value="square">Quadrada</option><option value="none">Sem Moldura</option></select></div>
+            </div>
+            <div className="border-t pt-2"><label>URL Banner:</label><input className="border w-full p-1 rounded" value={data.bannerUrl||""} onChange={e=>handleChange("bannerUrl",e.target.value)} /></div>
+            <div className="flex gap-2 border-t pt-2"><div className="w-1/2"><label>Abertura:</label><input type="time" className="border w-full p-1 rounded" value={data.openTime||"18:00"} onChange={e=>handleChange("openTime",e.target.value)} /></div><div className="w-1/2"><label>Fechamento:</label><input type="time" className="border w-full p-1 rounded" value={data.closeTime||"23:00"} onChange={e=>handleChange("closeTime",e.target.value)} /></div></div>
+            <div className="border-t pt-2">
+                <div className="flex justify-between">
+                    <div className="w-1/2 pr-1"><label>R$ / Km:</label><input type="number" className="border w-full p-1 rounded" value={data.pricePerKm||""} onChange={e=>handleChange("pricePerKm",e.target.value)} /></div>
+                    <div className="w-1/2 pl-1"><label>Meta CMV (%):</label><input type="number" className="border w-full p-1 rounded" value={data.targetCMV||35} onChange={e=>handleChange("targetCMV",e.target.value)} /></div>
+                </div>
+            </div>
+            <div className="border-t pt-2"><label className="font-bold">GPS Restaurante</label><div className="flex gap-2"><input placeholder="Lat" className="border w-1/2 p-1" value={data.restLat||""} onChange={e=>handleChange("restLat",e.target.value)} /><input placeholder="Lng" className="border w-1/2 p-1" value={data.restLng||""} onChange={e=>handleChange("restLng",e.target.value)} /></div></div>
+            
+            <div className="border-t pt-2 bg-blue-50 p-2 rounded mt-2">
+                <label className="font-bold text-blue-700">Integração Pix (Mercado Pago)</label>
+                <div className="text-xs text-gray-500 mb-1">Cole aqui seu Access Token (APP_USR-...). Se deixar vazio, usa chave Pix manual.</div>
+                <input type="text" className="border w-full p-2 rounded font-mono text-xs" value={data.mercadoPagoToken||""} onChange={e=>handleChange("mercadoPagoToken",e.target.value)} placeholder="APP_USR-..." />
+            </div>
+
+            <div className="border-t pt-2"><label className="font-bold text-red-600">Senha Admin</label><input type="text" className="border w-full p-2 rounded mt-1" value={data.adminPassword||""} onChange={e=>handleChange("adminPassword",e.target.value)} /></div>
+            <button onClick={save} className="text-white px-4 py-2 rounded w-full font-bold" style={theme}>Salvar Tudo</button>
+        </div>
+        <div className="border p-3 rounded bg-white"><h3>Categorias</h3><div className="flex gap-2 mb-2"><input className="border p-1 flex-1" value={nC} onChange={e=>setNC(e.target.value)} /><button onClick={addC} className="text-white px-2 rounded" style={theme}>+</button></div>{categories.map((c,i)=><div key={c.id} className="flex justify-between border-b py-1"><span>{c.name}</span><div className="flex gap-1"><button onClick={()=>move(i,-1)}>⬆️</button><button onClick={()=>move(i,1)}>⬇️</button><button onClick={(e)=>{e.stopPropagation(); delC(c.id)}} className="text-red-500 font-bold px-2">X</button></div></div>)}</div></div>
+        ); };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
+
+
