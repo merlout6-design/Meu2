@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fritzza - Admin Master</title>
+    
+    <!-- React & Tailwind -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Toastify -->
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Chewy&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Poppins', sans-serif; background-color: #f3f4f6; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 9999; animation: fadeIn 0.2s; backdrop-filter: blur(2px); }
+        .modal-box { background: white; padding: 25px; border-radius: 15px; width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto; text-align: center; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes popIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .sidebar { transition: transform 0.3s ease-in-out; }
+        @media (max-width: 768px) { .sidebar { transform: translateX(-100%); position: fixed; height: 100%; z-index: 50; } .sidebar.open { transform: translateX(0); } }
+        input[type="color"] { -webkit-appearance: none; border: none; width: 40px; height: 40px; border-radius: 8px; overflow: hidden; padding: 0; cursor: pointer; border: 1px solid #ddd; }
+        input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; } input[type="color"]::-webkit-color-swatch { border: none; }
+        .pulse-dot { width: 10px; height: 10px; background-color: #22c55e; border-radius: 50%; display: inline-block; box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); animation: pulse-green 2s infinite; }
+        @keyframes pulse-green { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); } }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const firebaseConfig = { apiKey: "AIzaSyAg2kfoWsvWWyEXQGe8v6jZZqKepgButUk", authDomain: "ajuda-2217b.firebaseapp.com", projectId: "ajuda-2217b", storageBucket: "ajuda-2217b.firebasestorage.app", messagingSenderId: "421083897636", appId: "1:421083897636:web:18bd6097b5c0169427ddb1" };
+        if (!firebase.apps.length) { try { firebase.initializeApp(firebaseConfig); } catch (e) {} }
+        const auth = firebase.auth(); const db = firebase.firestore(); const APP_ID = "ajuda-2217b"; 
+        const getCol = (n) => db.collection('artifacts').doc(APP_ID).collection('public').doc('data').collection(n);
+        const getConfigDoc = () => db.collection('artifacts').doc(APP_ID).collection('public').doc('data').collection('config').doc('main');
+        
+        const { useState, useEffect, useMemo } = React;
+        const formatMoney = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+        const calculateSmartPrice = (cost, cmvPercent) => {
+            if (!cost || cost <= 0) return 0;
+            const cmv = cmvPercent || 35;
+            const targetPrice = cost / (cmv / 100); 
+            return Math.ceil(targetPrice) - 0.01;
+        };
+
+        // --- FUNÇÃO DE ENVIO DE MENSAGEM (ADMIN -> CLIENTE) ---
+        // Esta função envia atualizações de status.
+        async function sendWhatsAppNotification(phone, statusKey, customerName, settings) {
+            if (!phone || !settings.whatsappServerUrl) return;
+            
+            const MENSAGENS_WPP = {
+                'confirmado': "Olá {nome}! Seu pedido na *{loja}* foi confirmado e já está sendo preparado! 🍕🔥",
+                'enviado': "🛵 *Saiu para entrega!* Seu pedido está a caminho, {nome}. Prepare a mesa! 🍽️",
+                'entregue': "Pedido entregue! ✅ Agradecemos a preferência, {nome}. Bom apetite! 😋",
+                'cancelado': "⚠️ Olá {nome}. Houve um imprevisto e seu pedido precisou ser cancelado. Por favor, entre em contato."
+            };
+
+            let message = MENSAGENS_WPP[statusKey];
+            if (!message) return;
+
+            const nome = customerName ? customerName.split(' ')[0] : 'Cliente';
+            message = message.replace('{nome}', nome).replace('{loja}', settings.appName || 'Fritzza');
+
+            try {
+                Toastify({ text: "Enviando WhatsApp... 📲", duration: 2000, style: { background: "#2563eb" } }).showToast();
+                const response = await fetch(settings.whatsappServerUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone: phone, message: message })
+                });
+                const resData = await response.json();
+                if (resData.status === 'success') {
+                    Toastify({ text: "WhatsApp Enviado! ✅", duration: 3000, style: { background: "#059669" } }).showToast();
+                } else {
+                    console.error("Erro WPP:", resData);
+                    Toastify({ text: "Erro no envio ❌", duration: 3000, style: { background: "#dc2626" } }).showToast();
+                }
+            } catch (e) {
+                console.error(e);
+                Toastify({ text: "Erro Conexão API ⚠️", duration: 3000, style: { background: "#d97706" } }).showToast();
+            }
+        }
+
+        function GlobalModal({ modal, close }) { if (!modal.isOpen) return null; return ( <div className="modal-overlay" onClick={modal.type === 'alert' ? close : undefined}> <div className="modal-box text-left" onClick={e => e.stopPropagation()}> <div className={`text-4xl mb-3 text-center ${modal.type === 'error' ? 'text-red-500' : modal.type === 'success' ? 'text-green-500' : 'text-blue-500'}`}> {modal.type === 'error' ? <i className="fa-solid fa-circle-xmark"></i> : modal.type === 'success' ? <i className="fa-solid fa-circle-check"></i> : <i className="fa-solid fa-circle-info"></i>} </div> <h3 className="text-xl font-bold text-gray-800 mb-2 text-center">{modal.title}</h3> <p className="text-gray-600 text-sm mb-6 text-center">{modal.message}</p> <div className="flex gap-2 justify-center"> {modal.type === 'confirm' && <button onClick={close} className="px-4 py-2 border rounded-lg text-gray-600 font-bold hover:bg-gray-50 flex-1">Cancelar</button>} <button onClick={() => { if(modal.onConfirm) modal.onConfirm(); close(); }} className={`px-4 py-2 rounded-lg text-white font-bold shadow-md flex-1 ${modal.type === 'error' ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-600 hover:bg-blue-700'}`}>{modal.confirmText || 'OK'}</button> </div> </div> </div> ); }
+        function LoginView({ onLogin, loading, error }) { const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); return ( <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4"> <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm"> <div className="text-center mb-6"> <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-3"><i className="fa-solid fa-shield-halved"></i></div> <h2 className="text-2xl font-bold text-gray-800">Acesso Restrito</h2> </div> <form onSubmit={(e) => { e.preventDefault(); onLogin(email, password); }} className="space-y-4"> <div><label className="block text-sm font-medium text-gray-700 mb-1">Email</label><input type="email" required className="w-full border p-3 rounded-lg outline-none" value={email} onChange={e=>setEmail(e.target.value)} /></div> <div><label className="block text-sm font-medium text-gray-700 mb-1">Senha</label><input type="password" required className="w-full border p-3 rounded-lg outline-none" value={password} onChange={e=>setPassword(e.target.value)} /></div> {error && <div className="text-red-600 text-sm text-center bg-red-50 p-2 rounded">{error}</div>} <button type="submit" disabled={loading} className="w-full bg-red-600 text-white py-3 rounded-lg font-bold hover:bg-red-700 transition disabled:opacity-70">{loading ? 'Entrando...' : 'Entrar'}</button> </form> </div> </div> ); }
+
+        function printOrderReceipt(order, settings) {
+            const w = window.open('', '', 'width=400,height=600');
+            const itemsHtml = order.items.map(i => `<div class="item"><span>${i.quantity}x ${i.name}</span><span>${formatMoney(i.price * i.quantity)}</span></div>${i.obs ? `<div class="obs">Obs: ${i.obs}</div>` : ''}`).join('');
+            w.document.write(`<html><head><title>Pedido #${order.id.slice(-4)}</title><style>body{font-family:'Courier New',monospace;padding:10px;width:300px;margin:0 auto;font-size:12px}.header{text-align:center;border-bottom:1px dashed #000;padding-bottom:10px;margin-bottom:10px}.title{font-size:16px;font-weight:bold}.item{display:flex;justify-content:space-between;margin-bottom:5px;font-weight:bold}.obs{font-size:10px;margin-bottom:5px;font-style:italic}.totals{border-top:1px dashed #000;margin-top:10px;padding-top:10px}.row{display:flex;justify-content:space-between}.total-final{font-size:16px;font-weight:bold;margin-top:5px}.footer{text-align:center;margin-top:20px;font-size:10px}</style></head><body><div class="header"><div class="title">${settings.appName || 'Fritzza'}</div><div>Pedido #${order.id.slice(-4)}</div><div>${new Date(order.createdAt).toLocaleString('pt-BR')}</div></div><div class="info"><b>Cliente:</b> ${order.customer?.name || 'Não inf.'}<br/><b>Tel:</b> ${order.customer?.phone || 'Não inf.'}<br/><b>End:</b> ${order.customer?.address || ''}, ${order.customer?.number || ''}<br/><b>Bairro:</b> ${order.customer?.bairro || ''}<br/><b>Pagamento:</b> ${order.payment?.method} ${order.payment?.change ? '(Troco: '+order.payment.change+')' : ''}</div><div class="items">${itemsHtml}</div><div class="totals"><div class="row"><span>Subtotal:</span><span>${formatMoney(order.totals?.sub || 0)}</span></div><div class="row"><span>Entrega:</span><span>${formatMoney(order.totals?.del || 0)}</span></div><div class="row"><span>Desconto:</span><span>-${formatMoney(order.totals?.discount || 0)}</span></div><div class="row total-final"><span>TOTAL:</span><span>${formatMoney(order.totals?.total || 0)}</span></div></div><div class="footer">Obrigado pela preferência!</div><script>window.print(); window.close();<\/script></body></html>`);
+            w.document.close();
+        }
+
+        function AdminDashboard({ theme }) { const [stats, setStats] = useState({ todaySales: 0, todayOrders: 0, avgTicket: 0, pending: 0 }); useEffect(() => { const startOfDay = new Date(); startOfDay.setHours(0,0,0,0); const u = getCol('orders').where('createdAt', '>=', startOfDay.toISOString()).onSnapshot(s => { let total = 0, count = 0, pending = 0; s.docs.forEach(d => { const data = d.data(); total += (data.totals?.total || 0); count++; if(data.status === 'pendente' || data.status === 'enviado') pending++; }); setStats({ todaySales: total, todayOrders: count, avgTicket: count > 0 ? total / count : 0, pending }); }); return () => u(); }, []); return ( <div className="space-y-4 animate-fade-in"> <h2 className="text-2xl font-bold text-gray-800 mb-4">Visão Geral de Hoje</h2> <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"> <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-green-500"><div className="text-gray-500 text-sm font-bold uppercase mb-1">Vendas Hoje</div><div className="text-3xl font-bold text-gray-800">{formatMoney(stats.todaySales)}</div></div> <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-blue-500"><div className="text-gray-500 text-sm font-bold uppercase mb-1">Pedidos</div><div className="text-3xl font-bold text-gray-800">{stats.todayOrders}</div></div> <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-purple-500"><div className="text-gray-500 text-sm font-bold uppercase mb-1">Ticket Médio</div><div className="text-3xl font-bold text-gray-800">{formatMoney(stats.avgTicket)}</div></div> <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-yellow-500"><div className="text-gray-500 text-sm font-bold uppercase mb-1">Em Aberto</div><div className="text-3xl font-bold text-gray-800">{stats.pending}</div></div> </div> </div> ); }
+
+        function AdminOrders({ showConfirm, settings }) { 
+            const [allOrders, setAllOrders] = useState([]);
+            const [filter, setFilter] = useState('today');
+            useEffect(() => { const u = getCol('orders').orderBy('createdAt', 'desc').limit(500).onSnapshot(s => setAllOrders(s.docs.map(d => ({ id: d.id, ...d.data() })))); return () => u(); }, []);
+            const filteredOrders = useMemo(() => {
+                const now = new Date(); const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                if (filter === 'today') return allOrders.filter(o => new Date(o.createdAt) >= today);
+                return allOrders;
+            }, [filter, allOrders]);
+            
+            // --- STATUS FLOW + WHATSAPP ---
+            const nextStatus = async (order) => {
+                const statusFlow = { 'pendente': 'confirmado', 'confirmado': 'enviado', 'enviado': 'entregue' };
+                const newStatus = statusFlow[order.status];
+                if(newStatus) {
+                    await getCol('orders').doc(order.id).update({ status: newStatus });
+                    // Notifica cliente se tiver telefone e config
+                    if (['confirmado', 'enviado', 'entregue'].includes(newStatus) && order.customer?.phone) {
+                        sendWhatsAppNotification(order.customer.phone, newStatus, order.customer.name, settings);
+                    }
+                }
+            };
+
+            const del = (id) => showConfirm("Excluir", "Excluir pedido?", async () => await getCol('orders').doc(id).delete()); 
+
+            return (
+                <div className="space-y-4">
+                    <div className="flex gap-2 bg-gray-50 p-2 rounded-lg border">
+                        {['today', 'all'].map(k => <button key={k} onClick={()=>setFilter(k)} className={`px-4 py-1 rounded text-sm font-bold ${filter===k?'bg-gray-800 text-white':'bg-white border'}`}>{k==='today'?'Hoje':'Todos'}</button>)}
+                    </div>
+                    {filteredOrders.map(x => (
+                        <div key={x.id} className={`border p-3 rounded-lg bg-white shadow-sm border-l-4 transition hover:shadow-md ${x.status==='pendente'?'border-l-red-500':x.status==='confirmado'?'border-l-blue-500':x.status==='entregue'?'border-l-green-500':'border-l-yellow-500'}`}>
+                            <div className="flex justify-between items-start">
+                                <div><div className="font-bold text-gray-800 text-lg">{x.customer?.name} <span className="text-xs font-normal text-gray-400">#{x.id.slice(-4)}</span></div><div className="text-xs text-gray-500">{new Date(x.createdAt).toLocaleString()}</div></div>
+                                <div className="text-right"><span className="text-green-600 font-bold text-xl block">{formatMoney(x.totals?.total || 0)}</span></div>
+                            </div>
+                            <div className="mt-2 bg-gray-50 p-2 rounded text-sm text-gray-700">{x.items?.map((i,idx) => (<div key={idx} className="flex justify-between border-b last:border-0 py-1"><span>{i.quantity}x {i.name}</span></div>))}</div>
+                            <div className="mt-3 flex flex-wrap gap-2 text-xs items-center justify-between">
+                                <span className={`uppercase font-bold px-2 py-1 rounded ${x.status==='pendente'?'bg-red-100 text-red-700':x.status==='entregue'?'bg-green-100 text-green-700':'bg-yellow-100 text-yellow-700'}`}>{x.status}</span>
+                                <div className="flex gap-2">
+                                    {x.status !== 'entregue' && <button onClick={()=>nextStatus(x)} className="bg-blue-600 text-white px-3 py-1 rounded font-bold hover:bg-blue-700">Avançar <i className="fa-brands fa-whatsapp ml-1"></i></button>}
+                                    <button onClick={()=>printOrderReceipt(x, settings)} className="bg-gray-200 text-gray-700 px-3 py-1 rounded font-bold hover:bg-gray-300"><i className="fa-solid fa-print"></i></button>
+                                    <button onClick={()=>del(x.id)} className="text-red-500 bg-red-50 px-3 py-1 rounded font-bold hover:bg-red-100"><i className="fa-solid fa-trash"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ); 
+        }
+        
+        function AdminProducts({products, categories, ingredients, settings, theme, showAlert, showConfirm}) { 
+            const [edit, setEdit] = useState(false); 
+            const [data, setData] = useState({name:"", price:"", category:"", imageUrl:"", description:"", recipe: []}); 
+            const [newIng, setNewIng] = useState({ id: "", qty: "" });
+            const addIngToRecipe = () => { if(!newIng.id || !newIng.qty) return; const ing = ingredients.find(i => i.id === newIng.id); const currentRecipe = [...(data.recipe || []), { id: newIng.id, name: ing.name, unit: ing.unit, cost: ing.cost, qty: parseFloat(newIng.qty) }]; setData({ ...data, recipe: currentRecipe }); setNewIng({ id: "", qty: "" }); };
+            const removeIngFromRecipe = (idx) => { const newRecipe = [...data.recipe]; newRecipe.splice(idx, 1); setData({ ...data, recipe: newRecipe }); };
+            const getMetrics = (prod) => { const recipe = prod.recipe || []; const totalCost = recipe.reduce((acc, item) => { const currentIng = ingredients.find(i => i.id === item.id); return acc + ((currentIng ? currentIng.cost : item.cost) * item.qty); }, 0); const cmv = settings.targetCMV || 35; const suggested = calculateSmartPrice(totalCost, cmv); const ifood = suggested > 0 ? suggested / 0.73 : 0; return { totalCost, suggested, ifood }; };
+            const metrics = getMetrics(data);
+            const save = async (e) => { e.preventDefault(); const p = {...data, price:parseFloat(data.price)}; if(data.id) await getCol('products').doc(data.id).update(p); else await getCol('products').add(p); setEdit(false); setData({name:"", price:"", category:"", imageUrl:"", description:"", recipe: []}); showAlert("Sucesso", "Salvo!", "success"); }; 
+            const del = (id) => showConfirm("Excluir?", "Apagar produto?", async () => await getCol('products').doc(id).delete());
+            return ( <div> <button onClick={()=>{setData({name:"", price:"", category:categories[0]?.name||"", recipe: []}); setEdit(true)}} className="text-white px-4 py-2 rounded mb-4 font-bold shadow" style={theme}>+ Produto</button> {edit && <form onSubmit={save} className="bg-gray-50 p-4 rounded-lg mb-4 space-y-3 border shadow-sm animate-fade-in"> <div className="grid grid-cols-2 gap-3"><input required placeholder="Nome" className="border p-2 rounded w-full" value={data.name} onChange={e=>setData({...data, name:e.target.value})} /><select className="border p-2 rounded w-full" value={data.category} onChange={e=>setData({...data, category:e.target.value})}>{categories.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}</select></div> <div className="grid grid-cols-2 gap-3"><input placeholder="URL Imagem" className="border p-2 rounded w-full" value={data.imageUrl} onChange={e=>setData({...data, imageUrl:e.target.value})} /><input type="number" step="0.01" placeholder="Preço (R$)" className="border p-2 rounded w-full font-bold" value={data.price} onChange={e=>setData({...data, price:e.target.value})} /></div> <textarea placeholder="Descrição" className="w-full border p-2 rounded h-20" value={data.description} onChange={e=>setData({...data, description:e.target.value})} /> <div className="bg-white p-3 rounded border border-gray-300"> <h4 className="font-bold text-gray-700 mb-2 text-sm">Ficha Técnica (Meta CMV: {settings.targetCMV||35}%)</h4> <div className="flex gap-2 mb-3"> <select className="border p-1 flex-1 text-sm" value={newIng.id} onChange={e=>setNewIng({...newIng, id:e.target.value})}><option value="">+ Insumo</option>{ingredients.map(i=><option key={i.id} value={i.id}>{i.name} ({formatMoney(i.cost)}/{i.unit})</option>)}</select> <input type="number" step="0.001" placeholder="Qtd" className="border p-1 w-20 text-sm" value={newIng.qty} onChange={e=>setNewIng({...newIng, qty:e.target.value})} /> <button type="button" onClick={addIngToRecipe} className="bg-blue-600 text-white px-3 rounded font-bold">+</button> </div> <div className="space-y-1 max-h-32 overflow-y-auto mb-2"> {(data.recipe || []).map((ing, idx) => ( <div key={idx} className="flex justify-between text-xs bg-gray-50 p-1 rounded border"><span>{ing.name} ({ing.qty}{ing.unit})</span> <button type="button" onClick={()=>removeIngFromRecipe(idx)} className="text-red-500 font-bold">x</button></div> ))} </div> <div className="grid grid-cols-3 gap-2 text-xs border-t pt-2 bg-gray-50 p-2 rounded"> <div>Custo:<br/><b className="text-red-600">{formatMoney(metrics.totalCost)}</b></div> <div>Sugerido:<br/><b className="text-blue-600">{formatMoney(metrics.suggested)}</b></div> <div>iFood (27%):<br/><b className="text-orange-600">{formatMoney(metrics.ifood)}</b></div> </div> <div className="mt-2"> <button type="button" onClick={()=>setData({...data, price: metrics.suggested})} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded mr-2">Usar Sugerido</button> <button type="button" onClick={()=>setData({...data, price: metrics.ifood.toFixed(2)})} className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded">Usar iFood</button> </div> </div> <div className="flex gap-2"><button type="submit" className="flex-1 text-white py-2 rounded font-bold" style={theme}>Salvar</button><button type="button" onClick={()=>setEdit(false)} className="flex-1 border py-2 rounded text-gray-600">Cancelar</button></div> </form>} <div className="grid gap-2"> {products.map(p => { const m = getMetrics(p); return ( <div key={p.id} className="flex justify-between items-center border p-3 rounded bg-white shadow-sm"> <div className="flex items-center gap-3"> {p.imageUrl && <img src={p.imageUrl} className="w-10 h-10 rounded object-cover"/>} <div> <h4 className="font-bold">{p.name}</h4> <div className="text-xs flex gap-2 mt-1"> <span className="bg-gray-100 px-2 rounded border text-gray-600">{p.category}</span> <span className="text-orange-600 font-bold bg-orange-50 px-2 rounded border border-orange-100">iFood: {formatMoney(m.ifood)}</span> </div> </div> </div> <div className="flex items-center gap-3"> <span className="font-bold text-lg">{formatMoney(p.price)}</span> <div className="flex gap-1"> <button onClick={()=>{setData(p);setEdit(true)}} className="text-blue-500 p-2"><i className="fa-solid fa-pen"></i></button> <button onClick={()=>del(p.id)} className="text-red-500 p-2"><i className="fa-solid fa-trash"></i></button> </div> </div> </div> ); })} </div> </div> ); }
+        function AdminIngredients({ ingredients, settings, theme, showAlert, showConfirm }) { const [data, setData] = useState({ name: "", unit: "kg", cost: "" }); const save = async (e) => { e.preventDefault(); const cost = parseFloat(data.cost); if(data.id) { await getCol('ingredients').doc(data.id).update({...data, cost}); showConfirm("Atualizar Preços?", "Deseja recalcular o preço de todos os produtos que usam este insumo?", async () => { const batch = db.batch(); const allProducts = await getCol('products').get(); let count = 0; allProducts.docs.forEach(doc => { const prod = doc.data(); if(prod.recipe && prod.recipe.some(r => r.id === data.id)) { const newRecipe = prod.recipe.map(r => r.id === data.id ? {...r, cost, name: data.name} : r); const totalCost = newRecipe.reduce((acc, item) => { const ingRef = ingredients.find(i => i.id === item.id); const currentCost = (item.id === data.id) ? cost : (ingRef ? ingRef.cost : item.cost); return acc + (currentCost * item.qty); }, 0); const newPrice = calculateSmartPrice(totalCost, settings.targetCMV || 35); batch.update(doc.ref, { recipe: newRecipe, price: newPrice }); count++; } }); if(count > 0) { await batch.commit(); showAlert("Sucesso", `${count} produtos atualizados!`, "success"); } else showAlert("Info", "Nenhum produto usava este insumo.", "info"); }); } else { await getCol('ingredients').add({...data, cost}); showAlert("Sucesso", "Criado!", 'success'); } setData({name:"", unit:"kg", cost:""}); }; const del = (id) => showConfirm("Excluir", "Apagar?", async () => await getCol('ingredients').doc(id).delete()); return ( <div> <form onSubmit={save} className="bg-gray-50 p-4 rounded-lg mb-4 border space-y-3"> <div className="grid grid-cols-3 gap-3"> <input placeholder="Nome" className="border p-2 rounded" value={data.name} onChange={e=>setData({...data, name:e.target.value})} /> <select className="border p-2 rounded" value={data.unit} onChange={e=>setData({...data, unit:e.target.value})}><option value="kg">Kg</option><option value="lt">Lt</option><option value="un">Un</option></select> <input type="number" step="0.01" placeholder="Custo" className="border p-2 rounded" value={data.cost} onChange={e=>setData({...data, cost:e.target.value})} /> </div> <button className="w-full text-white px-4 py-2 rounded font-bold" style={theme}>Salvar Insumo</button> </form> <div className="space-y-2">{ingredients.map(i => (<div key={i.id} className="flex justify-between border p-3 rounded bg-white items-center"><div><b>{i.name}</b> <span className="text-xs text-gray-500">({i.unit})</span></div><div className="flex gap-3 items-center"><span className="text-green-600 font-bold">{formatMoney(i.cost)}</span><button onClick={()=>setData(i)} className="text-blue-500"><i className="fa-solid fa-pen"></i></button><button onClick={()=>del(i.id)} className="text-red-500"><i className="fa-solid fa-trash"></i></button></div></div>))}</div> </div> ); }
+        function AdminCoupons({ theme, showAlert, showConfirm }) { const [coupons, setCoupons] = useState([]); const [form, setForm] = useState({ code: "", type: "fixed", value: "", limit: 100, maxDiscount: "" }); useEffect(() => { const u = getCol('coupons').onSnapshot(s => setCoupons(s.docs.map(d => ({ id: d.id, ...d.data() })))); return () => u(); }, []); const save = async (e) => { e.preventDefault(); if(!form.code) return; const payload = { ...form, code: form.code.toUpperCase(), usageCount: 0, active: true, createdAt: new Date().toISOString(), limit: parseInt(form.limit), value: parseFloat(form.value) }; if(form.maxDiscount) payload.maxDiscount = parseFloat(form.maxDiscount); await getCol('coupons').add(payload); setForm({ code: "", type: "fixed", value: "", limit: 100, maxDiscount: "" }); showAlert("Sucesso","Criado",'success'); }; const del = (id) => showConfirm("Excluir", "Apagar?", async () => await getCol('coupons').doc(id).delete()); return ( <div> <form onSubmit={save} className="bg-gray-50 p-4 rounded-lg mb-4 border space-y-3 shadow-sm"> <h4 className="font-bold text-gray-700">Novo Cupom</h4> <div className="grid grid-cols-2 gap-3"> <input placeholder="CÓDIGO (Ex: WELCOME10)" className="border p-2 rounded uppercase font-bold" value={form.code} onChange={e=>setForm({...form, code:e.target.value})} /> <select className="border p-2 rounded" value={form.type} onChange={e=>setForm({...form, type:e.target.value})}> <option value="fixed">Valor Fixo (R$)</option> <option value="percent">Porcentagem (%)</option> <option value="shipping">Entrega Grátis</option> </select> </div> <div className="grid grid-cols-3 gap-3"> <input type="number" placeholder={form.type==='percent'?'Valor %':'Valor R$'} className="border p-2 rounded" value={form.value} onChange={e=>setForm({...form, value:e.target.value})} disabled={form.type==='shipping'} /> <input type="number" placeholder="Qtd Limite" className="border p-2 rounded" value={form.limit} onChange={e=>setForm({...form, limit:e.target.value})} /> <input type="number" placeholder="Teto Máx (R$)" className="border p-2 rounded" value={form.maxDiscount} onChange={e=>setForm({...form, maxDiscount:e.target.value})} disabled={form.type==='fixed'} /> </div> <button className="w-full text-white py-2 rounded font-bold" style={theme}>Criar Cupom</button> </form> <div className="grid gap-3"> {coupons.map(c => { const usage = c.usageCount || 0; const limit = c.limit || 100; const percent = Math.min(100, (usage/limit)*100); return ( <div key={c.id} className="border p-3 rounded bg-white shadow-sm"> <div className="flex justify-between mb-2"> <div> <b className="text-lg text-gray-800">{c.code}</b> <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded"> {c.type==='shipping' ? 'Entrega Grátis' : c.type==='percent' ? `${c.value}% OFF` : `R$ ${c.value} OFF`} </span> </div> <button onClick={()=>del(c.id)} className="text-red-500"><i className="fa-solid fa-trash"></i></button> </div> <div className="w-full bg-gray-200 rounded-full h-2.5"> <div className="bg-blue-600 h-2.5 rounded-full" style={{width: `${percent}%`}}></div> </div> <div className="flex justify-between text-xs text-gray-500 mt-1"> <span>Usado: {usage} / {limit}</span> <span>{percent.toFixed(0)}% esgotado</span> </div> </div> ); })} </div> </div> ); }
+        function AdminCustomers({ showAlert }) { const [all, setAll] = useState([]); const [filter, setFilter] = useState("all"); useEffect(() => { const u = getCol('customers').limit(2000).onSnapshot(s => setAll(s.docs.map(d => ({ id: d.id, ...d.data() })))); return () => u(); }, []); const filtered = useMemo(() => { let list = [...all]; if (filter === "top") return list.filter(c => (c.orderCount || 0) >= 2).sort((a, b) => (b.orderCount || 0) - (a.orderCount || 0)).slice(0, 100); if (filter === "inactive") { const d = new Date(); d.setDate(d.getDate() - 30); return list.filter(c => new Date(c.lastOrder) < d); } return list; }, [all, filter]); const exp = () => { const t = "Nome;Telefone;Endereço;Bairro;Total Pedidos;Ultimo Pedido\n" + filtered.map(x => `${x.name};${x.phone};${x.address}, ${x.number};${x.bairro};${x.orderCount||0};${new Date(x.lastOrder).toLocaleDateString()}`).join('\n'); const a = document.createElement('a'); a.href = 'data:text/csv;charset=utf-8,' + encodeURI("\uFEFF"+t); a.download = `clientes_${filter}.csv`; a.click(); }; return ( <div> <div className="flex flex-wrap gap-2 mb-4 bg-gray-50 p-2 rounded border"> <button onClick={()=>setFilter("all")} className={`px-3 py-1 rounded text-sm font-bold ${filter==="all"?"bg-gray-800 text-white":"bg-white border"}`}>Todos</button> <button onClick={()=>setFilter("top")} className={`px-3 py-1 rounded text-sm font-bold ${filter==="top"?"bg-gray-800 text-white":"bg-white border"}`}>Top 100</button> <button onClick={()=>setFilter("inactive")} className={`px-3 py-1 rounded text-sm font-bold ${filter==="inactive"?"bg-gray-800 text-white":"bg-white border"}`}>Inativos (+30d)</button> <button onClick={exp} className="bg-green-600 text-white px-3 py-1 rounded text-sm font-bold ml-auto"><i className="fa-solid fa-file-csv"></i> CSV</button> </div> <div className="h-96 overflow-y-auto space-y-2 border rounded bg-gray-50 p-2">{filtered.map(x=>( <div key={x.id} className="bg-white p-3 rounded shadow-sm flex justify-between items-center"> <div><b className="text-gray-800">{x.name}</b> <span className="text-xs text-gray-500">({x.orderCount||1} pedidos)</span><br/><span className="text-sm text-gray-600">{x.phone}</span></div> <div className="text-right text-xs text-gray-400">Último: {new Date(x.lastOrder).toLocaleDateString()}</div> </div> ))}</div> </div> ); }
+        
+        function AdminConfig({ settings, categories, theme, showAlert, showConfirm, ingredients, products }) { 
+            const [data, setData] = useState(settings); const [tab, setTab] = useState('visual'); const [nC, setNC] = useState(""); 
+            const handleChange = (k, v) => setData(p=>({...p, [k]:v})); 
+            const save = () => { getConfigDoc().set(data, {merge:true}); showAlert("Sucesso", "Atualizado!", "success"); }; 
+            const addC = () => { if(nC) getCol('categories').add({ name: nC, order: categories.length }); setNC(""); }; 
+            const delC = (id) => showConfirm("Excluir", "Apagar?", async () => await getCol('categories').doc(id).delete()); 
+            const move = (idx, dir) => { if((dir===-1&&idx===0)||(dir===1&&idx===categories.length-1))return; const items = [...categories]; const temp = items[idx]; items[idx] = items[idx+dir]; items[idx+dir] = temp; const b = db.batch(); items.forEach((cat, i) => b.update(getCol('categories').doc(cat.id), {order: i})); b.commit(); }; 
+            const ColorInput = ({ label, propKey }) => (<div><label className="text-xs text-gray-500">{label}</label><div className="flex gap-2 items-center"><input type="color" value={data[propKey]||"#000000"} onChange={e=>handleChange(propKey,e.target.value)} /><input type="text" className="border rounded px-2 py-1 text-sm font-mono flex-1 uppercase" value={data[propKey]||""} onChange={e=>handleChange(propKey,e.target.value)} placeholder="#000000" maxLength={7} /></div></div>); 
+            const addKey = (key) => { const area = document.getElementById('msg-template-area'); if(area) { const start = area.selectionStart; const end = area.selectionEnd; const text = data.whatsappTemplate || ""; const newText = text.substring(0, start) + key + text.substring(end); handleChange("whatsappTemplate", newText); setTimeout(() => { area.focus(); area.setSelectionRange(start+key.length, start+key.length); }, 50); } else handleChange("whatsappTemplate", (data.whatsappTemplate || "") + key); };
+            const placeholders = [{k: "{nome}", l: "Nome"}, {k: "{telefone}", l: "Fone"}, {k: "{endereco}", l: "Rua e Nº"}, {k: "{bairro}", l: "Bairro"}, {k: "{complemento}", l: "Obs (Se houver)"}, {k: "{itens}", l: "Lista de Itens"}, {k: "{total}", l: "Valor Final"}, {k: "{subtotal}", l: "Subtotal"}, {k: "{entrega}", l: "Taxa"}, {k: "{pagamento}", l: "Forma Pagto"}, {k: "{troco}", l: "Troco (Se houver)"}, {k: "{cupom}", l: "Cupom (Se houver)"}, {k: "{link_rastreio}", l: "Link"}];
+            const defaultTemplate = "*NOVO PEDIDO - {nome_app}*\n{nome}\n{telefone}\n\n📍 {endereco} - {bairro}\n{complemento}\n\n🛒 *ITENS:*\n{itens}\n\n💰 *RESUMO:*\nSubtotal: {subtotal}\nEntrega: {entrega}\n*TOTAL: {total}*\n\n💳 {pagamento}\n{troco}\n{cupom}\n\n🛵 *Acompanhe:*\n{link_rastreio}";
+            
+            const bulkUpdate = async () => { showConfirm("Recalcular TUDO?", "Isso atualizará o preço de TODOS os produtos com base no CMV de " + (data.targetCMV||35) + "%.", async () => { const batch = db.batch(); let count = 0; products.forEach(p => { if(p.recipe && p.recipe.length > 0) { const totalCost = p.recipe.reduce((acc, item) => { const ing = ingredients.find(i => i.id === item.id); return acc + ((ing ? ing.cost : item.cost) * item.qty); }, 0); const newPrice = calculateSmartPrice(totalCost, data.targetCMV || 35); batch.update(getCol('products').doc(p.id), { price: newPrice }); count++; } }); if(count > 0) { await batch.commit(); showAlert("Sucesso", `${count} produtos atualizados!`, "success"); } else showAlert("Info", "Nenhum produto com receita para atualizar.", "info"); }); };
+
+            return ( 
+                <div className="space-y-4">
+                    <div className="flex overflow-x-auto gap-2 pb-2 hide-scrollbar">
+                        {[{id: 'visual', icon: 'fa-paintbrush', label: 'Visual'}, {id: 'message', icon: 'fa-whatsapp', label: 'Mensagem WhatsApp'}, {id: 'operation', icon: 'fa-clock', label: 'Operação'}, {id: 'payment', icon: 'fa-credit-card', label: 'Pagamento'}, {id: 'categories', icon: 'fa-list', label: 'Categorias'}].map(t => (
+                            <button key={t.id} onClick={()=>setTab(t.id)} className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold whitespace-nowrap transition ${tab===t.id ? 'bg-gray-800 text-white shadow-lg' : 'bg-white text-gray-600 border'}`}><i className={`fa-solid ${t.icon}`}></i> {t.label}</button>
+                        ))}
+                    </div>
+                    <div className="bg-white rounded-xl shadow-sm border p-4 animate-fade-in relative overflow-hidden">
+                        {tab === 'visual' && (
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div><label className="text-xs font-bold text-gray-500 uppercase">Nome do App</label><input className="border w-full p-2 rounded" value={data.appName||""} onChange={e=>handleChange("appName",e.target.value)} /></div>
+                                    <div className="md:col-span-2"><label className="text-xs font-bold text-gray-500 uppercase">Frase do Cabeçalho</label><input className="border w-full p-2 rounded" value={data.headerPhrase||""} onChange={e=>handleChange("headerPhrase",e.target.value)} /></div>
+                                </div>
+                                <hr/><h4 className="font-bold text-gray-800">Cores</h4><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><ColorInput label="Cor Principal" propKey="themeColor" /><ColorInput label="Cor Fundo" propKey="bgColor" /><ColorInput label="Cor Botão Carrinho" propKey="cartColor" /><ColorInput label="Cor Texto do Título" propKey="appNameColor" /></div>
+                                <hr/><div className="grid grid-cols-2 gap-4"><div><label className="text-xs text-gray-500">Estilo dos Cards</label><select className="border w-full p-2 rounded" value={data.cardStyle||"grid"} onChange={e=>handleChange("cardStyle",e.target.value)}><option value="grid">Grade</option><option value="list">Lista</option><option value="minimal">Minimal</option></select></div><div><label className="text-xs text-gray-500">Bordas</label><select className="border w-full p-2 rounded" value={data.borderRadius||"rounded-2xl"} onChange={e=>handleChange("borderRadius",e.target.value)}><option value="rounded-2xl">Moderno</option><option value="rounded-lg">Suave</option><option value="rounded-none">Quadrado</option></select></div></div>
+                                <hr/><div className="grid grid-cols-1 gap-3"><div><label className="text-xs text-gray-500">Logo URL</label><input className="border w-full p-2 rounded text-sm" value={data.logoUrl||""} onChange={e=>handleChange("logoUrl",e.target.value)} /></div><div><label className="text-xs text-gray-500">Banner URL</label><input className="border w-full p-2 rounded text-sm" value={data.bannerUrl||""} onChange={e=>handleChange("bannerUrl",e.target.value)} /></div></div><div className="grid grid-cols-2 gap-4"><div><label className="text-xs text-gray-500">Estilo Logo</label><select className="border w-full p-2 rounded" value={data.logoStyle||"circle"} onChange={e=>handleChange("logoStyle",e.target.value)}><option value="circle">Circular</option><option value="square">Quadrado</option><option value="raw">Puro</option><option value="none">Texto</option></select></div><div><label className="text-xs text-gray-500">Tamanho Logo</label><input type="number" className="border w-full p-2 rounded" value={data.logoSize||60} onChange={e=>handleChange("logoSize",e.target.value)} /></div></div>
+                            </div>
+                        )}
+                        {tab === 'message' && (
+                            <div className="space-y-3">
+                                <div className="bg-green-50 p-3 rounded text-sm text-green-800 border border-green-200"><i className="fa-brands fa-whatsapp mr-1"></i> Configure aqui a integração automática.</div>
+                                
+                                <div className="mb-4">
+                                    <label className="font-bold text-gray-700 block mb-1">Link do Servidor WhatsApp (API Tunnel)</label>
+                                    <input className="border w-full p-3 rounded-lg font-mono text-sm bg-gray-50 focus:ring-2 focus:ring-green-500 outline-none" placeholder="Ex: https://fritzza.trycloudflare.com/send" value={data.whatsappServerUrl || ""} onChange={e=>handleChange("whatsappServerUrl", e.target.value)} />
+                                    <p className="text-xs text-gray-500 mt-1">Cole aqui o link gerado pelo Cloudflare no seu servidor.</p>
+                                </div>
+
+                                <label className="font-bold text-gray-700 block">Modelo da Mensagem (O que o cliente envia)</label>
+                                <textarea id="msg-template-area" className="w-full h-64 border p-4 rounded-lg font-mono text-sm bg-gray-50 focus:ring-2 focus:ring-green-500 outline-none" value={data.whatsappTemplate || defaultTemplate} onChange={e=>handleChange("whatsappTemplate", e.target.value)}></textarea>
+                                <div className="flex flex-wrap gap-2 mt-2 p-2 bg-gray-100 rounded border">
+                                    {placeholders.map(p => (
+                                        <button key={p.k} onClick={()=>addKey(p.k)} className="bg-white hover:bg-gray-50 text-gray-700 px-2 py-1 rounded text-xs font-bold border shadow-sm transition active:scale-95" title={p.l}>{p.k}</button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        {tab === 'operation' && (
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4"><div><label className="text-xs font-bold text-gray-500">Abre às</label><input type="time" className="border w-full p-2 rounded" value={data.openTime||"18:00"} onChange={e=>handleChange("openTime",e.target.value)} /></div><div><label className="text-xs font-bold text-gray-500">Fecha às</label><input type="time" className="border w-full p-2 rounded" value={data.closeTime||"23:00"} onChange={e=>handleChange("closeTime",e.target.value)} /></div></div>
+                                <hr/><h4 className="font-bold text-gray-800">Localização</h4>
+                                <div className="grid grid-cols-2 gap-4"><div><label className="text-xs text-gray-500">Latitude</label><input className="border w-full p-2 rounded" value={data.restLat||""} onChange={e=>handleChange("restLat",e.target.value)} /></div><div><label className="text-xs text-gray-500">Longitude</label><input className="border w-full p-2 rounded" value={data.restLng||""} onChange={e=>handleChange("restLng",e.target.value)} /></div></div>
+                                <div className="grid grid-cols-2 gap-4 items-end">
+                                    <div><label className="text-xs font-bold text-gray-500">Preço por KM (R$)</label><input type="number" step="0.10" className="border w-full p-2 rounded font-bold" value={data.pricePerKm||2.00} onChange={e=>handleChange("pricePerKm",e.target.value)} /></div>
+                                    <div><label className="text-xs font-bold text-red-600">Meta CMV (%)</label><input type="number" className="border w-full p-2 rounded font-bold border-red-200 bg-red-50" value={data.targetCMV||35} onChange={e=>handleChange("targetCMV",e.target.value)} /></div>
+                                </div>
+                                <button onClick={bulkUpdate} className="w-full bg-orange-500 text-white py-3 rounded-lg font-bold shadow hover:bg-orange-600 mt-4"><i className="fa-solid fa-calculator mr-2"></i> Recalcular Preços de TUDO (Baseado no CMV)</button>
+                            </div>
+                        )}
+                        {tab === 'payment' && (
+                            <div className="space-y-4">
+                                <div><label className="text-xs font-bold text-gray-500">Chave Pix Manual</label><input className="border w-full p-2 rounded" value={data.pixKey||""} onChange={e=>handleChange("pixKey",e.target.value)} /></div>
+                                <hr/><div className="bg-gray-50 p-4 rounded-xl border border-gray-200"><h4 className="font-bold text-gray-800 mb-2">Mercado Pago (Pix Auto)</h4><label className="text-xs font-bold text-gray-500">Access Token</label><input className="border w-full p-2 rounded font-mono text-sm bg-white" value={data.mercadoPagoToken||""} onChange={e=>handleChange("mercadoPagoToken",e.target.value)} type="password" /></div>
+                            </div>
+                        )}
+                        {tab === 'categories' && (
+                            <div><h3 className="font-bold border-b pb-2 mb-3">Gerenciar Categorias</h3><div className="flex gap-2 mb-4"><input className="border p-2 flex-1 rounded" placeholder="Nova Categoria..." value={nC} onChange={e=>setNC(e.target.value)} /><button onClick={addC} className="text-white px-4 rounded font-bold shadow" style={theme}>+</button></div><div className="space-y-2 max-h-60 overflow-y-auto">{categories.map((c,i)=><div key={c.id} className="flex justify-between items-center bg-gray-50 p-2 rounded border"><span>{c.name}</span><div className="flex gap-1"><button onClick={()=>move(i,-1)} className="text-gray-400 hover:text-gray-600 px-2"><i className="fa-solid fa-arrow-up"></i></button><button onClick={()=>move(i,1)} className="text-gray-400 hover:text-gray-600 px-2"><i className="fa-solid fa-arrow-down"></i></button><button onClick={(e)=>{e.stopPropagation(); delC(c.id)}} className="text-red-500 hover:text-red-700 ml-2"><i className="fa-solid fa-trash"></i></button></div></div>)}</div></div> )} <div className="mt-6 pt-4 border-t"><button onClick={save} className="w-full py-3 rounded-lg text-white font-bold shadow-md hover:opacity-90" style={theme}><i className="fa-solid fa-save mr-2"></i> Salvar</button></div> </div> </div> ); 
+        }
+
+        function App() {
+            const [user, setUser] = useState(null); const [view, setView] = useState('dashboard'); const [products, setProducts] = useState([]); const [categories, setCategories] = useState([]); const [ingredients, setIngredients] = useState([]); const [settings, setSettings] = useState({}); const [loading, setLoading] = useState(true); const [sidebarOpen, setSidebarOpen] = useState(false); const [modal, setModal] = useState({ isOpen: false, title: '', message: '', type: 'info', onConfirm: null });
+            const [onlineCount, setOnlineCount] = useState(0);
+
+            const showAlert = (title, message, type='info') => setModal({ isOpen: true, title, message, type });
+            const showConfirm = (title, message, onConfirm) => setModal({ isOpen: true, title, message, type: 'confirm', onConfirm });
+            const closeModal = () => setModal({ ...modal, isOpen: false });
+            useEffect(() => { auth.onAuthStateChanged(u => { setUser(u); if(u) fetchData(); else setLoading(false); }); }, []);
+            
+            useEffect(() => {
+                const unsub = getCol('active_visitors').onSnapshot(snapshot => {
+                    const now = new Date();
+                    const fiveMinutesAgo = new Date(now.getTime() - 5 * 60000);
+                    const active = snapshot.docs.filter(doc => {
+                        const data = doc.data();
+                        return data.last_seen && new Date(data.last_seen) > fiveMinutesAgo;
+                    });
+                    setOnlineCount(active.length);
+                });
+                return () => unsub();
+            }, []);
+
+            const fetchData = () => {
+                const unsubs = [];
+                unsubs.push(getCol('products').onSnapshot(s => setProducts(s.docs.map(d=>({id:d.id, ...d.data()})))));
+                unsubs.push(getCol('categories').orderBy('order').onSnapshot(s => setCategories(s.docs.map(d=>({id:d.id, ...d.data()})))));
+                unsubs.push(getCol('ingredients').onSnapshot(s => setIngredients(s.docs.map(d=>({id:d.id, ...d.data()})))));
+                unsubs.push(getConfigDoc().onSnapshot(d => { if(d.exists) setSettings(d.data()); setLoading(false); }));
+                return () => unsubs.forEach(u => u());
+            };
+            const handleLogin = async (email, password) => { setLoading(true); try { await auth.signInWithEmailAndPassword(email, password); } catch (error) { showAlert("Erro", "Login inválido.", "error"); setLoading(false); } };
+            const themeStyle = { backgroundColor: settings.themeColor || '#dc2626' };
+            
+            if (loading && !user) return <div className="min-h-screen flex items-center justify-center text-gray-400"><i className="fa-solid fa-spinner fa-spin text-3xl"></i></div>;
+            if (!user) return <><LoginView onLogin={handleLogin} loading={loading} /><GlobalModal modal={modal} close={closeModal} /></>;
+
+            const MenuBtn = ({ id, icon, label }) => (<button onClick={() => { setView(id); setSidebarOpen(false); }} className={`w-full text-left p-3 rounded-lg mb-1 flex items-center gap-3 transition ${view === id ? 'bg-white text-red-600 shadow font-bold' : 'text-white hover:bg-white/10'}`}><i className={`fa-solid ${icon} w-6 text-center`}></i> {label}</button>);
+            
+            return (
+                <div className="min-h-screen flex bg-gray-100">
+                    <GlobalModal modal={modal} close={closeModal} />
+                    <div className="fixed w-full bg-white z-40 p-4 shadow-sm flex justify-between items-center md:hidden"><div className="font-bold text-gray-800">{settings.appName || 'Admin'}</div><button onClick={()=>setSidebarOpen(!sidebarOpen)} className="text-gray-600"><i className="fa-solid fa-bars text-xl"></i></button></div>
+                    
+                    <div className={`sidebar fixed md:relative w-64 h-screen flex flex-col justify-between z-50 shadow-xl md:shadow-none ${sidebarOpen ? 'open' : ''}`} style={themeStyle}>
+                        <div className="p-4">
+                            <div className="text-white font-bold text-2xl mb-8 flex items-center gap-2 px-2"><i className="fa-solid fa-pizza-slice"></i> {settings.appName || 'Fritzza'}</div>
+                            <nav>
+                                <MenuBtn id="dashboard" icon="fa-chart-pie" label="Resumo" /><MenuBtn id="orders" icon="fa-list-check" label="Pedidos" /><MenuBtn id="products" icon="fa-burger" label="Produtos" /><MenuBtn id="ingredients" icon="fa-carrot" label="Insumos" /><MenuBtn id="config" icon="fa-wand-magic-sparkles" label="Personalizar App" />
+                                <div className="border-t border-white/20 my-2 pt-2"><MenuBtn id="coupons" icon="fa-ticket" label="Cupons" /><MenuBtn id="customers" icon="fa-users" label="Clientes" /></div>
+                            </nav>
+                        </div>
+                        
+                        <div className="p-4 bg-black/10 border-t border-white/10 text-white">
+                             <div className="flex items-center justify-center gap-2 text-xs mb-3 bg-black/20 p-2 rounded-full border border-white/10">
+                                <span className="pulse-dot"></span> {onlineCount} Visitantes Online
+                             </div>
+                             <button onClick={() => auth.signOut()} className="w-full text-left p-3 rounded-lg flex items-center gap-3 text-white hover:bg-white/20 transition font-bold text-red-100 hover:text-white">
+                                <i className="fa-solid fa-right-from-bracket w-6 text-center"></i> Sair do Sistema
+                            </button>
+                        </div>
+                    </div>
+                    
+                    {sidebarOpen && <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={()=>setSidebarOpen(false)}></div>}
+                    
+                    <main className="flex-1 p-4 md:p-8 pt-20 md:pt-8 overflow-y-auto h-screen">
+                        <header className="flex justify-between items-center mb-6">
+                            <h1 className="text-2xl font-bold text-gray-800">
+                                {view === 'dashboard' && 'Resumo Geral'}{view === 'orders' && 'Gerenciar Pedidos'}{view === 'products' && 'Cardápio & Fichas'}{view === 'ingredients' && 'Insumos & Custos'}{view === 'config' && 'Personalizar Site Cliente'}{view === 'coupons' && 'Cupons de Desconto'}{view === 'customers' && 'Base de Clientes'}
+                            </h1>
+                        </header>
+                        <div className="max-w-5xl mx-auto">
+                            {view === 'dashboard' && <AdminDashboard theme={themeStyle} />}
+                            {view === 'orders' && <AdminOrders showConfirm={showConfirm} settings={settings} />}
+                            {view === 'products' && <AdminProducts products={products} categories={categories} ingredients={ingredients} settings={settings} theme={themeStyle} showAlert={showAlert} showConfirm={showConfirm} />}
+                            {view === 'ingredients' && <AdminIngredients ingredients={ingredients} settings={settings} theme={themeStyle} showAlert={showAlert} showConfirm={showConfirm} />}
+                            {view === 'config' && <AdminConfig settings={settings} categories={categories} theme={themeStyle} showAlert={showAlert} showConfirm={showConfirm} ingredients={ingredients} products={products} />}
+                            {view === 'coupons' && <AdminCoupons theme={themeStyle} showAlert={showAlert} showConfirm={showConfirm} />}
+                            {view === 'customers' && <AdminCustomers showAlert={showAlert} />}
+                        </div>
+                    </main>
+                </div>
+            );
+        }
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
+
+
