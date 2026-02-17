@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Acompanhar Pedido - Fritzza</title>
+    <title>Acompanhar Pedido</title>
     <!-- React & Tailwind -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
@@ -31,9 +31,33 @@
 <body>
     <div id="root"></div>
     <script type="text/babel">
-        const firebaseConfig = { apiKey: "AIzaSyAg2kfoWsvWWyEXQGe8v6jZZqKepgButUk", authDomain: "ajuda-2217b.firebaseapp.com", projectId: "ajuda-2217b", storageBucket: "ajuda-2217b.firebasestorage.app", messagingSenderId: "421083897636", appId: "1:421083897636:web:18bd6097b5c0169427ddb1" };
-        if (!firebase.apps.length) { try { firebase.initializeApp(firebaseConfig); } catch (e) {} }
-        const db = firebase.firestore(); const APP_ID = "ajuda-2217b"; 
+        // =================================================================================
+        // --- CONFIGURAÇÃO DO CLIENTE (ALTERE APENAS AQUI PARA MUDAR O SITE) ---
+        // =================================================================================
+        
+        // 1. Identificador da Pasta/Coleção no Banco de Dados (ex: 'pizzaria-1', 'loja-do-joao')
+        const APP_COLLECTION_ID = "rodaoDef"; 
+
+        // 2. Configurações do Firebase (Copie do Console do Firebase)
+        const firebaseConfig = {
+  apiKey: "AIzaSyAf7ML3Gd9kJQI5XcowCRlH0F1VF7x-gMI",
+  authDomain: "rodaodef.firebaseapp.com",
+  projectId: "rodaodef",
+  storageBucket: "rodaodef.firebasestorage.app",
+  messagingSenderId: "232817991067",
+  appId: "1:232817991067:web:469fc0e867e516b510153e",
+  measurementId: "G-5NL356FCMP"
+};
+
+        
+        // =================================================================================
+        // --- FIM DA CONFIGURAÇÃO (NÃO ALTERE O CÓDIGO ABAIXO) ---
+        // =================================================================================
+
+        if (!firebase.apps.length) { try { firebase.initializeApp(FIREBASE_CONFIG); } catch (e) {} }
+        const db = firebase.firestore();
+        const APP_ID = APP_COLLECTION_ID; 
+
         const getCol = (n) => db.collection('artifacts').doc(APP_ID).collection('public').doc('data').collection(n);
         const { useState, useEffect, useMemo } = React;
         const formatMoney = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -111,5 +135,4 @@
     </script>
 </body>
 </html>
-
 
