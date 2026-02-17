@@ -41,9 +41,24 @@
 <body>
     <div id="root"></div>
     <script type="text/babel">
-        const firebaseConfig = { apiKey: "AIzaSyAg2kfoWsvWWyEXQGe8v6jZZqKepgButUk", authDomain: "ajuda-2217b.firebaseapp.com", projectId: "ajuda-2217b", storageBucket: "ajuda-2217b.firebasestorage.app", messagingSenderId: "421083897636", appId: "1:421083897636:web:18bd6097b5c0169427ddb1" };
+        // --- NOVA CONFIGURAÇÃO FIREBASE (RODAODEF) ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyAf7ML3Gd9kJQI5XcowCRlH0F1VF7x-gMI",
+            authDomain: "rodaodef.firebaseapp.com",
+            projectId: "rodaodef",
+            storageBucket: "rodaodef.firebasestorage.app",
+            messagingSenderId: "232817991067",
+            appId: "1:232817991067:web:09d1a2226f09696710153e",
+            measurementId: "G-W3C2VH0QFP"
+        };
+        
         if (!firebase.apps.length) { try { firebase.initializeApp(firebaseConfig); } catch (e) {} }
-        const auth = firebase.auth(); const db = firebase.firestore(); const APP_ID = "ajuda-2217b"; 
+        const auth = firebase.auth(); 
+        const db = firebase.firestore(); 
+        
+        // Atualizado para o ID do projeto novo para manter consistência no Firestore
+        const APP_ID = "rodaodef"; 
+        
         const getCol = (n) => db.collection('artifacts').doc(APP_ID).collection('public').doc('data').collection(n);
         const getConfigDoc = () => db.collection('artifacts').doc(APP_ID).collection('public').doc('data').collection('config').doc('main');
         
@@ -58,7 +73,6 @@
         };
 
         // --- FUNÇÃO DE ENVIO DE MENSAGEM (ADMIN -> CLIENTE) ---
-        // Esta função envia atualizações de status.
         async function sendWhatsAppNotification(phone, statusKey, customerName, settings) {
             if (!phone || !settings.whatsappServerUrl) return;
             
@@ -324,8 +338,7 @@
                             {view === 'ingredients' && <AdminIngredients ingredients={ingredients} settings={settings} theme={themeStyle} showAlert={showAlert} showConfirm={showConfirm} />}
                             {view === 'config' && <AdminConfig settings={settings} categories={categories} theme={themeStyle} showAlert={showAlert} showConfirm={showConfirm} ingredients={ingredients} products={products} />}
                             {view === 'coupons' && <AdminCoupons theme={themeStyle} showAlert={showAlert} showConfirm={showConfirm} />}
-                            {view === 'customers' && <AdminCustomers showAlert={showAlert} />}
-                        </div>
+                            {view === 'customers' && <AdminCustomers showAlert={showAlert} />}\n                        </div>
                     </main>
                 </div>
             );
@@ -335,5 +348,4 @@
     </script>
 </body>
 </html>
-
 
