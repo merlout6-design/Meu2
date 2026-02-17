@@ -3,23 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Delivery App</title>
+    <title>Fritzza - Delivery</title>
 
-    <meta name="description" content="Faça seu pedido online. Rápido, fácil e delicioso.">
+    <meta name="description" content="Delivery Fritzza em Cascavel. A melhor pizza frita e empanado da cidade. Peça online: rápido, crocante e delicioso.">
 
-    <meta property="og:title" content="Delivery Online 🍔">
-    <meta property="og:description" content="Bateu a fome? Peça agora! Clique para ver o cardápio.">
+    <meta property="og:title" content="Fritzza - O Delivery Crocante 🍔">
+    <meta property="og:description" content="Bateu a fome? Peça agora nossas pizzas fritas e empanados. Clique para ver o cardápio!">
+    <meta property="og:url" content="https://fritzza.online/">
     <meta property="og:type" content="website">
     <meta property="og:locale" content="pt_BR">
-    
-    <!-- Bibliotecas React e Tailwind -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- Firebase Compat -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -60,14 +58,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        // =================================================================================
-        // --- CONFIGURAÇÃO DO CLIENTE (ALTERE APENAS AQUI PARA MUDAR O SITE) ---
-        // =================================================================================
-        
-        // 1. Identificador da Pasta/Coleção no Banco de Dados (ex: 'pizzaria-1', 'loja-do-joao')
-        const APP_COLLECTION_ID = "rodaodef"; 
-
-        // 2. Configurações do Firebase (Copie do Console do Firebase)
+        // --- CONFIGURAÇÃO FIREBASE ---
         const firebaseConfig = {
   apiKey: "AIzaSyAf7ML3Gd9kJQI5XcowCRlH0F1VF7x-gMI",
   authDomain: "rodaodef.firebaseapp.com",
@@ -77,22 +68,17 @@
   appId: "1:232817991067:web:469fc0e867e516b510153e",
   measurementId: "G-5NL356FCMP"
 };
-        
-        // =================================================================================
-        // --- FIM DA CONFIGURAÇÃO (NÃO ALTERE O CÓDIGO ABAIXO) ---
-        // =================================================================================
 
-        if (!firebase.apps.length) { try { firebase.initializeApp(FIREBASE_CONFIG); } catch (e) {} }
+        if (!firebase.apps.length) { try { firebase.initializeApp(firebaseConfig); } catch (e) {} }
         const auth = firebase.auth();
         const db = firebase.firestore();
-        // Usa a constante definida no topo
-        const APP_ID = APP_COLLECTION_ID; 
-        
+        const APP_ID = "rodaodef"; 
         const getCol = (n) => db.collection('artifacts').doc(APP_ID).collection('public').doc('data').collection(n);
 
         const { useState, useEffect, useMemo, useRef } = React;
         const formatMoney = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
         const DEFAULT_COORDS = { lat: -25.0015570, lng: -53.4628300 };
+        const WHATSAPP_NUMBER = "5545988166885";
 
         // --- UTILITÁRIOS ---
         const isStoreOpen = (start, end) => {
@@ -208,7 +194,7 @@
             const [products, setProducts] = useState([]);
             const [categories, setCategories] = useState([]);
             const [neighborhoods, setNeighborhoods] = useState([]);
-            const [settings, setSettings] = useState({ appName: "Delivery", themeColor: "#dc2626", openTime: "18:00", closeTime: "23:00", cardStyle: "grid", borderRadius: "rounded-2xl", restLat: DEFAULT_COORDS.lat, restLng: DEFAULT_COORDS.lng, pricePerKm: 2.00 });
+            const [settings, setSettings] = useState({ appName: "Fritzza", themeColor: "#dc2626", openTime: "18:00", closeTime: "23:00", cardStyle: "grid", borderRadius: "rounded-2xl", restLat: DEFAULT_COORDS.lat, restLng: DEFAULT_COORDS.lng, pricePerKm: 2.00 });
             const [loading, setLoading] = useState(true);
 
             const showAlert = (title, message, type='alert', icon=null) => setModal({ isOpen: true, type, title, message, icon });
@@ -265,7 +251,6 @@
                             const data = d.data();
                             setSettings(prev => ({...prev, ...data})); 
                             if(data.bgColor) document.body.style.backgroundColor = data.bgColor; 
-                            if(data.appName) document.title = data.appName;
                         } 
                     });
                     root.collection('categories').orderBy('order').onSnapshot(s => setCategories(s.docs.map(d => ({ id: d.id, ...d.data() }))));
@@ -548,4 +533,5 @@
     </script>
 </body>
 </html>
+
 

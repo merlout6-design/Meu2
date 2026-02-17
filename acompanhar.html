@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Acompanhar Pedido</title>
+    <title>Acompanhar Pedido - Fritzza</title>
     <!-- React & Tailwind -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
@@ -31,14 +31,6 @@
 <body>
     <div id="root"></div>
     <script type="text/babel">
-        // =================================================================================
-        // --- CONFIGURAÇÃO DO CLIENTE (ALTERE APENAS AQUI PARA MUDAR O SITE) ---
-        // =================================================================================
-        
-        // 1. Identificador da Pasta/Coleção no Banco de Dados (ex: 'pizzaria-1', 'loja-do-joao')
-        const APP_COLLECTION_ID = "rodaoDef"; 
-
-        // 2. Configurações do Firebase (Copie do Console do Firebase)
         const firebaseConfig = {
   apiKey: "AIzaSyAf7ML3Gd9kJQI5XcowCRlH0F1VF7x-gMI",
   authDomain: "rodaodef.firebaseapp.com",
@@ -48,16 +40,8 @@
   appId: "1:232817991067:web:469fc0e867e516b510153e",
   measurementId: "G-5NL356FCMP"
 };
-
-        
-        // =================================================================================
-        // --- FIM DA CONFIGURAÇÃO (NÃO ALTERE O CÓDIGO ABAIXO) ---
-        // =================================================================================
-
-        if (!firebase.apps.length) { try { firebase.initializeApp(FIREBASE_CONFIG); } catch (e) {} }
-        const db = firebase.firestore();
-        const APP_ID = APP_COLLECTION_ID; 
-
+        if (!firebase.apps.length) { try { firebase.initializeApp(firebaseConfig); } catch (e) {} }
+        const db = firebase.firestore(); const APP_ID = "rodaodef"; 
         const getCol = (n) => db.collection('artifacts').doc(APP_ID).collection('public').doc('data').collection(n);
         const { useState, useEffect, useMemo } = React;
         const formatMoney = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -135,4 +119,5 @@
     </script>
 </body>
 </html>
+
 
