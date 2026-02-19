@@ -330,10 +330,16 @@
                                             {settings.logoUrl ? <img src={settings.logoUrl} className={`${settings.logoStyle === 'raw' ? 'w-16 h-16 object-contain' : 'w-full h-full object-cover'} ${settings.logoStyle==='circle'?'rounded-full':(settings.logoStyle==='square' ? 'rounded-lg' : '')}`} /> : <span className="font-chewy text-2xl">{settings.appName?.[0]}</span>}
                                         </div>
                                     )}
-                                    <div>
-                                        <h1 className="font-chewy text-3xl leading-none drop-shadow-md" style={{color: settings.appNameColor || '#fff'}}>{settings.appName}</h1>
-                                        <p className="text-white/90 text-xs font-medium tracking-wide drop-shadow-sm">{settings.appSubtitle}</p>
-                                    </div>
+                                    <div className="flex flex-col justify-center">
+    <img 
+        src="COLOQUE_A_URL_DA_SUA_IMAGEM_AQUI" 
+        alt="Logo Fritzza" 
+        className="h-12 w-auto object-contain drop-shadow-md" 
+    />
+    {/* Se quiser que o subtítulo (aquela frase embaixo do nome) continue aparecendo, deixe a linha abaixo. Se não, pode apagar! */}
+    <p className="text-white/90 text-xs font-medium tracking-wide drop-shadow-sm mt-1">{settings.appSubtitle}</p>
+</div>
+
                                 </div>
                                 <button onClick={()=>window.location.href='acompanhar.html'} className="bg-white/20 backdrop-blur text-white px-3 py-1.5 rounded-full text-xs font-bold border border-white/30 hover:bg-white/30 transition">
                                     <i className="fa-solid fa-motorcycle mr-1"></i> Pedidos
