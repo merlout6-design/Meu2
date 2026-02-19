@@ -380,16 +380,19 @@
 
             return (
                 <div className="pb-10">
-                    <div className={`bg-white shadow-lg p-4 mb-6 glass-panel ${border}`}>
-                        <div className={`flex items-center justify-center gap-2 text-sm font-bold mb-4 ${isOpen ? 'text-green-600' : 'text-red-500'}`}>
-                            <div className={`w-2 h-2 rounded-full ${isOpen ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
-                            {isOpen ? "Aberto agora" : `Fechado • Abre às ${settings.openTime}`}
-                        </div>
-                        <div className="relative">
-                            <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                            <input type="text" placeholder="Buscar..." className={`w-full bg-gray-100 border-none py-3 pl-10 pr-4 text-gray-700 focus:ring-2 focus:ring-opacity-50 outline-none transition ${border}`} style={{'--tw-ring-color': settings.themeColor}} value={search} onChange={e=>setSearch(e.target.value)} />
-                        </div>
-                    </div>
+    {/* Adicionei 'mt-8' logo no início do className abaixo */}
+    <div className={`mt-8 bg-white shadow-lg p-4 mb-6 glass-panel ${border}`}>
+        
+        <div className={`flex items-center justify-center gap-2 text-sm font-bold mb-4 ${isOpen ? 'text-green-600' : 'text-red-500'}`}>
+            <div className={`w-2 h-2 rounded-full ${isOpen ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
+            {isOpen ? "Aberto agora" : `Fechado • Abre às ${settings.openTime}`}
+        </div>
+        
+        <div className="relative">
+            <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+            <input type="text" placeholder="Buscar..." className={`w-full bg-gray-100 border-none py-3 pl-10 pr-4 text-gray-700 focus:ring-2 focus:ring-opacity-50 outline-none transition ${border}`} style={{'--tw-ring-color': settings.themeColor}} value={search} onChange={e=>setSearch(e.target.value)} />
+        </div>
+    </div>
                     <div className="flex gap-2 overflow-x-auto pb-4 hide-scrollbar mb-2 sticky top-20 z-30 py-2 -mx-4 px-4 bg-gradient-to-b from-[#f8fafc] to-transparent">
                         <button onClick={()=>setCatSel("Todas")} className={`px-4 py-2 text-sm font-bold whitespace-nowrap transition shadow-sm ${catSel==="Todas" ? 'text-white shadow-md transform scale-105' : 'bg-white text-gray-500 border border-gray-100'} ${border}`} style={catSel==="Todas"?theme:{}}>Todas</button>
                         {categories.map(c => (<button key={c.id} onClick={()=>setCatSel(c.name)} className={`px-4 py-2 text-sm font-bold whitespace-nowrap transition shadow-sm ${catSel===c.name ? 'text-white shadow-md transform scale-105' : 'bg-white text-gray-500 border border-gray-100'} ${border}`} style={catSel===c.name?theme:{}}>{c.name}</button>))}
