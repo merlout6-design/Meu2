@@ -463,14 +463,29 @@
             const discount = getDiscount(); const total = Math.max(0, totalItems + del.fee - discount);
             const handlePix = async () => { if (!form.name || !form.phone || !form.cep || !form.number) { showAlert("Atenção", "Preencha todos os dados de entrega antes de gerar o Pix.", "alert"); return; } showLoading("Gerando Pix Automático..."); try { const mpUrl = "https://api.mercadopago.com/v1/payments"; const proxyUrl = "https://corsproxy.io/?" + encodeURIComponent(mpUrl); const payload = { transaction_amount: Number(total.toFixed(2)), description: `Pedido ${settings.appName} - ${form.phone}`, payment_method_id: "pix", payer: { email: "cliente@email.com", first_name: form.name.split(' ')[0], last_name: form.name.split(' ').slice(1).join(' ') || 'Cliente' } }; const res = await fetch(proxyUrl, { method: "POST", headers: { "Authorization": `Bearer ${settings.mercadoPagoToken}`, "Content-Type": "application/json", "X-Idempotency-Key": Date.now().toString() }, body: JSON.stringify(payload) }); const data = await res.json(); if (data.point_of_interaction) { setPixData(data); closeModal(); } else { throw new Error("Resposta inválida do MP"); } } catch (e) { closeModal(); showAlert("Erro", "Não foi possível gerar o Pix.", "error"); } };
             
-            // --- NOVA FUNÇÃO PARA FORMATAR MENSAGEM DO TUNEL ---
+                        // --- NOVA FUNÇÃO PARA FORMATAR MENSAGEM DO TUNEL ---
             const formatTunnelMessage = (template, data, cartItems, totals, payInfo, link) => {
                 let msg = template || "*NOVO PEDIDO*\n{nome}\n{telefone}\n\n{itens}\n\nTotal: {total}\nLink: {link_rastreio}";
                 const itemsList = cartItems.map(i => `${i.quantity}x ${i.name}`).join('\n');
-                msg = msg.replace(/{nome}/g, data.name).replace(/{telefone}/g, data.phone).replace(/{endereco}/g, `${data.address}, ${data.number}`).replace(/{bairro}/g, data.bairro).replace(/{complemento}/g, data.complement||"").replace(/{itens}/g, itemsList).replace(/{subtotal}/g, formatMoney(totals.sub)).replace(/{entrega}/g, formatMoney(totals.del)).replace(/{desconto}/g, formatMoney(totals.discount)).replace(/{total}/g, formatMoney(totals.total)).replace(/{pagamento}/g, payInfo.method).replace(/{troco}/g, payInfo.change||"").replace(/{cupom}/g, payInfo.coupon||"").replace(/{link_rastreio}/g, link);
+                
+                msg = msg.replace(/{nome_app}/g, settings.appName || 'Fritzza') // <-- ESTA É A LINHA QUE FALTAVA
+                         .replace(/{nome}/g, data.name)
+                         .replace(/{telefone}/g, data.phone)
+                         .replace(/{endereco}/g, `${data.address}, ${data.number}`)
+                         .replace(/{bairro}/g, data.bairro)
+                         .replace(/{complemento}/g, data.complement||"")
+                         .replace(/{itens}/g, itemsList)
+                         .replace(/{subtotal}/g, formatMoney(totals.sub))
+                         .replace(/{entrega}/g, formatMoney(totals.del))
+                         .replace(/{desconto}/g, formatMoney(totals.discount))
+                         .replace(/{total}/g, formatMoney(totals.total))
+                         .replace(/{pagamento}/g, payInfo.method)
+                         .replace(/{troco}/g, payInfo.change||"")
+                         .replace(/{cupom}/g, payInfo.coupon||"")
+                         .replace(/{link_rastreio}/g, link);
+                         
                 return msg.replace(/\n\s*\n/g, '\n\n').trim();
             };
-
             const finishOrder = async () => {
                 if(!form.name || !form.phone || !form.address || !form.number) return showAlert("Ops", "Preencha todos os campos de entrega.");
                 if(!payMethod) return showAlert("Ops", "Selecione o pagamento.");
