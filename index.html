@@ -93,31 +93,29 @@
             else return current >= startMin && current <= endMin;
         };
 
-        // --- NOVA FUNÇÃO PARA FORMATAR MENSAGEM DO TUNEL ---
-const formatTunnelMessage = (template, data, cartItems, totals, payInfo, link, appName) => {
-    let msg = template || "*NOVO PEDIDO*\n{nome}\n{telefone}\n\n{itens}\n\nTotal: {total}\nLink: {link_rastreio}";
-    const itemsList = cartItems.map(i => `${i.quantity}x ${i.name}`).join('\n');
-    
-    // Substitui todas as tags dinâmicas que você configurou no painel
-    msg = msg.replace(/{nome_app}/g, appName || "Fritzza")
-             .replace(/{nome}/g, data.name)
-             .replace(/{telefone}/g, data.phone)
-             .replace(/{endereco}/g, `${data.address}, ${data.number}`)
-             .replace(/{bairro}/g, data.bairro)
-             .replace(/{complemento}/g, data.complement || "")
-             .replace(/{itens}/g, itemsList)
-             .replace(/{subtotal}/g, formatMoney(totals.sub))
-             .replace(/{entrega}/g, formatMoney(totals.del))
-             .replace(/{desconto}/g, formatMoney(totals.discount))
-             .replace(/{total}/g, formatMoney(totals.total))
-             .replace(/{pagamento}/g, payInfo.method)
-             .replace(/{troco}/g, payInfo.change ? `Troco para: ${payInfo.change}` : "")
-             .replace(/{cupom}/g, payInfo.coupon ? `Cupom: ${payInfo.coupon}` : "")
-             .replace(/{link_rastreio}/g, link);
-             
-    // Agora retornamos apenas com trim() para respeitar as quebras de linha do seu painel
-    return msg.trim();
-};
+                    // --- NOVA FUNÇÃO PARA FORMATAR MENSAGEM DO TUNEL ---
+            const formatTunnelMessage = (template, data, cartItems, totals, payInfo, link) => {
+                let msg = template || "*NOVO PEDIDO*\n{nome}\n{telefone}\n\n{itens}\n\nTotal: {total}\nLink: {link_rastreio}";
+                const itemsList = cartItems.map(i => `${i.quantity}x ${i.name}`).join('\n');
+                
+                msg = msg.replace(/{nome_app}/g, settings.appName || 'Fritzza') // <-- ESTA É A LINHA QUE FALTAVA
+                         .replace(/{nome}/g, data.name)
+                         .replace(/{telefone}/g, data.phone)
+                         .replace(/{endereco}/g, `${data.address}, ${data.number}`)
+                         .replace(/{bairro}/g, data.bairro)
+                         .replace(/{complemento}/g, data.complement||"")
+                         .replace(/{itens}/g, itemsList)
+                         .replace(/{subtotal}/g, formatMoney(totals.sub))
+                         .replace(/{entrega}/g, formatMoney(totals.del))
+                         .replace(/{desconto}/g, formatMoney(totals.discount))
+                         .replace(/{total}/g, formatMoney(totals.total))
+                         .replace(/{pagamento}/g, payInfo.method)
+                         .replace(/{troco}/g, payInfo.change||"")
+                         .replace(/{cupom}/g, payInfo.coupon||"")
+                         .replace(/{link_rastreio}/g, link);
+                         
+                return msg.replace(/\n\s*\n/g, '\n\n').trim();
+            };
         // --- COMPONENTES UI ---
         const GlobalModal = ({ modal, close }) => {
             if (!modal.isOpen) return null;
