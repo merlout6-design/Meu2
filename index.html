@@ -93,30 +93,31 @@
             else return current >= startMin && current <= endMin;
         };
 
-        // --- FUNÇÃO AUXILIAR PARA FORMATAR MENSAGEM DO TÚNEL ---
-        const formatTunnelMessage = (template, data, cartItems, totals, payInfo, link) => {
-            let msg = template || "*NOVO PEDIDO*\n{nome}\n{telefone}\n\n{itens}\n\nTotal: {total}\nLink: {link_rastreio}";
-            
-            const itemsList = cartItems.map(i => `${i.quantity}x ${i.name}`).join('\n');
-            
-            msg = msg.replace(/{nome}/g, data.name || 'Cliente')
-                     .replace(/{telefone}/g, data.phone || '')
-                     .replace(/{endereco}/g, `${data.address}, ${data.number}`)
-                     .replace(/{bairro}/g, data.bairro || '')
-                     .replace(/{complemento}/g, data.complement || '')
-                     .replace(/{itens}/g, itemsList)
-                     .replace(/{subtotal}/g, formatMoney(totals.sub))
-                     .replace(/{entrega}/g, formatMoney(totals.del))
-                     .replace(/{desconto}/g, formatMoney(totals.discount))
-                     .replace(/{total}/g, formatMoney(totals.total))
-                     .replace(/{pagamento}/g, payInfo.method)
-                     .replace(/{troco}/g, payInfo.change ? `Troco para: ${payInfo.change}` : '')
-                     .replace(/{cupom}/g, payInfo.coupon ? `Cupom: ${payInfo.coupon}` : '')
-                     .replace(/{link_rastreio}/g, link);
-            
-            return msg;
-        };
-
+        // --- NOVA FUNÇÃO PARA FORMATAR MENSAGEM DO TUNEL ---
+const formatTunnelMessage = (template, data, cartItems, totals, payInfo, link, appName) => {
+    let msg = template || "*NOVO PEDIDO*\n{nome}\n{telefone}\n\n{itens}\n\nTotal: {total}\nLink: {link_rastreio}";
+    const itemsList = cartItems.map(i => `${i.quantity}x ${i.name}`).join('\n');
+    
+    // Substitui todas as tags dinâmicas que você configurou no painel
+    msg = msg.replace(/{nome_app}/g, appName || "Fritzza")
+             .replace(/{nome}/g, data.name)
+             .replace(/{telefone}/g, data.phone)
+             .replace(/{endereco}/g, `${data.address}, ${data.number}`)
+             .replace(/{bairro}/g, data.bairro)
+             .replace(/{complemento}/g, data.complement || "")
+             .replace(/{itens}/g, itemsList)
+             .replace(/{subtotal}/g, formatMoney(totals.sub))
+             .replace(/{entrega}/g, formatMoney(totals.del))
+             .replace(/{desconto}/g, formatMoney(totals.discount))
+             .replace(/{total}/g, formatMoney(totals.total))
+             .replace(/{pagamento}/g, payInfo.method)
+             .replace(/{troco}/g, payInfo.change ? `Troco para: ${payInfo.change}` : "")
+             .replace(/{cupom}/g, payInfo.coupon ? `Cupom: ${payInfo.coupon}` : "")
+             .replace(/{link_rastreio}/g, link);
+             
+    // Agora retornamos apenas com trim() para respeitar as quebras de linha do seu painel
+    return msg.trim();
+};
         // --- COMPONENTES UI ---
         const GlobalModal = ({ modal, close }) => {
             if (!modal.isOpen) return null;
@@ -490,7 +491,7 @@
                             const baseUrl = window.location.href.substring(0, window.location.href.lastIndexOf('/')) + '/';
                             // Correção: Link aponta para acompanhar.html?fone=NUMERO
                             const trackLink = `${baseUrl}acompanhar.html?fone=${cleanPhone}`;
-                            const plainMsg = formatTunnelMessage(settings.whatsappTemplate, form, cart, { sub: totalItems, del: del.fee, discount, total }, { method: payMethod, change, coupon: appliedCoupon?.code }, trackLink);
+                            const plainMsg = formatTunnelMessage(settings.whatsappTemplate, form, cart, { sub: totalItems, del: del.fee, discount, total }, { method: payMethod, change, coupon: appliedCoupon?.code }, trackLink, settings.appName);
                             
                             // Formata número para 55
                             let finalPhone = cleanPhone;
