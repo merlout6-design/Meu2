@@ -496,12 +496,12 @@
                             let finalPhone = cleanPhone;
                             if(finalPhone.length >= 10 && finalPhone.length <= 11) finalPhone = '55' + finalPhone;
 
-                            // Dispara sem esperar (Fire and Forget)
-                            fetch(settings.whatsappServerUrl, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ phone: finalPhone, message: plainMsg })
-                            });
+                            // Agora ele aguarda o envio antes de redirecionar a página
+await fetch(settings.whatsappServerUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone: finalPhone, message: plainMsg })
+});
                         } catch(err) { console.error("Erro ao tentar enviar WhatsApp automático:", err); }
                     }
                     
