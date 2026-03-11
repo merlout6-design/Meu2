@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Fritzza - Delivery</title>
+    <title>X RODÃO - AQUI SUA FOME RODA!</title>
 
-    <meta name="description" content="Delivery Fritzza em Cascavel. A melhor pizza frita e empanado da cidade. Peça online: rápido, crocante e delicioso.">
+    <meta name="description" content="Delivery de Mega Hamburgueres em Cascavel. O melhor lanche para familia da cidade. Peça online: rápido, crocante e delicioso.">
 
-    <meta property="og:title" content="Fritzza - O Delivery Crocante 🍔">
-    <meta property="og:description" content="Bateu a fome? Peça agora nossas pizzas fritas e empanados. Clique para ver o cardápio!">
+    <meta property="og:title" content="X RODÃO - AQUI SUA FOME RODA! 🍔">
+    <meta property="og:description" content="Bateu a fome? Peça agora nossas delicias. Clique para ver o cardápio!">
     <meta property="og:url" content="https://fritzza.online/">
     <meta property="og:type" content="website">
     <meta property="og:locale" content="pt_BR">
@@ -60,23 +60,26 @@
     <script type="text/babel">
         // --- CONFIGURAÇÃO FIREBASE ---
         const firebaseConfig = {
-  apiKey: "AIzaSyAf7ML3Gd9kJQI5XcowCRlH0F1VF7x-gMI",
-  authDomain: "rodaodef.firebaseapp.com",
-  projectId: "rodaodef",
-  storageBucket: "rodaodef.firebasestorage.app",
-  messagingSenderId: "232817991067",
-  appId: "1:232817991067:web:43d6cb14e3b3e4ea10153e",
-  measurementId: "G-SGFYV3565X"
-};
+            apiKey: "AIzaSyAg2kfoWsvWWyEXQGe8v6jZZqKepgButUk",
+            authDomain: "ajuda-2217b.firebaseapp.com",
+            projectId: "ajuda-2217b",
+            storageBucket: "ajuda-2217b.firebasestorage.app",
+            messagingSenderId: "421083897636",
+            appId: "1:421083897636:web:18bd6097b5c0169427ddb1"
+        };
 
         if (!firebase.apps.length) { try { firebase.initializeApp(firebaseConfig); } catch (e) {} }
         const auth = firebase.auth();
         const db = firebase.firestore();
-        const APP_ID = "rodaodef"; 
+        const APP_ID = "ajuda-2217b"; 
         const getCol = (n) => db.collection('artifacts').doc(APP_ID).collection('public').doc('data').collection(n);
 
         const { useState, useEffect, useMemo, useRef } = React;
-        const formatMoney = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const formatMoney = (v) => {
+		// Converte para número e se for nulo/undefined assume 0 para não quebrar a tela
+		const numberValue = Number(v) || 0; 
+		return numberValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+		};
         const DEFAULT_COORDS = { lat: -25.0015570, lng: -53.4628300 };
         const WHATSAPP_NUMBER = "5545988166885";
 
@@ -93,29 +96,30 @@
             else return current >= startMin && current <= endMin;
         };
 
-                    // --- NOVA FUNÇÃO PARA FORMATAR MENSAGEM DO TUNEL ---
-            const formatTunnelMessage = (template, data, cartItems, totals, payInfo, link) => {
-                let msg = template || "*NOVO PEDIDO*\n{nome}\n{telefone}\n\n{itens}\n\nTotal: {total}\nLink: {link_rastreio}";
-                const itemsList = cartItems.map(i => `${i.quantity}x ${i.name}`).join('\n');
-                
-                msg = msg.replace(/{nome_app}/g, settings.appName || 'Fritzza') // <-- ESTA É A LINHA QUE FALTAVA
-                         .replace(/{nome}/g, data.name)
-                         .replace(/{telefone}/g, data.phone)
-                         .replace(/{endereco}/g, `${data.address}, ${data.number}`)
-                         .replace(/{bairro}/g, data.bairro)
-                         .replace(/{complemento}/g, data.complement||"")
-                         .replace(/{itens}/g, itemsList)
-                         .replace(/{subtotal}/g, formatMoney(totals.sub))
-                         .replace(/{entrega}/g, formatMoney(totals.del))
-                         .replace(/{desconto}/g, formatMoney(totals.discount))
-                         .replace(/{total}/g, formatMoney(totals.total))
-                         .replace(/{pagamento}/g, payInfo.method)
-                         .replace(/{troco}/g, payInfo.change||"")
-                         .replace(/{cupom}/g, payInfo.coupon||"")
-                         .replace(/{link_rastreio}/g, link);
-                         
-                return msg.replace(/\n\s*\n/g, '\n\n').trim();
-            };
+        // --- FUNÇÃO AUXILIAR PARA FORMATAR MENSAGEM DO TÚNEL ---
+        const formatTunnelMessage = (template, data, cartItems, totals, payInfo, link) => {
+            let msg = template || "*NOVO PEDIDO*\n{nome}\n{telefone}\n\n{itens}\n\nTotal: {total}\nLink: {link_rastreio}";
+            
+            const itemsList = cartItems.map(i => `${i.quantity}x ${i.name}`).join('\n');
+            
+            msg = msg.replace(/{nome}/g, data.name || 'Cliente')
+                     .replace(/{telefone}/g, data.phone || '')
+                     .replace(/{endereco}/g, `${data.address}, ${data.number}`)
+                     .replace(/{bairro}/g, data.bairro || '')
+                     .replace(/{complemento}/g, data.complement || '')
+                     .replace(/{itens}/g, itemsList)
+                     .replace(/{subtotal}/g, formatMoney(totals.sub))
+                     .replace(/{entrega}/g, formatMoney(totals.del))
+                     .replace(/{desconto}/g, formatMoney(totals.discount))
+                     .replace(/{total}/g, formatMoney(totals.total))
+                     .replace(/{pagamento}/g, payInfo.method)
+                     .replace(/{troco}/g, payInfo.change ? `Troco para: ${payInfo.change}` : '')
+                     .replace(/{cupom}/g, payInfo.coupon ? `Cupom: ${payInfo.coupon}` : '')
+                     .replace(/{link_rastreio}/g, link);
+            
+            return msg;
+        };
+
         // --- COMPONENTES UI ---
         const GlobalModal = ({ modal, close }) => {
             if (!modal.isOpen) return null;
@@ -320,27 +324,28 @@
                     <Toast msg={toast} />
                     
                     <header className="sticky top-0 z-40 transition-all duration-300">
-    <div className={`relative overflow-hidden pt-4 pb-12 px-4 shadow-lg ${settings.borderRadius === 'rounded-none' ? '' : 'rounded-b-[2rem]'}`} style={themeStyle}>
-        {settings.bannerUrl ? <div className="absolute inset-0 z-0"><img src={settings.bannerUrl} className="w-full h-full object-cover opacity-50" /></div> : <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/food.png')]"></div>}
-        <div className="relative z-10 flex justify-between items-center">
-            
-            {/* --- NOVA IMAGEM SUBSTITUINDO LOGO E NOME --- */}
-            <div className="flex items-center text-white">
-                <img 
-                    src={settings.logoUrl || "https://i.imgur.com/DvATbsT.png"} 
-                    alt="Fritzza" 
-                    className="h-[72px] w-auto object-contain drop-shadow-md" 
-                />
-            </div>
-            {/* --------------------------------------------- */}
+                        <div className={`relative overflow-hidden pt-4 pb-12 px-4 shadow-lg ${settings.borderRadius === 'rounded-none' ? '' : 'rounded-b-[2rem]'}`} style={themeStyle}>
+                            {settings.bannerUrl ? <div className="absolute inset-0 z-0"><img src={settings.bannerUrl} className="w-full h-full object-cover opacity-50" /></div> : <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/food.png')]"></div>}
+                            <div className="relative z-10 flex justify-between items-center">
+                                <div className="flex items-center gap-3 text-white">
+                                    {settings.logoStyle !== 'none' && (
+                                        <div className={`flex items-center justify-center ${settings.logoStyle === 'raw' ? '' : 'w-14 h-14 bg-white/20 backdrop-blur border-2 border-white/30 shadow-inner'} ${settings.logoStyle==='circle'?'rounded-full':(settings.logoStyle==='square' ? 'rounded-lg' : '')}`}>
+                                            {settings.logoUrl ? <img src={settings.logoUrl} className={`${settings.logoStyle === 'raw' ? 'w-16 h-16 object-contain' : 'w-full h-full object-cover'} ${settings.logoStyle==='circle'?'rounded-full':(settings.logoStyle==='square' ? 'rounded-lg' : '')}`} /> : <span className="font-chewy text-2xl">{settings.appName?.[0]}</span>}
+                                        </div>
+                                    )}
+                                    <div>
+                                        <h1 className="font-chewy text-3xl leading-none drop-shadow-md" style={{color: settings.appNameColor || '#fff'}}>{settings.appName}</h1>
+                                        <p className="text-white/90 text-xs font-medium tracking-wide drop-shadow-sm">{settings.appSubtitle}</p>
+                                    </div>
+                                </div>
+                                <button onClick={()=>window.location.href='acompanhar.html'} className="bg-white/20 backdrop-blur text-white px-3 py-1.5 rounded-full text-xs font-bold border border-white/30 hover:bg-white/30 transition">
+                                    <i className="fa-solid fa-motorcycle mr-1"></i> Pedidos
+                                </button>
+                            </div>
+                            {settings.headerPhrase && <div className="relative z-10 mt-3 text-center"><div className="inline-block bg-black/20 backdrop-blur-sm px-4 py-1 rounded-full text-xs text-white font-medium border border-white/10 shadow-sm"><i className="fa-solid fa-bullhorn mr-1 text-yellow-300"></i> {settings.headerPhrase}</div></div>}
+                        </div>
+                    </header>
 
-            <button onClick={()=>window.location.href='acompanhar.html'} className="bg-white/20 backdrop-blur text-white px-3 py-1.5 rounded-full text-xs font-bold border border-white/30 hover:bg-white/30 transition">
-                <i className="fa-solid fa-motorcycle mr-1"></i> Pedidos
-            </button>
-        </div>
-        {settings.headerPhrase && <div className="relative z-10 mt-3 text-center"><div className="inline-block bg-black/20 backdrop-blur-sm px-4 py-1 rounded-full text-xs text-white font-medium border border-white/10 shadow-sm"><i className="fa-solid fa-bullhorn mr-1 text-yellow-300"></i> {settings.headerPhrase}</div></div>}
-    </div>
-</header>
                     <main className={`container mx-auto max-w-lg ${view === 'menu' ? '-mt-8' : ''} relative z-20 px-4`}>
                         {view === "menu" && <MenuView products={products} categories={categories} addToCart={addToCart} settings={settings} theme={themeStyle} border={borderStyle} />}
                         {view === "checkout" && <CheckoutView cart={cart} setCart={setCart} settings={settings} neighborhoods={neighborhoods} products={products} onBack={()=>setView("menu")} showAlert={showAlert} showConfirm={showConfirm} showLoading={showLoading} closeModal={closeModal} theme={themeStyle} border={borderStyle} />}
@@ -378,19 +383,16 @@
 
             return (
                 <div className="pb-10">
-    {/* Adicionei 'mt-8' logo no início do className abaixo */}
-    <div className={`mt-8 bg-white shadow-lg p-4 mb-6 glass-panel ${border}`}>
-        
-        <div className={`flex items-center justify-center gap-2 text-sm font-bold mb-4 ${isOpen ? 'text-green-600' : 'text-red-500'}`}>
-            <div className={`w-2 h-2 rounded-full ${isOpen ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
-            {isOpen ? "Aberto agora" : `Fechado • Abre às ${settings.openTime}`}
-        </div>
-        
-        <div className="relative">
-            <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
-            <input type="text" placeholder="Buscar..." className={`w-full bg-gray-100 border-none py-3 pl-10 pr-4 text-gray-700 focus:ring-2 focus:ring-opacity-50 outline-none transition ${border}`} style={{'--tw-ring-color': settings.themeColor}} value={search} onChange={e=>setSearch(e.target.value)} />
-        </div>
-    </div>
+                    <div className={`bg-white shadow-lg p-4 mb-6 glass-panel ${border}`}>
+                        <div className={`flex items-center justify-center gap-2 text-sm font-bold mb-4 ${isOpen ? 'text-green-600' : 'text-red-500'}`}>
+                            <div className={`w-2 h-2 rounded-full ${isOpen ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
+                            {isOpen ? "Aberto agora" : `Fechado • Abre às ${settings.openTime}`}
+                        </div>
+                        <div className="relative">
+                            <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                            <input type="text" placeholder="Buscar..." className={`w-full bg-gray-100 border-none py-3 pl-10 pr-4 text-gray-700 focus:ring-2 focus:ring-opacity-50 outline-none transition ${border}`} style={{'--tw-ring-color': settings.themeColor}} value={search} onChange={e=>setSearch(e.target.value)} />
+                        </div>
+                    </div>
                     <div className="flex gap-2 overflow-x-auto pb-4 hide-scrollbar mb-2 sticky top-20 z-30 py-2 -mx-4 px-4 bg-gradient-to-b from-[#f8fafc] to-transparent">
                         <button onClick={()=>setCatSel("Todas")} className={`px-4 py-2 text-sm font-bold whitespace-nowrap transition shadow-sm ${catSel==="Todas" ? 'text-white shadow-md transform scale-105' : 'bg-white text-gray-500 border border-gray-100'} ${border}`} style={catSel==="Todas"?theme:{}}>Todas</button>
                         {categories.map(c => (<button key={c.id} onClick={()=>setCatSel(c.name)} className={`px-4 py-2 text-sm font-bold whitespace-nowrap transition shadow-sm ${catSel===c.name ? 'text-white shadow-md transform scale-105' : 'bg-white text-gray-500 border border-gray-100'} ${border}`} style={catSel===c.name?theme:{}}>{c.name}</button>))}
@@ -448,180 +450,23 @@
             const [form, setForm] = useState({ name: "", phone: "", cep: "", address: "", number: "", bairro: "", complement: "" });
             const [del, setDel] = useState({ fee: 0, km: 0, loading: false, lat: null, lon: null, method: 'pendente' });
             const [payMethod, setPayMethod] = useState(""); const [change, setChange] = useState(""); const [couponCode, setCouponCode] = useState(""); const [appliedCoupon, setAppliedCoupon] = useState(null); const [typingTimer, setTypingTimer] = useState(null); const [cepLoading, setCepLoading] = useState(false); const [pixData, setPixData] = useState(null);
-            const totalItems = cart.reduce((a,b)=>a+(b.price*b.quantity),0);
+            const totalItems = cart.reduce((a,b) => a + (Number(b.price || 0) * Number(b.quantity || 1)), 0);
             
             const handlePhoneChange = (e) => { let v = e.target.value.replace(/\D/g,'').slice(0,11); setForm(p => ({...p, phone: v})); if(v.length === 11) check(v); };
             const check = async (phoneValue) => { const clean = (phoneValue || form.phone).replace(/\D/g, ''); if(clean.length < 8) return; try { const snap = await getCol('customers').where('phoneRaw','==',clean).limit(1).get(); if(!snap.empty) { const d = snap.docs[0].data(); setForm(p => ({ ...p, name: d.name || "", cep: d.cep || "", number: d.number || "", complement: d.complement || "", address: d.address || "", bairro: d.bairro || "" })); if(d.cep) fetchCep(d.cep, false); } } catch(e) {} };
             const handleCepChange = (e) => { let val = e.target.value.replace(/\D/g, ''); if (val.length > 8) val = val.slice(0, 8); setForm(p => ({ ...p, cep: val })); if (val.length === 8) fetchCep(val, true); };
             const fetchCep = async (cep, autoFocusNumber) => { setCepLoading(true); try { const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`); const data = await res.json(); if(!data.erro) { if(data.localidade !== 'Cascavel') { showAlert("Atenção", "Entrega apenas em Cascavel/PR", "error"); return; } setForm(p=>({...p, address: data.logradouro, bairro: data.bairro})); if (autoFocusNumber && document.getElementById('input-number')) document.getElementById('input-number').focus(); } else { showAlert("Erro", "CEP não encontrado.", "error"); } } catch(e) { showAlert("Erro", "Erro ao buscar CEP.", "error"); } finally { setCepLoading(false); } };
-            useEffect(() => { if (form.cep.length >= 8 && form.number && form.bairro && form.address) { setDel(p => ({ ...p, loading: true })); if (typingTimer) clearTimeout(typingTimer); const timer = setTimeout(() => calculateFinalShipping(), 1000); setTypingTimer(timer); } }, [form.number, form.cep, form.bairro, form.address]);
+            useEffect(() => { if (form.cep.length >= 8 && form.number) { setDel(p => ({ ...p, loading: true })); if (typingTimer) clearTimeout(typingTimer); const timer = setTimeout(() => calculateFinalShipping(), 1000); setTypingTimer(timer); } }, [form.number, form.cep]);
             const calculateFinalShipping = async () => { if(!form.bairro) return; const bairroMatch = neighborhoods.find(n => n.name.toLowerCase().trim() === form.bairro.toLowerCase().trim()); if (bairroMatch) { setDel({ fee: parseFloat(bairroMatch.price), method: 'bairro_fixo' }); return; } try { const query = `${form.address}, ${form.number}, Cascavel, PR, Brazil`; const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`); const data = await res.json(); if(data.length > 0) { const lat = parseFloat(data[0].lat); const lon = parseFloat(data[0].lon); const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${settings.restLng},${settings.restLat};${lon},${lat}?overview=false`; const rRes = await fetch(osrmUrl); const rData = await rRes.json(); if (rData.routes && rData.routes.length > 0) { const km = (rData.routes[0].distance / 1000).toFixed(1); const fee = Math.max(5, km * settings.pricePerKm); setDel({ fee, km, lat, lon, method: 'gps_auto' }); } else { fallbackCalc(lat, lon); } } else { setDel({ fee: 0, method: 'erro' }); showAlert("Atenção", "Rota não encontrada. Verifique o número.", 'alert'); } } catch(e) { setDel({ fee: 0, method: 'erro' }); } };
             const fallbackCalc = (lat, lon) => { const R=6371; const dLat=(lat-settings.restLat)*Math.PI/180; const dLon=(lon-settings.restLng)*Math.PI/180; const a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(settings.restLat*Math.PI/180)*Math.cos(lat*Math.PI/180) * Math.sin(dLon/2)*Math.sin(dLon/2); const km = (R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)) * 1.3).toFixed(1); const fee = Math.max(5, km * settings.pricePerKm); setDel({ fee, km, lat, lon, method: 'fallback' }); };
             const handleCouponChange = (e) => { setCouponCode(e.target.value.replace(/\s/g, '').toUpperCase()); };
             const applyCoupon = async () => { if(!couponCode) return; const q = await getCol('coupons').where('code', '==', couponCode.toUpperCase()).where('active', '==', true).get(); if(q.empty) return showAlert("Erro", "Cupom inválido", "error"); const d = q.docs[0].data(); if(d.limit && (d.usageCount || 0) >= d.limit) return showAlert("Erro", "Cupom esgotado", "error"); setAppliedCoupon({ id: q.docs[0].id, ...d }); showAlert("Sucesso", "Cupom aplicado!", "success"); };
             const getDiscount = () => { if(!appliedCoupon) return 0; if(appliedCoupon.type === 'fixed') return parseFloat(appliedCoupon.value); if(appliedCoupon.type === 'percent') { const d = totalItems * (parseFloat(appliedCoupon.value)/100); return appliedCoupon.maxDiscount ? Math.min(d, parseFloat(appliedCoupon.maxDiscount)) : d; } return 0; };
             const discount = getDiscount(); const total = Math.max(0, totalItems + del.fee - discount);
-            const handlePix = async () => { 
-    if (!form.name || !form.phone || !form.cep || !form.number) { 
-        showAlert("Atenção", "Preencha todos os dados de entrega antes de gerar o Pix.", "alert"); 
-        return; 
-    } 
-    showLoading("Gerando Pix..."); 
-    
-    try { 
-        const mpUrl = "https://api.mercadopago.com/v1/payments"; 
-        
-        // PLANO ANTI-QUEDA: Lista de proxies
-        const proxies = [
-            "https://corsproxy.io/?",
-            "https://api.allorigins.win/raw?url=",
-            "https://thingproxy.freeboard.io/fetch/"
-        ];
-        
-                // SUPER PAYLOAD - Otimizado para pontuação máxima no Mercado Pago
-        const payload = { 
-            transaction_amount: Number(total.toFixed(2)), 
-            description: `Pedido ${settings.appName} - ${form.phone}`, 
-            payment_method_id: "pix", 
+            const handlePix = async () => { if (!form.name || !form.phone || !form.cep || !form.number) { showAlert("Atenção", "Preencha todos os dados de entrega antes de gerar o Pix.", "alert"); return; } showLoading("Gerando Pix Automático..."); try { const mpUrl = "https://api.mercadopago.com/v1/payments"; const proxyUrl = "https://corsproxy.io/?" + encodeURIComponent(mpUrl); const payload = { transaction_amount: Number(total.toFixed(2)), description: `Pedido ${settings.appName} - ${form.phone}`, payment_method_id: "pix", payer: { email: "cliente@email.com", first_name: form.name.split(' ')[0], last_name: form.name.split(' ').slice(1).join(' ') || 'Cliente' } }; const res = await fetch(proxyUrl, { method: "POST", headers: { "Authorization": `Bearer ${settings.mercadoPagoToken}`, "Content-Type": "application/json", "X-Idempotency-Key": Date.now().toString() }, body: JSON.stringify(payload) }); const data = await res.json(); if (data.point_of_interaction) { setPixData(data); closeModal(); } else { throw new Error("Resposta inválida do MP"); } } catch (e) { closeModal(); showAlert("Erro", "Não foi possível gerar o Pix.", "error"); } };
             
-            // 1. Experiência de compra (Ganha pontos de "Fatura do cartão" e "Resposta binária")
-            statement_descriptor: "FRITZZA", 
-            binary_mode: true,
-
-            // 2. Conciliação financeira (Ganha pontos de "Referência Externa" e "Webhook")
-            external_reference: `PED-${Date.now()}`,
-            notification_url: "https://fritzza.trycloudflare.com/webhook", // URL fictícia/futura só para pontuar
-
-            // 3. Aprovação de pagamentos - Dados do Comprador (Ganha pontos de Endereço e Telefone)
-            payer: { 
-                email: "cliente@fritzza.online", 
-                first_name: form.name.split(' ')[0], 
-                last_name: form.name.split(' ').slice(1).join(' ') || 'Cliente',
-                phone: {
-                    area_code: form.phone.substring(0, 2),
-                    number: form.phone.substring(2)
-                },
-                address: {
-                    zip_code: form.cep,
-                    street_name: form.address,
-                    street_number: form.number,
-                    neighborhood: form.bairro,
-                    city: "Cascavel",
-                    federal_unit: "PR"
-                }
-            },
-
-            // 4. Aprovação de pagamentos - Itens (Ganha pontos de Código, Nome, Qtd, Preço e Categoria)
-            additional_info: {
-                items: cart.map(item => ({
-                    id: item.id,
-                    title: item.name.substring(0, 250), // MP tem limite de caracteres
-                    description: (item.description || "Produto Fritzza").substring(0, 250),
-                    category_id: "food",
-                    quantity: item.quantity,
-                    unit_price: Number(item.price)
-                }))
-            }
-        }; 
 
 
-        let data = null;
-        let success = false;
-
-        // Tenta um proxy de cada vez até funcionar
-        for (let proxy of proxies) {
-            try {
-                const res = await fetch(proxy + encodeURIComponent(mpUrl), { 
-                    method: "POST", 
-                    headers: { 
-                        "Authorization": `Bearer ${settings.mercadoPagoToken}`, 
-                        "Content-Type": "application/json", 
-                        "X-Idempotency-Key": Date.now().toString() + proxy.length
-                    }, 
-                    body: JSON.stringify(payload) 
-                });
-                
-                if (res.ok) {
-                    data = await res.json();
-                    if (data.point_of_interaction) {
-                        success = true;
-                        break; // Funcionou! Sai do loop.
-                    }
-                }
-            } catch (err) {
-                console.warn("Proxy falhou, tentando o próximo...");
-            }
-        }
-
-        if (success) { 
-            setPixData(data); 
-            setPixPaymentId(data.id); // Salva o ID da transação
-            setPixStatus("pending"); // Define como pendente
-            closeModal(); 
-        } else { 
-            throw new Error("Todos os proxies falharam."); 
-        } 
-    } catch (e) { 
-        closeModal(); 
-        showAlert("Erro", "Sistema de Pix indisponível no momento. Escolha outra forma de pagamento.", "error"); 
-    } 
-};
-// OLHEIRO 1: Fica checando o status no Mercado Pago a cada 5 segundos
-useEffect(() => {
-    let interval;
-    if (pixPaymentId && pixStatus !== 'approved') {
-        interval = setInterval(async () => {
-            try {
-                const mpUrl = `https://api.mercadopago.com/v1/payments/${pixPaymentId}`;
-                const res = await fetch("https://corsproxy.io/?" + encodeURIComponent(mpUrl), {
-                    headers: { "Authorization": `Bearer ${settings.mercadoPagoToken}` }
-                });
-                const data = await res.json();
-                
-                if (data.status === 'approved') {
-                    setPixStatus('approved');
-                    clearInterval(interval);
-                }
-            } catch(e) {} // Ignora erros silenciosamente e tenta de novo na próxima rodada
-        }, 5000);
-    }
-    return () => clearInterval(interval);
-}, [pixPaymentId, pixStatus, settings.mercadoPagoToken]);
-
-// OLHEIRO 2: Se o status mudou para aprovado, avisa o cliente e finaliza sozinho
-useEffect(() => {
-    if (pixStatus === 'approved') {
-        showAlert("Pix Aprovado! 🎉", "Recebemos seu pagamento. Finalizando o pedido...", "success");
-        // Dá 2 segundos para o cliente ler a mensagem e chama a função de finalizar
-        setTimeout(() => {
-            finishOrder();
-        }, 2000);
-    }
-}, [pixStatus]);
-     
-                        // --- NOVA FUNÇÃO PARA FORMATAR MENSAGEM DO TUNEL ---
-            const formatTunnelMessage = (template, data, cartItems, totals, payInfo, link) => {
-                let msg = template || "*NOVO PEDIDO*\n{nome}\n{telefone}\n\n{itens}\n\nTotal: {total}\nLink: {link_rastreio}";
-                const itemsList = cartItems.map(i => `${i.quantity}x ${i.name}`).join('\n');
-                
-                msg = msg.replace(/{nome_app}/g, settings.appName || 'Fritzza') // <-- ESTA É A LINHA QUE FALTAVA
-                         .replace(/{nome}/g, data.name)
-                         .replace(/{telefone}/g, data.phone)
-                         .replace(/{endereco}/g, `${data.address}, ${data.number}`)
-                         .replace(/{bairro}/g, data.bairro)
-                         .replace(/{complemento}/g, data.complement||"")
-                         .replace(/{itens}/g, itemsList)
-                         .replace(/{subtotal}/g, formatMoney(totals.sub))
-                         .replace(/{entrega}/g, formatMoney(totals.del))
-                         .replace(/{desconto}/g, formatMoney(totals.discount))
-                         .replace(/{total}/g, formatMoney(totals.total))
-                         .replace(/{pagamento}/g, payInfo.method)
-                         .replace(/{troco}/g, payInfo.change||"")
-                         .replace(/{cupom}/g, payInfo.coupon||"")
-                         .replace(/{link_rastreio}/g, link);
-                         
-                return msg.replace(/\n\s*\n/g, '\n\n').trim();
-            };
             const finishOrder = async () => {
                 if(!form.name || !form.phone || !form.address || !form.number) return showAlert("Ops", "Preencha todos os campos de entrega.");
                 if(!payMethod) return showAlert("Ops", "Selecione o pagamento.");
@@ -640,18 +485,18 @@ useEffect(() => {
                             const baseUrl = window.location.href.substring(0, window.location.href.lastIndexOf('/')) + '/';
                             // Correção: Link aponta para acompanhar.html?fone=NUMERO
                             const trackLink = `${baseUrl}acompanhar.html?fone=${cleanPhone}`;
-                            const plainMsg = formatTunnelMessage(settings.whatsappTemplate, form, cart, { sub: totalItems, del: del.fee, discount, total }, { method: payMethod, change, coupon: appliedCoupon?.code }, trackLink, settings.appName);
+                            const plainMsg = formatTunnelMessage(settings.whatsappTemplate, form, cart, { sub: totalItems, del: del.fee, discount, total }, { method: payMethod, change, coupon: appliedCoupon?.code }, trackLink);
                             
                             // Formata número para 55
                             let finalPhone = cleanPhone;
                             if(finalPhone.length >= 10 && finalPhone.length <= 11) finalPhone = '55' + finalPhone;
 
-                            // Agora ele aguarda o envio antes de redirecionar a página
-await fetch(settings.whatsappServerUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ phone: finalPhone, message: plainMsg })
-});
+                            // Dispara sem esperar (Fire and Forget)
+                            fetch(settings.whatsappServerUrl, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ phone: finalPhone, message: plainMsg })
+                            });
                         } catch(err) { console.error("Erro ao tentar enviar WhatsApp automático:", err); }
                     }
                     
@@ -671,30 +516,9 @@ await fetch(settings.whatsappServerUrl, {
                         <div className="bg-gray-50 p-6 border-b"><h2 className="text-2xl font-bold text-gray-800">Seu Pedido</h2><div className="mt-4 space-y-3">{cart.map(i => (<div key={i.id} className="flex justify-between items-center text-sm"><div className="flex items-center gap-3"><span className="bg-gray-200 text-gray-700 w-6 h-6 rounded flex items-center justify-center font-bold text-xs">{i.quantity}</span><span className="text-gray-600">{i.name}</span></div><div className="flex items-center gap-3"><span className="font-medium">{formatMoney(i.price * i.quantity)}</span><button onClick={()=>setCart(p=>p.filter(x=>x.id!==i.id))} className="text-red-400 text-xs"><i className="fa-solid fa-trash"></i></button></div></div>))}</div></div>
                         <div className="p-6 space-y-6">
                             <div className="space-y-3"><h3 className="font-bold text-gray-800 border-l-4 pl-3" style={{borderColor: settings.themeColor}}>Entrega</h3><input type="tel" placeholder="WhatsApp (45...)" className={`border p-3 bg-gray-50 w-full text-lg font-bold ${border}`} value={form.phone} onChange={handlePhoneChange} onBlur={()=>check(form.phone)} /><input placeholder="Seu Nome" className={`border p-3 bg-gray-50 w-full ${border}`} value={form.name} onChange={e=>setForm({...form, name:e.target.value})} /><div className="flex gap-2"><div className="relative flex-1"><input type="tel" placeholder="CEP (85803...)" className={`border p-3 bg-gray-50 w-full font-bold ${border}`} value={form.cep} onChange={handleCepChange} maxLength={9} />{cepLoading && <i className="fa-solid fa-spinner fa-spin absolute right-3 top-4 text-gray-400"></i>}</div><input placeholder="Nº" type="tel" id="input-number" className={`border p-3 bg-gray-50 w-24 text-center font-bold ${border}`} value={form.number} onChange={e=>setForm({...form, number:e.target.value})} /></div><div className="space-y-2"><input placeholder="Endereço (Preenchido pelo CEP)" className={`border p-3 bg-gray-100 text-gray-500 w-full ${border}`} value={form.address} readOnly /><input placeholder="Bairro" className={`border p-3 bg-gray-100 text-gray-500 w-full ${border}`} value={form.bairro} readOnly /></div><input placeholder="Complemento / Ponto de Ref." className={`border p-3 bg-gray-50 w-full ${border}`} value={form.complement} onChange={e=>setForm({...form, complement:e.target.value})} /></div>
-                            <div className="space-y-3"><h3 className="font-bold text-gray-800 border-l-4 pl-3" style={{borderColor: settings.themeColor}}>Pagamento</h3><div className="flex gap-2"><input placeholder="CÓDIGO CUPOM" className={`border p-2 flex-1 uppercase text-sm ${border}`} value={couponCode} onChange={handleCouponChange} /><button onClick={applyCoupon} className={`px-4 text-white text-xs font-bold ${border}`} style={theme}>APLICAR</button></div>{appliedCoupon && <div className="bg-green-100 text-green-700 p-2 text-xs font-bold rounded flex justify-between"><span>Cupom Aplicado: {appliedCoupon.code}</span><span>- {formatMoney(discount)}</span></div>}<div className="grid grid-cols-2 gap-2">
-    {['Dinheiro', 'Pix'].map(m => (
-        <button 
-            key={m} 
-            disabled={del.loading || (del.fee === 0 && del.method !== 'bairro_fixo')}
-            onClick={() => { setPayMethod(m); if(m==='Pix' && settings.mercadoPagoToken) handlePix(); else setPixData(null); }} 
-            className={`p-3 border text-xs font-bold transition ${border} ${del.loading || (del.fee === 0 && del.method !== 'bairro_fixo') ? 'bg-gray-100 text-gray-400 border-gray-200 opacity-60 cursor-not-allowed' : (payMethod === m ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50')}`} 
-            style={payMethod === m && !(del.loading || (del.fee === 0 && del.method !== 'bairro_fixo')) ? theme : {}}
-        >
-            {m}
-        </button>
-    ))}
-    <button 
-        disabled={del.loading || (del.fee === 0 && del.method !== 'bairro_fixo')}
-        onClick={() => setPayMethod('Cartão Crédito/Débito')} 
-        className={`p-3 border text-xs font-bold transition col-span-2 ${border} ${del.loading || (del.fee === 0 && del.method !== 'bairro_fixo') ? 'bg-gray-100 text-gray-400 border-gray-200 opacity-60 cursor-not-allowed' : (payMethod === 'Cartão Crédito/Débito' ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50')}`} 
-        style={payMethod === 'Cartão Crédito/Débito' && !(del.loading || (del.fee === 0 && del.method !== 'bairro_fixo')) ? theme : {}}
-    >
-        Cartão Crédito/Débito
-    </button>
-</div>
-{payMethod === 'Dinheiro' && <input type="number" placeholder="Troco para quanto?" className={`w-full p-3 border bg-yellow-50 ${border}`} value={change} onChange={e=>setChange(e.target.value)} />}{payMethod === 'Pix' && !pixData && !settings.mercadoPagoToken && <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded">Chave Pix será enviada na mensagem.</div>}{pixData && (<div className={`bg-teal-50 p-4 border border-teal-200 text-center ${border}`}><img src={`data:image/png;base64,${pixData.point_of_interaction.transaction_data.qr_code_base64}`} className="w-40 h-40 mx-auto mix-blend-multiply" /><textarea className="w-full text-xs p-2 mt-2 border rounded" readOnly value={pixData.point_of_interaction.transaction_data.qr_code} onClick={(e)=>e.target.select()}></textarea><button onClick={copyPix} className="w-full mt-2 py-2 bg-teal-600 text-white font-bold rounded hover:bg-teal-700 transition text-sm"><i className="fa-regular fa-copy mr-1"></i> Copiar Código Pix</button><p className="text-xs text-teal-700 mt-2">Copie e cole no aplicativo do seu banco</p></div>)}</div>
+                            <div className="space-y-3"><h3 className="font-bold text-gray-800 border-l-4 pl-3" style={{borderColor: settings.themeColor}}>Pagamento</h3><div className="flex gap-2"><input placeholder="CÓDIGO CUPOM" className={`border p-2 flex-1 uppercase text-sm ${border}`} value={couponCode} onChange={handleCouponChange} /><button onClick={applyCoupon} className={`px-4 text-white text-xs font-bold ${border}`} style={theme}>APLICAR</button></div>{appliedCoupon && <div className="bg-green-100 text-green-700 p-2 text-xs font-bold rounded flex justify-between"><span>Cupom Aplicado: {appliedCoupon.code}</span><span>- {formatMoney(discount)}</span></div>}<div className="grid grid-cols-2 gap-2">{['Dinheiro', 'Pix'].map(m => (<button key={m} onClick={() => { setPayMethod(m); if(m==='Pix' && settings.mercadoPagoToken) handlePix(); else setPixData(null); }} className={`p-3 border text-xs font-bold transition ${border} ${payMethod === m ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600 border-gray-200'}`} style={payMethod===m?theme:{}}>{m}</button>))}<button onClick={() => setPayMethod('Cartão Crédito/Débito')} className={`p-3 border text-xs font-bold transition col-span-2 ${border} ${payMethod === 'Cartão Crédito/Débito' ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600 border-gray-200'}`} style={payMethod==='Cartão Crédito/Débito'?theme:{}}>Cartão Crédito/Débito</button></div>{payMethod === 'Dinheiro' && <input type="number" placeholder="Troco para quanto?" className={`w-full p-3 border bg-yellow-50 ${border}`} value={change} onChange={e=>setChange(e.target.value)} />}{payMethod === 'Pix' && !pixData && !settings.mercadoPagoToken && <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded">Chave Pix será enviada na mensagem.</div>}{pixData && (<div className={`bg-teal-50 p-4 border border-teal-200 text-center ${border}`}><img src={`data:image/png;base64,${pixData.point_of_interaction.transaction_data.qr_code_base64}`} className="w-40 h-40 mx-auto mix-blend-multiply" /><textarea className="w-full text-xs p-2 mt-2 border rounded" readOnly value={pixData.point_of_interaction.transaction_data.qr_code} onClick={(e)=>e.target.select()}></textarea><button onClick={copyPix} className="w-full mt-2 py-2 bg-teal-600 text-white font-bold rounded hover:bg-teal-700 transition text-sm"><i className="fa-regular fa-copy mr-1"></i> Copiar Código Pix</button><p className="text-xs text-teal-700 mt-2">Copie e cole no aplicativo do seu banco</p></div>)}</div>
                             <div className="bg-gray-100 p-4 rounded-xl space-y-1 text-sm"><div className="flex justify-between text-gray-600"><span>Subtotal</span><span>{formatMoney(totalItems)}</span></div><div className="flex justify-between text-gray-600"><span>Entrega {del.km > 0 ? `(${del.km}km)` : ''}</span><span className="font-bold">{del.loading ? 'Calculando...' : formatMoney(del.fee)}</span></div>{discount > 0 && <div className="flex justify-between text-green-600 font-bold"><span>Desconto</span><span>- {formatMoney(discount)}</span></div>}<div className="flex justify-between text-xl font-bold text-gray-800 border-t pt-2 mt-2" style={{color: settings.themeColor}}><span>Total</span><span>{formatMoney(total)}</span></div></div>
-                            <button onClick={finishOrder} disabled={del.loading || (del.fee===0 && del.method!=='bairro_fixo') || pixStatus === 'approved'} className={`w-full py-4 bg-green-600 hover:bg-green-700 text-white font-bold shadow-lg transition transform active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 ${border}`} style={{backgroundColor: settings.cartColor}}><span>Finalizar Pedido</span><i className="fa-brands fa-whatsapp"></i></button>
+                            <button onClick={finishOrder} disabled={del.loading || (del.fee===0 && del.method!=='bairro_fixo')} className={`w-full py-4 bg-green-600 hover:bg-green-700 text-white font-bold shadow-lg transition transform active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 ${border}`} style={{backgroundColor: settings.cartColor}}><span>Finalizar Pedido</span><i className="fa-brands fa-whatsapp"></i></button>
                         </div>
                     </div>
                 </div>
