@@ -118,20 +118,128 @@
         function AdminOrders({ showConfirm, settings }) { 
             const [allOrders, setAllOrders] = useState([]);
             const [filter, setFilter] = useState('today');
-            useEffect(() => { const u = getCol('orders').orderBy('createdAt', 'desc').limit(500).onSnapshot(s => setAllOrders(s.docs.map(d => ({ id: d.id, ...d.data() })))); return () => u(); }, []);
+
+            // --- 1. FUNÇÃO DE IMPRESSÃO TÉRMICA SILENCIOSA (58mm + Negrito) ---
+            const silentPrint = (order, currentSettings) => {
+                let iframe = document.getElementById('silent-print-frame');
+                if (!iframe) {
+                    iframe = document.createElement('iframe');
+                    iframe.id = 'silent-print-frame';
+                    iframe.style.width = '58mm'; 
+                    iframe.style.position = 'absolute';
+                    iframe.style.display = 'none';
+                    document.body.appendChild(iframe);
+                }
+                
+                const itemsHtml = order.items?.map(i => `<div class="item"><span>${i.quantity}x ${i.name}</span><span>${formatMoney(i.price * i.quantity)}</span></div>${i.obs ? `<div class="obs">Obs: ${i.obs}</div>` : ''}`).join('') || '';
+                const doc = iframe.contentWindow.document;
+                
+                doc.open();
+                doc.write(`
+                    <html><head><title>Cupom #${order.id.slice(-4)}</title>
+                    <style>
+                        @page { margin: 0; size: 58mm auto; }
+                        body { font-family: 'Arial', sans-serif; width: 48mm; margin: 0 auto; padding: 0; font-size: 13px; color: #000000 !important; font-weight: 900 !important; line-height: 1.3; -webkit-font-smoothing: none; text-rendering: crispEdges; }
+                        .title { font-size: 24px; font-weight: 900; text-transform: uppercase; text-align: center; }
+                        .subtitle { font-size: 13px; text-align: center; }
+                        .divider { border-bottom: 2px dashed #000; margin: 10px 0; }
+                        .info { font-size: 13px; line-height: 1.5; }
+                        
+                        /* Esta é a classe nova que deixa o Pagamento GIGANTE e em destaque */
+                        .pagamento-destaque { font-size: 18px; font-weight: 900; text-transform: uppercase; border: 2px dashed #000; padding: 10px 5px; text-align: center; border-radius: 5px; line-height: 1.2; }
+                        
+                        .items { width: 100%; }
+                        .item { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 14px; }
+                        .obs { font-size: 12px; font-style: italic; margin-bottom: 8px; }
+                        .totals { border-top: 2px dashed #000; margin-top: 5px; padding-top: 10px; }
+                        .row { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 14px; }
+                        .total-final { font-size: 20px; font-weight: 900; margin-top: 8px; border-top: 2px solid #000; padding-top: 8px; }
+                    </style>
+                    </head><body>
+                        
+                        <br/><br/>
+                        
+                        <div class="title">${currentSettings?.appName || 'X-RODÃO'}</div>
+                        
+                        <br/><br/>
+                        
+                        <div class="subtitle">
+                            Pedido #${order.id.slice(-4)}<br/>
+                            ${new Date(order.createdAt).toLocaleString('pt-BR')}
+                        </div>
+                        
+                        <div class="divider"></div>
+                        
+                        <div class="info">
+                            <b>Cliente:</b> ${order.customer?.name || 'Não inf.'}<br/>
+                            <b>Tel:</b> ${order.customer?.phone || 'Não inf.'}<br/>
+                            <b>End:</b> ${order.customer?.address || ''}, ${order.customer?.number || ''}<br/>
+                            <b>Bairro:</b> ${order.customer?.bairro || ''}
+                        </div>
+                        
+                        <br/>
+                        
+                        <div class="pagamento-destaque">
+                            PAGT: ${order.payment?.method} 
+                            ${order.payment?.change ? '<br/>(Troco para: '+order.payment.change+')' : ''}
+                        </div>
+                        
+                        <br/><br/><br/>
+                        
+                        <div class="items">${itemsHtml}</div>
+                        
+                        <br/>
+                        
+                        <div class="totals">
+                            <br/>
+                            <div class="row"><span>Subtotal:</span><span>${formatMoney(order.totals?.sub || 0)}</span></div>
+                            <div class="row"><span>Entrega:</span><span>${formatMoney(order.totals?.del || 0)}</span></div>
+                            ${order.totals?.discount ? `<div class="row"><span>Desconto:</span><span>-${formatMoney(order.totals?.discount)}</span></div>` : ''}
+                            
+                            <div class="row total-final"><span>TOTAL:</span><span>${formatMoney(order.totals?.total || 0)}</span></div>
+                        </div>
+                        
+                        <br/><br/>
+                        
+                    </body></html>
+                `);
+                doc.close();
+
+                setTimeout(() => {
+                    iframe.contentWindow.focus();
+                    iframe.contentWindow.print();
+                }, 500);
+            };
+
+            // --- 2. ESCUTADOR DE NOVOS PEDIDOS ---
+            useEffect(() => { 
+                const u = getCol('orders').orderBy('createdAt', 'desc').limit(500).onSnapshot(s => {
+                    s.docChanges().forEach(change => {
+                        if (change.type === 'added') {
+                            const order = change.doc.data();
+                            // Imprime apenas se o pedido tem menos de 1 minuto e está pendente
+                            const isNew = (new Date() - new Date(order.createdAt)) < 60000;
+                            if (isNew && order.status === 'pendente') {
+                                silentPrint({ id: change.doc.id, ...order }, settings);
+                            }
+                        }
+                    });
+                    setAllOrders(s.docs.map(d => ({ id: d.id, ...d.data() })));
+                }); 
+                return () => u(); 
+            }, [settings]);
+
             const filteredOrders = useMemo(() => {
                 const now = new Date(); const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
                 if (filter === 'today') return allOrders.filter(o => new Date(o.createdAt) >= today);
                 return allOrders;
             }, [filter, allOrders]);
             
-            // --- STATUS FLOW + WHATSAPP ---
             const nextStatus = async (order) => {
                 const statusFlow = { 'pendente': 'confirmado', 'confirmado': 'enviado', 'enviado': 'entregue' };
                 const newStatus = statusFlow[order.status];
                 if(newStatus) {
                     await getCol('orders').doc(order.id).update({ status: newStatus });
-                    // Notifica cliente se tiver telefone e config
                     if (['confirmado', 'enviado', 'entregue'].includes(newStatus) && order.customer?.phone) {
                         sendWhatsAppNotification(order.customer.phone, newStatus, order.customer.name, settings);
                     }
@@ -156,7 +264,8 @@
                                 <span className={`uppercase font-bold px-2 py-1 rounded ${x.status==='pendente'?'bg-red-100 text-red-700':x.status==='entregue'?'bg-green-100 text-green-700':'bg-yellow-100 text-yellow-700'}`}>{x.status}</span>
                                 <div className="flex gap-2">
                                     {x.status !== 'entregue' && <button onClick={()=>nextStatus(x)} className="bg-blue-600 text-white px-3 py-1 rounded font-bold hover:bg-blue-700">Avançar <i className="fa-brands fa-whatsapp ml-1"></i></button>}
-                                    <button onClick={()=>printOrderReceipt(x, settings)} className="bg-gray-200 text-gray-700 px-3 py-1 rounded font-bold hover:bg-gray-300"><i className="fa-solid fa-print"></i></button>
+                                    {/* --- 3. BOTÃO DE REIMPRIMIR ATUALIZADO --- */}
+                                    <button onClick={()=>silentPrint(x, settings)} className="bg-gray-200 text-gray-700 px-3 py-1 rounded font-bold hover:bg-gray-300" title="Reimprimir Cupom"><i className="fa-solid fa-print"></i></button>
                                     <button onClick={()=>del(x.id)} className="text-red-500 bg-red-50 px-3 py-1 rounded font-bold hover:bg-red-100"><i className="fa-solid fa-trash"></i></button>
                                 </div>
                             </div>
@@ -369,5 +478,3 @@ const updateIngQty = (idx, newQty) => {
     </script>
 </body>
 </html>
-
-
