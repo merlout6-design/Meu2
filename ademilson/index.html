@@ -128,15 +128,27 @@
                 doc.write(`
                     <html><head><title>Cupom #${order.id.slice(-4)}</title>
                     <style>
-                        body { font-family: 'Courier New', monospace; padding: 0; margin: 0; width: 100%; font-size: 12px; color: #000; }
-                        .header { text-align: center; border-bottom: 1px dashed #000; padding-bottom: 5px; margin-bottom: 5px; }
-                        .title { font-size: 18px; font-weight: bold; }
-                        .item { display: flex; justify-content: space-between; margin-bottom: 3px; font-weight: bold; }
-                        .obs { font-size: 10px; margin-bottom: 5px; font-style: italic; }
-                        .totals { border-top: 1px dashed #000; margin-top: 10px; padding-top: 5px; }
-                        .row { display: flex; justify-content: space-between; }
-                        .total-final { font-size: 16px; font-weight: bold; margin-top: 5px; }
-                        .footer { text-align: center; margin-top: 15px; font-size: 10px; border-top: 1px dashed #000; padding-top: 5px; }
+                        @page { 
+						margin: 0; 
+						size: 58mm auto; /* Força o navegador a respeitar a largura da KP-1029 */
+					}
+					body { 
+						font-family: 'Courier New', monospace; 
+						width: 48mm; /* Área útil exata de impressão */
+						margin: 0 auto; 
+						padding: 2mm 0; 
+						font-size: 11px; /* Fonte reduzida para não quebrar os itens na linha */
+						color: #000; 
+					}
+					.header { text-align: center; border-bottom: 1px dashed #000; padding-bottom: 3px; margin-bottom: 3px; }
+					.title { font-size: 14px; font-weight: bold; text-transform: uppercase; }
+					.info { font-size: 10px; margin-bottom: 5px; }
+					.item { display: flex; justify-content: space-between; margin-bottom: 2px; font-weight: bold; }
+					.obs { font-size: 9px; margin-bottom: 4px; font-style: italic; }
+					.totals { border-top: 1px dashed #000; margin-top: 5px; padding-top: 5px; }
+					.row { display: flex; justify-content: space-between; margin-bottom: 2px;}
+					.total-final { font-size: 13px; font-weight: bold; margin-top: 3px; }
+					.footer { text-align: center; margin-top: 10px; font-size: 9px; border-top: 1px dashed #000; padding-top: 5px; }
                     </style>
                     </head><body>
                         <div class="header">
