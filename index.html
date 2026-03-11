@@ -59,14 +59,7 @@
 
     <script type="text/babel">
         // --- CONFIGURAÇÃO FIREBASE ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyAg2kfoWsvWWyEXQGe8v6jZZqKepgButUk",
-            authDomain: "ajuda-2217b.firebaseapp.com",
-            projectId: "ajuda-2217b",
-            storageBucket: "ajuda-2217b.firebasestorage.app",
-            messagingSenderId: "421083897636",
-            appId: "1:421083897636:web:18bd6097b5c0169427ddb1"
-        };
+        const firebaseConfig = { apiKey: "AIzaSyAg2kfoWsvWWyEXQGe8v6jZZqKepgButUk", authDomain: "ajuda-2217b.firebaseapp.com", projectId: "ajuda-2217b", storageBucket: "ajuda-2217b.firebasestorage.app", messagingSenderId: "421083897636", appId: "1:421083897636:web:18bd6097b5c0169427ddb1" };
 
         if (!firebase.apps.length) { try { firebase.initializeApp(firebaseConfig); } catch (e) {} }
         const auth = firebase.auth();
