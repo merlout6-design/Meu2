@@ -32,19 +32,24 @@
     <div id="root"></div>
     <script type="text/babel">
         const firebaseConfig = {
-  apiKey: "AIzaSyAf7ML3Gd9kJQI5XcowCRlH0F1VF7x-gMI",
-  authDomain: "rodaodef.firebaseapp.com",
-  projectId: "rodaodef",
-  storageBucket: "rodaodef.firebasestorage.app",
-  messagingSenderId: "232817991067",
-  appId: "1:232817991067:web:469fc0e867e516b510153e",
-  measurementId: "G-5NL356FCMP"
-};
+          apiKey: "AIzaSyAf7ML3Gd9kJQI5XcowCRlH0F1VF7x-gMI",
+          authDomain: "rodaodef.firebaseapp.com",
+          projectId: "rodaodef",
+          storageBucket: "rodaodef.firebasestorage.app",
+          messagingSenderId: "232817991067",
+          appId: "1:232817991067:web:43d6cb14e3b3e4ea10153e",
+          measurementId: "G-SGFYV3565X"
+        };
+
         if (!firebase.apps.length) { try { firebase.initializeApp(firebaseConfig); } catch (e) {} }
-        const db = firebase.firestore(); const APP_ID = "rodaodef"; 
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const APP_ID = "rodaodef"; 
         const getCol = (n) => db.collection('artifacts').doc(APP_ID).collection('public').doc('data').collection(n);
-        const { useState, useEffect, useMemo } = React;
+
+        const { useState, useEffect, useMemo, useRef } = React;
         const formatMoney = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const DEFAULT_COORDS = { lat: -25.0015570, lng: -53.4628300 };
 
         const App = () => {
             const [allOrders, setAllOrders] = useState([]);
