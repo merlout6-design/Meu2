@@ -21,6 +21,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+	<script src="https://sdk.mercadopago.com/js/v2"></script>
     
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Chewy&display=swap" rel="stylesheet">
     <style>
@@ -458,7 +459,96 @@
             useEffect(() => { if (form.cep.length >= 8 && form.number && form.bairro && form.address) { setDel(p => ({ ...p, loading: true })); if (typingTimer) clearTimeout(typingTimer); const timer = setTimeout(() => calculateFinalShipping(), 1000); setTypingTimer(timer); } }, [form.number, form.cep, form.bairro, form.address]);
             const calculateFinalShipping = async () => { if(!form.bairro) return; const bairroMatch = neighborhoods.find(n => n.name.toLowerCase().trim() === form.bairro.toLowerCase().trim()); if (bairroMatch) { setDel({ fee: parseFloat(bairroMatch.price), method: 'bairro_fixo' }); return; } try { const query = `${form.address}, ${form.number}, Cascavel, PR, Brazil`; const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`); const data = await res.json(); if(data.length > 0) { const lat = parseFloat(data[0].lat); const lon = parseFloat(data[0].lon); const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${settings.restLng},${settings.restLat};${lon},${lat}?overview=false`; const rRes = await fetch(osrmUrl); const rData = await rRes.json(); if (rData.routes && rData.routes.length > 0) { const km = (rData.routes[0].distance / 1000).toFixed(1); const fee = Math.max(5, km * settings.pricePerKm); setDel({ fee, km, lat, lon, method: 'gps_auto' }); } else { fallbackCalc(lat, lon); } } else { setDel({ fee: 0, method: 'erro' }); showAlert("Atenção", "Rota não encontrada. Verifique o número.", 'alert'); } } catch(e) { setDel({ fee: 0, method: 'erro' }); } };
             const fallbackCalc = (lat, lon) => { const R=6371; const dLat=(lat-settings.restLat)*Math.PI/180; const dLon=(lon-settings.restLng)*Math.PI/180; const a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(settings.restLat*Math.PI/180)*Math.cos(lat*Math.PI/180) * Math.sin(dLon/2)*Math.sin(dLon/2); const km = (R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)) * 1.3).toFixed(1); const fee = Math.max(5, km * settings.pricePerKm); setDel({ fee, km, lat, lon, method: 'fallback' }); };
-            const handleCouponChange = (e) => { setCouponCode(e.target.value.replace(/\s/g, '').toUpperCase()); };
+            // Efeito para carregar o Mercado Pago Brick (Google Pay / Cartão)
+useEffect(() => {
+    // Se a opção de pagamento online for selecionada
+    if (payMethod === 'Pagar Online (Google Pay/Cartão)') {
+        const loadMp = async () => {
+            // Substitua pela sua Public Key do Mercado Pago
+            const mp = new window.MercadoPago('APP_USR-d4897d21-2f48-41d9-a3f1-58f21e102578', { locale: 'pt-BR' });
+            const bricksBuilder = mp.bricks();
+            
+            // Monta o visual no HTML
+            window.mpBrickController = await bricksBuilder.create('payment', 'payment-brick-container', {
+                initialization: {
+                    amount: total, // Puxa o total do carrinho atualizado com frete/cupom
+                },
+                customization: {
+                    paymentMethods: {
+                        creditCard: "all",
+                        debitCard: "all",
+                    },
+                    // ADICIONE ESTE BLOCO PARA ATIVAR O GOOGLE PAY
+                    wallets: {
+                        googlePay: "all",
+                        applePay: "all"
+                    }
+                },
+                callbacks: {
+                    onReady: () => { console.log('Google Pay / Cartão carregado!'); },
+                    onSubmit: (cardFormData) => {
+                        return new Promise(async (resolve, reject) => {
+                            showLoading("Processando pagamento...");
+                            try {
+                                // Garante que temos um email (obrigatório pro MP)
+                                const emailCliente = cardFormData.payer.email || `cliente_${Date.now()}@fritzza.online`;
+                                
+                                const payload = {
+                                    transaction_amount: Number(total.toFixed(2)),
+                                    description: `Pedido ${settings.appName} - ${form.phone}`,
+                                    payment_method_id: cardFormData.payment_method_id,
+                                    token: cardFormData.token,
+                                    installments: cardFormData.installments,
+                                    issuer_id: cardFormData.issuer_id,
+                                    payer: {
+                                        email: emailCliente,
+                                        identification: cardFormData.payer.identification
+                                    }
+                                };
+
+                                const idempotencyKey = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString();
+
+                                // Envia para o seu backend no Render
+                                const response = await fetch("https://rodaa.onrender.com/api/card-payment", {
+                                    method: "POST",
+                                    headers: {
+                                        "Content-Type": "application/json",
+                                        "X-Idempotency-Key": idempotencyKey
+                                    },
+                                    body: JSON.stringify(payload)
+                                });
+
+                                const data = await response.json();
+
+                                if (response.ok && (data.status === "approved" || data.status === "in_process")) {
+                                    showAlert("Pagamento Aprovado! 🎉", "Seu pedido já vai para a chapa. Finalizando...", "success");
+                                    // Chama a função de finalizar pedido ignorando a checagem de loja fechada (pois já pagou)
+                                    setTimeout(() => { finishOrder(true); }, 2000);
+                                    resolve();
+                                } else {
+                                    showAlert("Pagamento Recusado", "Verifique os dados do cartão e tente novamente.", "error");
+                                    reject();
+                                }
+                            } catch (error) {
+                                closeModal();
+                                showAlert("Erro", "Falha ao processar o pagamento com o servidor.", "error");
+                                reject();
+                            }
+                        });
+                    },
+                    onError: (error) => { 
+                        showAlert("Erro", "Não foi possível carregar o módulo de pagamento.", "error"); 
+                    }
+                }
+            });
+        };
+        loadMp();
+    } else {
+        // Desmonta o botão se o cliente escolher Dinheiro ou Pix
+        if (window.mpBrickController) window.mpBrickController.unmount();
+    }
+}, [payMethod, total]);
+			const handleCouponChange = (e) => { setCouponCode(e.target.value.replace(/\s/g, '').toUpperCase()); };
             const applyCoupon = async () => { 
     if(!couponCode) return; 
     const q = await getCol('coupons').where('code', '==', couponCode.toUpperCase()).where('active', '==', true).get(); 
@@ -748,6 +838,19 @@
                                         <i className="fa-regular fa-credit-card text-xl"></i>
                                         Cartão (Levamos a maquininha)
                                     </button>
+									<button 
+    disabled={del.loading || (del.fee === 0 && del.method !== 'bairro_fixo')}
+    onClick={() => { setPayMethod('Pagar Online (Google Pay/Cartão)'); setPixData(null); }} 
+    className={`p-4 border md:text-base font-bold transition col-span-2 flex items-center justify-center gap-3 ${border} ${del.loading || (del.fee === 0 && del.method !== 'bairro_fixo') ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed' : (payMethod === 'Pagar Online (Google Pay/Cartão)' ? 'bg-blue-600 text-white border-blue-600 shadow-md transform scale-[1.01]' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300')}`} 
+>
+    <i className="fa-brands fa-google-pay text-2xl"></i>
+    Pagar Online (Site)
+</button>
+
+{/* Contêiner onde o Mercado Pago vai aparecer magicamente */}
+{payMethod === 'Pagar Online (Google Pay/Cartão)' && (
+    <div id="payment-brick-container" className="col-span-2 mt-4 bg-white p-2 rounded-xl border border-gray-200"></div>
+)}
                                 </div>
 
                                 {payMethod === 'Dinheiro' && (
