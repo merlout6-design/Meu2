@@ -21,7 +21,6 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-	<script src="https://sdk.mercadopago.com/js/v2"></script>
     
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Chewy&display=swap" rel="stylesheet">
     <style>
@@ -459,108 +458,7 @@
             useEffect(() => { if (form.cep.length >= 8 && form.number && form.bairro && form.address) { setDel(p => ({ ...p, loading: true })); if (typingTimer) clearTimeout(typingTimer); const timer = setTimeout(() => calculateFinalShipping(), 1000); setTypingTimer(timer); } }, [form.number, form.cep, form.bairro, form.address]);
             const calculateFinalShipping = async () => { if(!form.bairro) return; const bairroMatch = neighborhoods.find(n => n.name.toLowerCase().trim() === form.bairro.toLowerCase().trim()); if (bairroMatch) { setDel({ fee: parseFloat(bairroMatch.price), method: 'bairro_fixo' }); return; } try { const query = `${form.address}, ${form.number}, Cascavel, PR, Brazil`; const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`); const data = await res.json(); if(data.length > 0) { const lat = parseFloat(data[0].lat); const lon = parseFloat(data[0].lon); const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${settings.restLng},${settings.restLat};${lon},${lat}?overview=false`; const rRes = await fetch(osrmUrl); const rData = await rRes.json(); if (rData.routes && rData.routes.length > 0) { const km = (rData.routes[0].distance / 1000).toFixed(1); const fee = Math.max(5, km * settings.pricePerKm); setDel({ fee, km, lat, lon, method: 'gps_auto' }); } else { fallbackCalc(lat, lon); } } else { setDel({ fee: 0, method: 'erro' }); showAlert("Atenção", "Rota não encontrada. Verifique o número.", 'alert'); } } catch(e) { setDel({ fee: 0, method: 'erro' }); } };
             const fallbackCalc = (lat, lon) => { const R=6371; const dLat=(lat-settings.restLat)*Math.PI/180; const dLon=(lon-settings.restLng)*Math.PI/180; const a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(settings.restLat*Math.PI/180)*Math.cos(lat*Math.PI/180) * Math.sin(dLon/2)*Math.sin(dLon/2); const km = (R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)) * 1.3).toFixed(1); const fee = Math.max(5, km * settings.pricePerKm); setDel({ fee, km, lat, lon, method: 'fallback' }); };
-            // Efeito para carregar o Mercado Pago Brick (Google Pay / Cartão)
-useEffect(() => {
-    // Se a opção de pagamento online for selecionada
-    if (payMethod === 'Pagar Online (Google Pay/Cartão)') {
-        const loadMp = async () => {
-            // Substitua pela sua Public Key do Mercado Pago
-            const mp = new window.MercadoPago('APP_USR-d4897d21-2f48-41d9-a3f1-58f21e102578', { locale: 'pt-BR' });
-            const bricksBuilder = mp.bricks();
-            
-            // Monta o visual no HTML
-            window.mpBrickController = await bricksBuilder.create('payment', 'payment-brick-container', {
-                initialization: {
-                    amount: total, // Puxa o total do carrinho atualizado com frete/cupom
-                },
-                customization: {
-                    paymentMethods: {
-                        creditCard: "all",
-                        debitCard: "all",
-                    },
-                    // ADICIONE ESTE BLOCO PARA ATIVAR O GOOGLE PAY
-                    wallets: {
-                        googlePay: "all",
-                        applePay: "all"
-                    }
-                },
-                callbacks: {
-                    onReady: () => { console.log('Google Pay / Cartão carregado!'); },
-                    onSubmit: (brickResponse) => {
-                        return new Promise(async (resolve, reject) => {
-                            showLoading("Processando pagamento...");
-                            try {
-                                // 1. A MÁGICA ACONTECE AQUI: Abrimos o "envelope" do Mercado Pago
-                                const formData = brickResponse.formData || brickResponse;
-                                
-                                const payerObj = formData.payer || {};
-                                const emailCliente = payerObj.email || `cliente_${Date.now()}@fritzza.online`;
-                                
-                                const payerData = { email: emailCliente };
-                                
-                                if (payerObj.identification && payerObj.identification.number && payerObj.identification.number !== "") {
-                                    payerData.identification = payerObj.identification;
-                                }
-
-                                // 2. Montamos o pacote com os dados reais (agora ele acha o Token e o ID!)
-                                const payload = {
-                                    transaction_amount: Number(total.toFixed(2)),
-                                    description: `Pedido ${settings.appName} - ${form.phone}`,
-                                    payment_method_id: formData.payment_method_id, 
-                                    token: formData.token, 
-                                    installments: formData.installments || 1,
-                                    payer: payerData
-                                };
-
-                                if (formData.issuer_id) {
-                                    payload.issuer_id = formData.issuer_id;
-                                }
-
-                                const idempotencyKey = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString();
-
-                                const response = await fetch("https://rodaa.onrender.com/api/card-payment", {
-                                    method: "POST",
-                                    headers: {
-                                        "Content-Type": "application/json",
-                                        "X-Idempotency-Key": idempotencyKey
-                                    },
-                                    body: JSON.stringify(payload)
-                                });
-
-                                const text = await response.text(); 
-                                console.log("🕵️ RESPOSTA DO RENDER:", text);
-                                
-                                const data = JSON.parse(text);
-
-                                if (response.ok && (data.status === "approved" || data.status === "in_process")) {
-                                    showAlert("Pagamento Aprovado! 🎉", "Seu pedido já vai para a chapa. Finalizando...", "success");
-                                    setTimeout(() => { finishOrder(true); }, 2000);
-                                    resolve();
-                                } else {
-                                    showAlert("Pagamento Recusado", `Motivo: ${data.message || 'Verifique o cartão'}`, "error");
-                                    reject();
-                                }
-                            } catch (error) {
-                                console.error("🕵️ ERRO FATAL NO FRONTEND:", error);
-                                closeModal();
-                                showAlert("Erro", "Falha ao processar o pagamento.", "error");
-                                reject();
-                            }
-                        });
-                    },
-                    onError: (error) => { 
-                        showAlert("Erro", "Não foi possível carregar o módulo de pagamento.", "error"); 
-                    }
-                }
-            });
-        };
-        loadMp();
-    } else {
-        // Desmonta o botão se o cliente escolher Dinheiro ou Pix
-        if (window.mpBrickController) window.mpBrickController.unmount();
-    }
-}, [payMethod, total]);
-			const handleCouponChange = (e) => { setCouponCode(e.target.value.replace(/\s/g, '').toUpperCase()); };
+            const handleCouponChange = (e) => { setCouponCode(e.target.value.replace(/\s/g, '').toUpperCase()); };
             const applyCoupon = async () => { 
     if(!couponCode) return; 
     const q = await getCol('coupons').where('code', '==', couponCode.toUpperCase()).where('active', '==', true).get(); 
@@ -741,9 +639,37 @@ useEffect(() => {
                 <div className="pt-8">
                     <button onClick={onBack} className="mb-6 text-gray-500 hover:text-gray-800 transition font-bold flex items-center gap-2 text-sm"><i className="fa-solid fa-arrow-left"></i> Voltar ao Cardápio</button>
                     
-                    <div className={`bg-white shadow-xl overflow-hidden ${border} flex flex-col md:flex-row-reverse md:items-start`}>
+                    {/* NOVO CONTAINER GRID PARA CONTROLAR A ORDEM EXATA NO MOBILE E NO DESKTOP */}
+                    <div className={`bg-white shadow-xl overflow-hidden ${border} grid grid-cols-1 md:grid-cols-12 md:items-start`}>
                         
-                        <div className="bg-gray-50 p-6 border-b md:border-b-0 md:border-l md:w-[40%] md:sticky md:top-24">
+                        {/* 1. DADOS DE ENTREGA (Sempre no topo no celular: order-1) */}
+                        <div className="p-6 md:p-8 md:pb-4 md:col-span-7 order-1 space-y-4">
+                            <h3 className="font-bold text-lg md:text-xl text-gray-800 border-l-4 pl-3 flex items-center gap-2" style={{borderColor: settings.themeColor}}>
+                                <i className="fa-solid fa-location-dot text-gray-400"></i> Dados de Entrega
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <input type="tel" placeholder="WhatsApp (45...)" className={`border p-3.5 bg-gray-50 w-full text-base font-medium focus:ring-2 focus:ring-opacity-50 outline-none transition ${border}`} style={{'--tw-ring-color': settings.themeColor}} value={form.phone} onChange={handlePhoneChange} onBlur={()=>check(form.phone)} />
+                                <input placeholder="Seu Nome" className={`border p-3.5 bg-gray-50 w-full text-base font-medium focus:ring-2 focus:ring-opacity-50 outline-none transition ${border}`} style={{'--tw-ring-color': settings.themeColor}} value={form.name} onChange={e=>setForm({...form, name:e.target.value})} />
+                            </div>
+                            
+                            {/* CORREÇÃO DO CEP: Usando Grid col-cols-3 para evitar o "bug oval" */}
+                            <div className="grid grid-cols-3 gap-4">
+                                <div className="relative col-span-2">
+                                    <input type="tel" placeholder="CEP (Apenas Números)" className={`border p-3.5 bg-gray-50 w-full font-medium focus:ring-2 focus:ring-opacity-50 outline-none transition ${border}`} style={{'--tw-ring-color': settings.themeColor}} value={form.cep} onChange={handleCepChange} maxLength={9} />
+                                    {cepLoading && <i className="fa-solid fa-spinner fa-spin absolute right-4 top-4 text-gray-400"></i>}
+                                </div>
+                                <input placeholder="Nº da Casa" type="tel" id="input-number" className={`border p-3.5 bg-gray-50 w-full text-center font-bold focus:ring-2 focus:ring-opacity-50 outline-none transition ${border}`} style={{'--tw-ring-color': settings.themeColor}} value={form.number} onChange={e=>setForm({...form, number:e.target.value})} />
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <input placeholder="Endereço (Puxado pelo CEP)" className={`border p-3.5 bg-gray-100 text-gray-500 w-full ${border}`} value={form.address} readOnly />
+                                <input placeholder="Bairro" className={`border p-3.5 bg-gray-100 text-gray-500 w-full ${border}`} value={form.bairro} readOnly />
+                            </div>
+                            <input placeholder="Complemento / Ponto de Referência (Opcional)" className={`border p-3.5 bg-gray-50 w-full focus:ring-2 focus:ring-opacity-50 outline-none transition ${border}`} style={{'--tw-ring-color': settings.themeColor}} value={form.complement} onChange={e=>setForm({...form, complement:e.target.value})} />
+                        </div>
+
+                        {/* 2. RESUMO DO PEDIDO (Meio no celular: order-2 | Lateral no PC: col-span-5) */}
+                        <div className="bg-gray-50 p-6 border-y md:border-y-0 md:border-l md:col-span-5 md:row-span-2 md:sticky md:top-24 order-2">
                             <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
                                 <i className="fa-solid fa-receipt text-gray-400"></i> Resumo do Pedido
                             </h2>
@@ -771,131 +697,100 @@ useEffect(() => {
                                 </div>
                             </div>
                             
-                            <button onClick={finishOrder} disabled={del.loading || (del.fee===0 && del.method!=='bairro_fixo') || pixStatus === 'approved'} className={`w-full py-4 mt-6 bg-green-600 hover:bg-green-700 text-white font-bold shadow-xl transition transform hover:-translate-y-1 active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50 disabled:transform-none ${border}`} style={{backgroundColor: settings.cartColor}}>
+                            {/* BOTÃO FINALIZAR - VERSÃO DESKTOP (Fica invisível no celular e visível no PC) */}
+                            <button onClick={finishOrder} disabled={del.loading || (del.fee===0 && del.method!=='bairro_fixo') || pixStatus === 'approved'} className={`hidden md:flex w-full py-4 mt-6 bg-green-600 hover:bg-green-700 text-white font-bold shadow-xl transition transform hover:-translate-y-1 active:scale-95 items-center justify-center gap-3 disabled:opacity-50 disabled:transform-none ${border}`} style={{backgroundColor: settings.cartColor}}>
                                 <span className="text-lg">Finalizar Pedido</span><i className="fa-brands fa-whatsapp text-xl"></i>
                             </button>
                         </div>
 
-                        <div className="p-6 md:p-8 space-y-8 md:w-[60%]">
-                            <div className="space-y-4">
-                                <h3 className="font-bold text-lg md:text-xl text-gray-800 border-l-4 pl-3 flex items-center gap-2" style={{borderColor: settings.themeColor}}>
-                                    <i className="fa-solid fa-location-dot text-gray-400"></i> Dados de Entrega
-                                </h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <input type="tel" placeholder="WhatsApp (45...)" className={`border p-3.5 bg-gray-50 w-full text-base font-medium focus:ring-2 focus:ring-opacity-50 outline-none transition ${border}`} style={{'--tw-ring-color': settings.themeColor}} value={form.phone} onChange={handlePhoneChange} onBlur={()=>check(form.phone)} />
-                                    <input placeholder="Seu Nome" className={`border p-3.5 bg-gray-50 w-full text-base font-medium focus:ring-2 focus:ring-opacity-50 outline-none transition ${border}`} style={{'--tw-ring-color': settings.themeColor}} value={form.name} onChange={e=>setForm({...form, name:e.target.value})} />
+                        {/* 3. PAGAMENTO (Fim no celular: order-3) */}
+                        <div className="p-6 md:p-8 md:pt-4 md:col-span-7 order-3 space-y-4">
+                            <h3 className="font-bold text-lg md:text-xl text-gray-800 border-l-4 pl-3 flex items-center gap-2 mt-2 md:mt-0" style={{borderColor: settings.themeColor}}>
+                                <i className="fa-solid fa-wallet text-gray-400"></i> Pagamento
+                            </h3>
+                            
+                            <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                                <label className="text-xs font-bold text-gray-500 mb-2 block">TEM CUPOM DE DESCONTO?</label>
+                                <div className="flex gap-2">
+                                    <input placeholder="Digite aqui..." className={`border p-3 flex-1 uppercase font-bold tracking-wider outline-none focus:border-gray-400 ${border}`} value={couponCode} onChange={handleCouponChange} />
+                                    <button onClick={applyCoupon} className={`px-6 text-white font-bold hover:opacity-90 transition ${border}`} style={theme}>APLICAR</button>
                                 </div>
-                                <div className="flex gap-4">
-                                    <div className="relative flex-[2]">
-                                        <input type="tel" placeholder="CEP (Apenas Números)" className={`border p-3.5 bg-gray-50 w-full font-medium focus:ring-2 focus:ring-opacity-50 outline-none transition ${border}`} style={{'--tw-ring-color': settings.themeColor}} value={form.cep} onChange={handleCepChange} maxLength={9} />
-                                        {cepLoading && <i className="fa-solid fa-spinner fa-spin absolute right-4 top-4 text-gray-400"></i>}
-                                    </div>
-                                    <input placeholder="Nº da Casa" type="tel" id="input-number" className={`border p-3.5 bg-gray-50 flex-1 text-center font-bold focus:ring-2 focus:ring-opacity-50 outline-none transition ${border}`} style={{'--tw-ring-color': settings.themeColor}} value={form.number} onChange={e=>setForm({...form, number:e.target.value})} />
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <input placeholder="Endereço (Puxado pelo CEP)" className={`border p-3.5 bg-gray-100 text-gray-500 w-full ${border}`} value={form.address} readOnly />
-                                    <input placeholder="Bairro" className={`border p-3.5 bg-gray-100 text-gray-500 w-full ${border}`} value={form.bairro} readOnly />
-                                </div>
-                                <input placeholder="Complemento / Ponto de Referência (Opcional)" className={`border p-3.5 bg-gray-50 w-full focus:ring-2 focus:ring-opacity-50 outline-none transition ${border}`} style={{'--tw-ring-color': settings.themeColor}} value={form.complement} onChange={e=>setForm({...form, complement:e.target.value})} />
+                                {appliedCoupon && <div className="mt-3 bg-green-100 border border-green-200 text-green-700 p-3 text-sm font-bold rounded-lg flex justify-between items-center"><span className="flex items-center gap-2"><i className="fa-solid fa-tag"></i> {appliedCoupon.code}</span><span>- {formatMoney(discount)}</span></div>}
                             </div>
 
-                            <div className="space-y-4">
-                                <h3 className="font-bold text-lg md:text-xl text-gray-800 border-l-4 pl-3 flex items-center gap-2 mt-8" style={{borderColor: settings.themeColor}}>
-                                    <i className="fa-solid fa-wallet text-gray-400"></i> Pagamento
-                                </h3>
-                                
-                                <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                                    <label className="text-xs font-bold text-gray-500 mb-2 block">TEM CUPOM DE DESCONTO?</label>
-                                    <div className="flex gap-2">
-                                        <input placeholder="Digite aqui..." className={`border p-3 flex-1 uppercase font-bold tracking-wider outline-none focus:border-gray-400 ${border}`} value={couponCode} onChange={handleCouponChange} />
-                                        <button onClick={applyCoupon} className={`px-6 text-white font-bold hover:opacity-90 transition ${border}`} style={theme}>APLICAR</button>
-                                    </div>
-                                    {appliedCoupon && <div className="mt-3 bg-green-100 border border-green-200 text-green-700 p-3 text-sm font-bold rounded-lg flex justify-between items-center"><span className="flex items-center gap-2"><i className="fa-solid fa-tag"></i> {appliedCoupon.code}</span><span>- {formatMoney(discount)}</span></div>}
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-3 mt-4">
-                                    {['Dinheiro', 'Pix'].map(m => (
-                                        <button 
-                                            key={m} 
-                                            disabled={del.loading || (del.fee === 0 && del.method !== 'bairro_fixo')}
-                                            onClick={() => { 
-                                                if (m === 'Pix') {
-                                                    // Verifica se os dados estão preenchidos ANTES de selecionar o Pix
-                                                    if (!form.name || !form.phone || !form.cep || !form.number) {
-                                                        showAlert("Atenção", "Preencha os dados de entrega antes de selecionar o Pix.", "alert");
-                                                        return;
-                                                    }
-                                                    setPayMethod(m); 
-                                                    setPixData(null); 
-                                                    // Dispara a geração automaticamente
-                                                    setTimeout(() => handlePix(), 50);
-                                                } else {
-                                                    setPayMethod(m); 
-                                                    setPixData(null); 
-                                                }
-                                            }} 
-                                            className={`p-4 border md:text-base font-bold transition flex flex-col items-center gap-2 ${border} ${del.loading || (del.fee === 0 && del.method !== 'bairro_fixo') ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed' : (payMethod === m ? 'bg-gray-800 text-white border-gray-800 shadow-md transform scale-[1.02]' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300')}`} 
-                                            style={payMethod === m && !(del.loading || (del.fee === 0 && del.method !== 'bairro_fixo')) ? theme : {}}
-                                        >
-                                            <i className={`fa-solid ${m === 'Dinheiro' ? 'fa-money-bill-wave' : 'fa-pix'} text-xl`}></i>
-                                            {m}
-                                        </button>
-                                    ))}
+                            <div className="grid grid-cols-2 gap-3 mt-4">
+                                {['Dinheiro', 'Pix'].map(m => (
                                     <button 
+                                        key={m} 
                                         disabled={del.loading || (del.fee === 0 && del.method !== 'bairro_fixo')}
-                                        onClick={() => { setPayMethod('Cartão Crédito/Débito'); setPixData(null); }} 
-                                        className={`p-4 border md:text-base font-bold transition col-span-2 flex items-center justify-center gap-3 ${border} ${del.loading || (del.fee === 0 && del.method !== 'bairro_fixo') ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed' : (payMethod === 'Cartão Crédito/Débito' ? 'bg-gray-800 text-white border-gray-800 shadow-md transform scale-[1.01]' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300')}`} 
-                                        style={payMethod === 'Cartão Crédito/Débito' && !(del.loading || (del.fee === 0 && del.method !== 'bairro_fixo')) ? theme : {}}
+                                        onClick={() => { 
+                                            if (m === 'Pix') {
+                                                if (!form.name || !form.phone || !form.cep || !form.number) {
+                                                    showAlert("Atenção", "Preencha os dados de entrega antes de selecionar o Pix.", "alert");
+                                                    return;
+                                                }
+                                                setPayMethod(m); 
+                                                setPixData(null); 
+                                                setTimeout(() => handlePix(), 50);
+                                            } else {
+                                                setPayMethod(m); 
+                                                setPixData(null); 
+                                            }
+                                        }} 
+                                        className={`p-4 border md:text-base font-bold transition flex flex-col items-center gap-2 ${border} ${del.loading || (del.fee === 0 && del.method !== 'bairro_fixo') ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed' : (payMethod === m ? 'bg-gray-800 text-white border-gray-800 shadow-md transform scale-[1.02]' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300')}`} 
+                                        style={payMethod === m && !(del.loading || (del.fee === 0 && del.method !== 'bairro_fixo')) ? theme : {}}
                                     >
-                                        <i className="fa-regular fa-credit-card text-xl"></i>
-                                        Cartão (Levamos a maquininha)
+                                        <i className={`fa-solid ${m === 'Dinheiro' ? 'fa-money-bill-wave' : 'fa-pix'} text-xl`}></i>
+                                        {m}
                                     </button>
-									<button 
-    disabled={del.loading || (del.fee === 0 && del.method !== 'bairro_fixo')}
-    onClick={() => { setPayMethod('Pagar Online (Google Pay/Cartão)'); setPixData(null); }} 
-    className={`p-4 border md:text-base font-bold transition col-span-2 flex items-center justify-center gap-3 ${border} ${del.loading || (del.fee === 0 && del.method !== 'bairro_fixo') ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed' : (payMethod === 'Pagar Online (Google Pay/Cartão)' ? 'bg-blue-600 text-white border-blue-600 shadow-md transform scale-[1.01]' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300')}`} 
->
-    <i className="fa-brands fa-google-pay text-2xl"></i>
-    Pagar Online (Site)
-</button>
-
-{/* Contêiner onde o Mercado Pago vai aparecer magicamente */}
-{payMethod === 'Pagar Online (Google Pay/Cartão)' && (
-    <div id="payment-brick-container" className="col-span-2 mt-4 bg-white p-2 rounded-xl border border-gray-200"></div>
-)}
-                                </div>
-
-                                {payMethod === 'Dinheiro' && (
-                                    <div className="animate-fadeIn mt-4">
-                                        <label className="text-sm font-bold text-gray-600 mb-2 block">Precisa de troco para quanto?</label>
-                                        <input type="number" placeholder="Ex: 50" className={`w-full p-4 border bg-yellow-50 text-lg font-bold focus:ring-2 outline-none transition ${border}`} style={{'--tw-ring-color': '#facc15', borderColor: '#fde047'}} value={change} onChange={e=>setChange(e.target.value)} />
-                                    </div>
-                                )}
-                                
-                                {payMethod === 'Pix' && !pixData && (
-                                    <div className="animate-fadeIn mt-4 bg-gray-50 p-5 rounded-xl border border-gray-200 text-center">
-                                        <p className="text-sm text-gray-600 mb-4 font-medium">Caso o código não tenha sido gerado automaticamente, tente novamente.</p>
-                                        <button 
-                                            onClick={handlePix} 
-                                            className={`w-full py-3.5 text-white font-bold transition shadow-md hover:opacity-90 active:scale-95 flex items-center justify-center gap-2 ${border}`}
-                                            style={theme}
-                                        >
-                                            <i className="fa-solid fa-rotate-right text-xl"></i> Tentar Novamente
-                                        </button>
-                                    </div>
-                                )}
-                                
-                                {pixData && (
-                                    <div className={`bg-teal-50 p-6 border border-teal-200 text-center shadow-inner mt-4 ${border}`}>
-                                        <p className="font-bold text-teal-800 mb-4">Escaneie o QR Code ou copie o código</p>
-                                        <div className="bg-white p-2 inline-block rounded-xl border shadow-sm mb-4">
-                                            <img src={`data:image/png;base64,${pixData.point_of_interaction.transaction_data.qr_code_base64}`} className="w-48 h-48 mx-auto" />
-                                        </div>
-                                        <textarea className="w-full text-xs p-3 border rounded-lg bg-white text-gray-600 outline-none focus:border-teal-400" rows="3" readOnly value={pixData.point_of_interaction.transaction_data.qr_code} onClick={(e)=>e.target.select()}></textarea>
-                                        <button onClick={copyPix} className="w-full mt-3 py-3.5 bg-teal-600 text-white font-bold rounded-xl hover:bg-teal-700 transition shadow-md flex items-center justify-center gap-2 text-base"><i className="fa-regular fa-copy"></i> Copiar Código Pix</button>
-                                    </div>
-                                )}
+                                ))}
+                                <button 
+                                    disabled={del.loading || (del.fee === 0 && del.method !== 'bairro_fixo')}
+                                    onClick={() => { setPayMethod('Cartão Crédito/Débito'); setPixData(null); }} 
+                                    className={`p-4 border md:text-base font-bold transition col-span-2 flex items-center justify-center gap-3 ${border} ${del.loading || (del.fee === 0 && del.method !== 'bairro_fixo') ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed' : (payMethod === 'Cartão Crédito/Débito' ? 'bg-gray-800 text-white border-gray-800 shadow-md transform scale-[1.01]' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300')}`} 
+                                    style={payMethod === 'Cartão Crédito/Débito' && !(del.loading || (del.fee === 0 && del.method !== 'bairro_fixo')) ? theme : {}}
+                                >
+                                    <i className="fa-regular fa-credit-card text-xl"></i>
+                                    Cartão (Levamos a maquininha)
+                                </button>
                             </div>
+
+                            {payMethod === 'Dinheiro' && (
+                                <div className="animate-fadeIn mt-4">
+                                    <label className="text-sm font-bold text-gray-600 mb-2 block">Precisa de troco para quanto?</label>
+                                    <input type="number" placeholder="Ex: 50" className={`w-full p-4 border bg-yellow-50 text-lg font-bold focus:ring-2 outline-none transition ${border}`} style={{'--tw-ring-color': '#facc15', borderColor: '#fde047'}} value={change} onChange={e=>setChange(e.target.value)} />
+                                </div>
+                            )}
+                            
+                            {payMethod === 'Pix' && !pixData && (
+                                <div className="animate-fadeIn mt-4 bg-gray-50 p-5 rounded-xl border border-gray-200 text-center">
+                                    <p className="text-sm text-gray-600 mb-4 font-medium">Caso o código não tenha sido gerado automaticamente, tente novamente.</p>
+                                    <button 
+                                        onClick={handlePix} 
+                                        className={`w-full py-3.5 text-white font-bold transition shadow-md hover:opacity-90 active:scale-95 flex items-center justify-center gap-2 ${border}`}
+                                        style={theme}
+                                    >
+                                        <i className="fa-solid fa-rotate-right text-xl"></i> Tentar Novamente
+                                    </button>
+                                </div>
+                            )}
+                            
+                            {pixData && (
+                                <div className={`bg-teal-50 p-6 border border-teal-200 text-center shadow-inner mt-4 ${border}`}>
+                                    <p className="font-bold text-teal-800 mb-4">Escaneie o QR Code ou copie o código</p>
+                                    <div className="bg-white p-2 inline-block rounded-xl border shadow-sm mb-4">
+                                        <img src={`data:image/png;base64,${pixData.point_of_interaction.transaction_data.qr_code_base64}`} className="w-48 h-48 mx-auto" />
+                                    </div>
+                                    <textarea className="w-full text-xs p-3 border rounded-lg bg-white text-gray-600 outline-none focus:border-teal-400" rows="3" readOnly value={pixData.point_of_interaction.transaction_data.qr_code} onClick={(e)=>e.target.select()}></textarea>
+                                    <button onClick={copyPix} className="w-full mt-3 py-3.5 bg-teal-600 text-white font-bold rounded-xl hover:bg-teal-700 transition shadow-md flex items-center justify-center gap-2 text-base"><i className="fa-regular fa-copy"></i> Copiar Código Pix</button>
+                                </div>
+                            )}
+
+                            {/* BOTÃO FINALIZAR - VERSÃO MOBILE (Fica no fim da tela, após selecionar o pagamento) */}
+                            <button onClick={finishOrder} disabled={del.loading || (del.fee===0 && del.method!=='bairro_fixo') || pixStatus === 'approved'} className={`flex md:hidden w-full py-4 mt-8 bg-green-600 hover:bg-green-700 text-white font-bold shadow-xl transition transform hover:-translate-y-1 active:scale-95 items-center justify-center gap-3 disabled:opacity-50 disabled:transform-none ${border}`} style={{backgroundColor: settings.cartColor}}>
+                                <span className="text-lg">Finalizar Pedido</span><i className="fa-brands fa-whatsapp text-xl"></i>
+                            </button>
+
                         </div>
                     </div>
                 </div>
