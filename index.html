@@ -490,7 +490,6 @@ useEffect(() => {
                         return new Promise(async (resolve, reject) => {
                             showLoading("Processando pagamento...");
                             try {
-                                // Garante que temos um email (obrigatório pro MP)
                                 const emailCliente = cardFormData.payer.email || `cliente_${Date.now()}@fritzza.online`;
                                 
                                 const payload = {
@@ -508,7 +507,6 @@ useEffect(() => {
 
                                 const idempotencyKey = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString();
 
-                                // Envia para o seu backend no Render
                                 const response = await fetch("https://rodaa.onrender.com/api/card-payment", {
                                     method: "POST",
                                     headers: {
@@ -518,18 +516,24 @@ useEffect(() => {
                                     body: JSON.stringify(payload)
                                 });
 
-                                const data = await response.json();
+                                // === CÓDIGO DETETIVE INÍCIO ===
+                                const text = await response.text(); 
+                                console.log("🕵️ RESPOSTA DO RENDER:", text);
+                                console.log("🕵️ STATUS DO RENDER:", response.status);
+                                // === CÓDIGO DETETIVE FIM ===
+
+                                const data = JSON.parse(text);
 
                                 if (response.ok && (data.status === "approved" || data.status === "in_process")) {
                                     showAlert("Pagamento Aprovado! 🎉", "Seu pedido já vai para a chapa. Finalizando...", "success");
-                                    // Chama a função de finalizar pedido ignorando a checagem de loja fechada (pois já pagou)
                                     setTimeout(() => { finishOrder(true); }, 2000);
                                     resolve();
                                 } else {
-                                    showAlert("Pagamento Recusado", "Verifique os dados do cartão e tente novamente.", "error");
+                                    showAlert("Pagamento Recusado", `Motivo: ${data.message || 'Verifique o cartão'}`, "error");
                                     reject();
                                 }
                             } catch (error) {
+                                console.error("🕵️ ERRO FATAL NO FRONTEND:", error);
                                 closeModal();
                                 showAlert("Erro", "Falha ao processar o pagamento com o servidor.", "error");
                                 reject();
