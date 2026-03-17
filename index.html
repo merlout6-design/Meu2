@@ -486,34 +486,34 @@ useEffect(() => {
                 },
                 callbacks: {
                     onReady: () => { console.log('Google Pay / Cartão carregado!'); },
-                    onSubmit: (cardFormData) => {
+                    onSubmit: (brickResponse) => {
                         return new Promise(async (resolve, reject) => {
                             showLoading("Processando pagamento...");
                             try {
-                                const payerObj = cardFormData.payer || {};
+                                // 1. A MÁGICA ACONTECE AQUI: Abrimos o "envelope" do Mercado Pago
+                                const formData = brickResponse.formData || brickResponse;
+                                
+                                const payerObj = formData.payer || {};
                                 const emailCliente = payerObj.email || `cliente_${Date.now()}@fritzza.online`;
                                 
-                                // 1. Começamos só com o e-mail (que é obrigatório)
                                 const payerData = { email: emailCliente };
                                 
-                                // 2. SÓ adicionamos a identificação (CPF) se ela realmente existir
                                 if (payerObj.identification && payerObj.identification.number && payerObj.identification.number !== "") {
                                     payerData.identification = payerObj.identification;
                                 }
 
-                                // 3. Montamos o pacote base
+                                // 2. Montamos o pacote com os dados reais (agora ele acha o Token e o ID!)
                                 const payload = {
                                     transaction_amount: Number(total.toFixed(2)),
                                     description: `Pedido ${settings.appName} - ${form.phone}`,
-                                    payment_method_id: cardFormData.payment_method_id,
-                                    token: cardFormData.token,
-                                    installments: cardFormData.installments || 1,
+                                    payment_method_id: formData.payment_method_id, 
+                                    token: formData.token, 
+                                    installments: formData.installments || 1,
                                     payer: payerData
                                 };
 
-                                // 4. O Google Pay às vezes esconde o issuer_id. Só enviamos se ele existir
-                                if (cardFormData.issuer_id) {
-                                    payload.issuer_id = cardFormData.issuer_id;
+                                if (formData.issuer_id) {
+                                    payload.issuer_id = formData.issuer_id;
                                 }
 
                                 const idempotencyKey = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString();
@@ -529,7 +529,6 @@ useEffect(() => {
 
                                 const text = await response.text(); 
                                 console.log("🕵️ RESPOSTA DO RENDER:", text);
-// ... (o resto do código continua igual, fazendo o JSON.parse e testando se foi approved)
                                 
                                 const data = JSON.parse(text);
 
