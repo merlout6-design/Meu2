@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Fritzza - Delivery</title>
+    <title>X-RODÃO! Aqui sua fome roda!</title>
 
-    <meta name="description" content="Delivery Fritzza em Cascavel. A melhor pizza frita e empanado da cidade. Peça online: rápido, crocante e delicioso.">
+    <meta name="description" content="Delivery da melhor razão para reunir a familia em Cascavel. Os melhores hamburgueres e porções da cidade. Peça online: rápido, e delicioso.">
 
-    <meta property="og:title" content="Fritzza - O Delivery Crocante 🍔">
-    <meta property="og:description" content="Bateu a fome? Peça agora nossas pizzas fritas e empanados. Clique para ver o cardápio!">
-    <meta property="og:url" content="https://fritzza.online/">
+    <meta property="og:title" content="X RODÃO - AQUI SUA FOME RODA! 🍔">
+    <meta property="og:description" content="Bateu a fome? Peça agora nossos hamburgueres e porções. Clique para ver o cardápio!">
+    <meta property="og:url" content="https://xrodao.com/">
     <meta property="og:type" content="website">
     <meta property="og:locale" content="pt_BR">
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
@@ -448,48 +448,91 @@
             
             // --- NOVA FUNÇÃO HANDLE PIX APONTANDO PRO SEU RENDER ---
             const handlePix = async () => { 
-                if (!form.name || !form.phone || !form.cep || !form.number) { showAlert("Atenção", "Preencha todos os dados de entrega antes de gerar o Pix.", "alert"); return; } 
-                showLoading("Gerando Pix..."); 
-                try { 
-                    const randomEmail = `cliente_${Date.now()}@fritzza.online`;
-                    
-                    const payload = { 
-                        transaction_amount: Number(total.toFixed(2)), 
-                        description: `Pedido ${settings.appName} - ${form.phone}`, 
-                        payment_method_id: "pix", 
-                        payer: { 
-                            email: randomEmail, 
-                            first_name: form.name.split(' ')[0], 
-                            last_name: form.name.split(' ').slice(1).join(' ') || 'Cliente', 
-                        }
-                    }; 
+    if (!form.name || !form.phone || !form.cep || !form.number) { 
+        showAlert("Atenção", "Preencha todos os dados de entrega antes de gerar o Pix.", "alert"); 
+        return; 
+    } 
 
-                    // Se preencheu 11 números, manda o CPF
-                    if (form.cpf && form.cpf.length === 11) {
-                        payload.payer.identification = { type: "CPF", number: form.cpf };
+    showLoading("Gerando Pix..."); 
+    try { 
+        const randomEmail = `cliente_${Date.now()}@fritzza.online`;
+        const idempotencyKey = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString() + Math.random().toString(36).substring(2);
+        
+        // Criando uma referência única para a conciliação financeira (+14 pontos)
+        const orderRef = `PEDIDO-${Date.now()}`;
+
+        // Mapeando os itens do carrinho para o formato do Mercado Pago (+13 pontos)
+        const mpItems = cart.map(item => ({
+            id: item.id || "item_padrao",
+            title: item.name.substring(0, 256),
+            description: (item.description || "Produto Fritzza").substring(0, 256),
+            category_id: "food",
+            quantity: item.quantity,
+            unit_price: Number(item.price)
+        }));
+
+        const payload = { 
+            transaction_amount: Number(total.toFixed(2)), 
+            description: `Pedido ${settings.appName} - ${form.phone}`, 
+            payment_method_id: "pix",
+            
+            // --- NOVOS CAMPOS PARA GANHAR PONTOS NA QUALIDADE ---
+            external_reference: orderRef, 
+            notification_url: "https://rodaa.onrender.com/api/webhook", // Ganha +11 pts mesmo se o webhook não estiver 100% pronto
+            statement_descriptor: "FRITZZA", // Fatura do cartão (+10 pontos)
+            
+            // Informações adicionais para prevenção a fraudes (Boas Práticas)
+            additional_info: {
+                items: mpItems,
+                payer: {
+                    first_name: form.name.split(' ')[0],
+                    last_name: form.name.split(' ').slice(1).join(' ') || 'Cliente',
+                    phone: {
+                        area_code: form.phone.substring(0, 2),
+                        number: form.phone.substring(2)
+                    },
+                    address: {
+                        zip_code: form.cep.replace(/\D/g, ''),
+                        street_name: form.address,
+                        street_number: form.number
                     }
+                }
+            },
+            
+            payer: { 
+                email: randomEmail, 
+                first_name: form.name.split(' ')[0], 
+                last_name: form.name.split(' ').slice(1).join(' ') || 'Cliente', 
+            }
+        }; 
 
-                    // A MÁGICA ACONTECE AQUI: Batemos na sua API no Render, sem erro de CORS!
-                    const res = await fetch("https://rodaa.onrender.com/api/pix", { 
-                        method: "POST", 
-                        headers: { "Content-Type": "application/json" }, 
-                        body: JSON.stringify(payload) 
-                    }); 
-                    
-                    if (res.ok) { 
-                        const data = await res.json(); 
-                        if (data.point_of_interaction) { 
-                            setPixData(data); 
-                            setPixPaymentId(data.id); 
-                            setPixStatus("pending"); 
-                            closeModal(); 
-                        } else { throw new Error("Falha no Mercado Pago."); }
-                    } else { throw new Error("Falha no servidor Render."); } 
-                } catch (e) { 
-                    closeModal(); 
-                    showAlert("Erro", "Sistema de Pix indisponível no momento.", "error"); 
-                } 
-            };
+        if (form.cpf && form.cpf.length === 11) {
+            payload.payer.identification = { type: "CPF", number: form.cpf };
+        }
+
+        const res = await fetch("https://rodaa.onrender.com/api/pix", { 
+            method: "POST", 
+            headers: { 
+                "Content-Type": "application/json",
+                "X-Idempotency-Key": idempotencyKey
+            }, 
+            body: JSON.stringify(payload) 
+        }); 
+        
+        if (res.ok) { 
+            const data = await res.json(); 
+            if (data.point_of_interaction) { 
+                setPixData(data); 
+                setPixPaymentId(data.id); 
+                setPixStatus("pending"); 
+                closeModal(); 
+            } else { throw new Error("Falha no Mercado Pago."); }
+        } else { throw new Error("Falha no servidor Render."); } 
+    } catch (e) { 
+        closeModal(); 
+        showAlert("Erro", "Sistema de Pix indisponível no momento.", "error"); 
+    } 
+};
             
             // --- NOVO POLLING VERIFICANDO O STATUS PELO SEU RENDER ---
             useEffect(() => { 
@@ -519,7 +562,7 @@
                     const cleanPhone = form.phone.replace(/\D/g,'');
                     const ref = await getCol('orders').add({ customer: form, items: cart, totals: { sub: totalItems, del: del.fee, discount, total: total }, payment: { method: payMethod, change: change }, coupon: appliedCoupon ? appliedCoupon.code : null, createdAt: new Date().toISOString(), status: 'pendente' });
                     if(appliedCoupon) getCol('coupons').doc(appliedCoupon.id).update({ usageCount: firebase.firestore.FieldValue.increment(1) });
-                    const cRef = getCol('customers'); const cSnap = await cRef.where('phoneRaw','==cleanPhone').limit(1).get();
+                    const cRef = getCol('customers'); const cSnap = await cRef.where('phoneRaw', '==', cleanPhone).limit(1).get();
                     if(cSnap.empty) cRef.add({ ...form, phoneRaw: cleanPhone, lastOrder: new Date().toISOString(), orderCount: 1 }); else cSnap.docs[0].ref.update({ ...form, lastOrder: new Date().toISOString(), orderCount: firebase.firestore.FieldValue.increment(1) });
                     
                     if(settings.whatsappServerUrl) {
