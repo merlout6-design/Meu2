@@ -21,6 +21,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+	<script src="https://sdk.mercadopago.com/js/v2"></script>
     
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Chewy&display=swap" rel="stylesheet">
     <style>
@@ -193,12 +194,29 @@
             const [categories, setCategories] = useState([]);
             const [neighborhoods, setNeighborhoods] = useState([]);
             const [settings, setSettings] = useState({ appName: "Fritzza", themeColor: "#dc2626", openTime: "18:00", closeTime: "23:00", cardStyle: "grid", borderRadius: "rounded-2xl", restLat: DEFAULT_COORDS.lat, restLng: DEFAULT_COORDS.lng, pricePerKm: 2.00 });
+            
             const [loading, setLoading] = useState(true);
+            const hasShownClosedAlert = useRef(false); // NOVO: Controle do pop-up de fechado
 
             const showAlert = (title, message, type='alert', icon=null) => setModal({ isOpen: true, type, title, message, icon });
             const showConfirm = (title, message, onConfirm) => setModal({ isOpen: true, type: 'confirm', title, message, onConfirm });
             const showLoading = (title='Carregando...') => setModal({ isOpen: true, type: 'loading', title, color: settings.themeColor });
             const closeModal = () => setModal({ ...modal, isOpen: false });
+
+            // NOVO: Verifica se está fechado logo após terminar o loading inicial
+            useEffect(() => {
+                if (!loading && !hasShownClosedAlert.current) {
+                    if (!isStoreOpen(settings.openTime, settings.closeTime)) {
+                        showAlert(
+                            "Restaurante Fechado 🌙",
+                            `Nosso horário de funcionamento é a partir das ${settings.openTime}. Fique à vontade para montar o seu carrinho! Seu pedido ficará agendado e será preparado assim que abrirmos.`,
+                            "alert",
+                            "fa-solid fa-clock"
+                        );
+                    }
+                    hasShownClosedAlert.current = true;
+                }
+            }, [loading, settings.openTime, settings.closeTime]);
             
             const showToast = (msg) => { 
                 if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
@@ -441,98 +459,163 @@
             useEffect(() => { if (form.cep.length >= 8 && form.number && form.bairro && form.address) { setDel(p => ({ ...p, loading: true })); if (typingTimer) clearTimeout(typingTimer); const timer = setTimeout(() => calculateFinalShipping(), 1000); setTypingTimer(timer); } }, [form.number, form.cep, form.bairro, form.address]);
             const calculateFinalShipping = async () => { if(!form.bairro) return; const bairroMatch = neighborhoods.find(n => n.name.toLowerCase().trim() === form.bairro.toLowerCase().trim()); if (bairroMatch) { setDel({ fee: parseFloat(bairroMatch.price), method: 'bairro_fixo' }); return; } try { const query = `${form.address}, ${form.number}, Cascavel, PR, Brazil`; const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`); const data = await res.json(); if(data.length > 0) { const lat = parseFloat(data[0].lat); const lon = parseFloat(data[0].lon); const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${settings.restLng},${settings.restLat};${lon},${lat}?overview=false`; const rRes = await fetch(osrmUrl); const rData = await rRes.json(); if (rData.routes && rData.routes.length > 0) { const km = (rData.routes[0].distance / 1000).toFixed(1); const fee = Math.max(5, km * settings.pricePerKm); setDel({ fee, km, lat, lon, method: 'gps_auto' }); } else { fallbackCalc(lat, lon); } } else { setDel({ fee: 0, method: 'erro' }); showAlert("Atenção", "Rota não encontrada. Verifique o número.", 'alert'); } } catch(e) { setDel({ fee: 0, method: 'erro' }); } };
             const fallbackCalc = (lat, lon) => { const R=6371; const dLat=(lat-settings.restLat)*Math.PI/180; const dLon=(lon-settings.restLng)*Math.PI/180; const a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(settings.restLat*Math.PI/180)*Math.cos(lat*Math.PI/180) * Math.sin(dLon/2)*Math.sin(dLon/2); const km = (R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)) * 1.3).toFixed(1); const fee = Math.max(5, km * settings.pricePerKm); setDel({ fee, km, lat, lon, method: 'fallback' }); };
-            const handleCouponChange = (e) => { setCouponCode(e.target.value.replace(/\s/g, '').toUpperCase()); };
-            const applyCoupon = async () => { if(!couponCode) return; const q = await getCol('coupons').where('code', '==', couponCode.toUpperCase()).where('active', '==', true).get(); if(q.empty) return showAlert("Erro", "Cupom inválido", "error"); const d = q.docs[0].data(); if(d.limit && (d.usageCount || 0) >= d.limit) return showAlert("Erro", "Cupom esgotado", "error"); setAppliedCoupon({ id: q.docs[0].id, ...d }); showAlert("Sucesso", "Cupom aplicado!", "success"); };
-            const getDiscount = () => { if(!appliedCoupon) return 0; if(appliedCoupon.type === 'fixed') return parseFloat(appliedCoupon.value); if(appliedCoupon.type === 'percent') { const d = totalItems * (parseFloat(appliedCoupon.value)/100); return appliedCoupon.maxDiscount ? Math.min(d, parseFloat(appliedCoupon.maxDiscount)) : d; } return 0; };
+            // Efeito para carregar o Mercado Pago Brick (Google Pay / Cartão)
+useEffect(() => {
+    // Se a opção de pagamento online for selecionada
+    if (payMethod === 'Pagar Online (Google Pay/Cartão)') {
+        const loadMp = async () => {
+            // Substitua pela sua Public Key do Mercado Pago
+            const mp = new window.MercadoPago('APP_USR-d4897d21-2f48-41d9-a3f1-58f21e102578', { locale: 'pt-BR' });
+            const bricksBuilder = mp.bricks();
+            
+            // Monta o visual no HTML
+            window.mpBrickController = await bricksBuilder.create('payment', 'payment-brick-container', {
+                initialization: {
+                    amount: total, // Puxa o total do carrinho atualizado com frete/cupom
+                },
+                customization: {
+                    paymentMethods: {
+                        creditCard: "all",
+                        debitCard: "all",
+                    },
+                },
+                callbacks: {
+                    onReady: () => { console.log('Google Pay / Cartão carregado!'); },
+                    onSubmit: (cardFormData) => {
+                        // Quando o cliente confirmar o pagamento no Google Pay ou Cartão
+                        return new Promise((resolve, reject) => {
+                            // Este é o momento em que enviaremos o Token para o seu servidor (Render)
+                            console.log("Dados seguros do cartão gerados:", cardFormData);
+                            showAlert("Atenção", "Token gerado! Agora precisamos ligar o backend.", "info");
+                            resolve();
+                        });
+                    },
+                    onError: (error) => { 
+                        showAlert("Erro", "Não foi possível carregar o módulo de pagamento.", "error"); 
+                    }
+                }
+            });
+        };
+        loadMp();
+    } else {
+        // Desmonta o botão se o cliente escolher Dinheiro ou Pix
+        if (window.mpBrickController) window.mpBrickController.unmount();
+    }
+}, [payMethod, total]);
+			const handleCouponChange = (e) => { setCouponCode(e.target.value.replace(/\s/g, '').toUpperCase()); };
+            const applyCoupon = async () => { 
+    if(!couponCode) return; 
+    const q = await getCol('coupons').where('code', '==', couponCode.toUpperCase()).where('active', '==', true).get(); 
+    if(q.empty) return showAlert("Erro", "Cupom inválido", "error"); 
+    const d = q.docs[0].data(); 
+    if(d.limit && (d.usageCount || 0) >= d.limit) return showAlert("Erro", "Cupom esgotado", "error"); 
+    
+    setAppliedCoupon({ id: q.docs[0].id, ...d }); 
+    
+    // VERIFICA SE JÁ HAVIA PAGAMENTO SELECIONADO
+    if (payMethod) {
+        setPayMethod(""); // Limpa a seleção de pagamento
+        setPixData(null); // Limpa o QR Code antigo
+        setPixPaymentId(null); // Limpa o ID do Pix antigo
+        setPixStatus(null); // Limpa o status
+        setChange(""); // Limpa o troco (caso fosse dinheiro)
+        
+        showAlert("Sucesso 🎉", "Cupom aplicado! Como o valor mudou, por favor, selecione sua forma de pagamento novamente.", "success");
+    } else {
+        showAlert("Sucesso", "Cupom aplicado!", "success"); 
+    }
+};
+            const getDiscount = () => { 
+    if(!appliedCoupon) return 0; 
+    if(appliedCoupon.type === 'fixed') return parseFloat(appliedCoupon.value); 
+    if(appliedCoupon.type === 'percent') { 
+        const d = totalItems * (parseFloat(appliedCoupon.value)/100); 
+        return appliedCoupon.maxDiscount ? Math.min(d, parseFloat(appliedCoupon.maxDiscount)) : d; 
+    } 
+    if(appliedCoupon.type === 'shipping') return del.fee; // Adicionamos esta regra para o frete grátis!
+    return 0; 
+};
             const discount = getDiscount(); const total = Math.max(0, totalItems + del.fee - discount);
             
             // --- NOVA FUNÇÃO HANDLE PIX APONTANDO PRO SEU RENDER ---
+            // --- NOVA FUNÇÃO HANDLE PIX ---
             const handlePix = async () => { 
-    if (!form.name || !form.phone || !form.cep || !form.number) { 
-        showAlert("Atenção", "Preencha todos os dados de entrega antes de gerar o Pix.", "alert"); 
-        return; 
-    } 
+                if (!form.name || !form.phone || !form.cep || !form.number) { 
+                    showAlert("Atenção", "Preencha todos os dados de entrega antes de gerar o Pix.", "alert"); 
+                    return; 
+                } 
 
-    showLoading("Gerando Pix..."); 
-    try { 
-        const randomEmail = `cliente_${Date.now()}@fritzza.online`;
-        const idempotencyKey = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString() + Math.random().toString(36).substring(2);
-        
-        // Criando uma referência única para a conciliação financeira (+14 pontos)
-        const orderRef = `PEDIDO-${Date.now()}`;
+                const executePix = async () => {
+                    showLoading("Gerando Pix..."); 
+                    try { 
+                        const randomEmail = `cliente_${Date.now()}@fritzza.online`;
+                        const idempotencyKey = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString() + Math.random().toString(36).substring(2);
+                        const orderRef = `PEDIDO-${Date.now()}`;
 
-        // Mapeando os itens do carrinho para o formato do Mercado Pago (+13 pontos)
-        const mpItems = cart.map(item => ({
-            id: item.id || "item_padrao",
-            title: item.name.substring(0, 256),
-            description: (item.description || "Produto Fritzza").substring(0, 256),
-            category_id: "food",
-            quantity: item.quantity,
-            unit_price: Number(item.price)
-        }));
+                        const mpItems = cart.map(item => ({
+                            id: item.id || "item_padrao",
+                            title: item.name.substring(0, 256),
+                            description: (item.description || "Produto Fritzza").substring(0, 256),
+                            category_id: "food",
+                            quantity: item.quantity,
+                            unit_price: Number(item.price)
+                        }));
 
-        const payload = { 
-            transaction_amount: Number(total.toFixed(2)), 
-            description: `Pedido ${settings.appName} - ${form.phone}`, 
-            payment_method_id: "pix",
-            
-            // --- NOVOS CAMPOS PARA GANHAR PONTOS NA QUALIDADE ---
-            external_reference: orderRef, 
-            notification_url: "https://rodaa.onrender.com/api/webhook", // Ganha +11 pts mesmo se o webhook não estiver 100% pronto
-            statement_descriptor: "FRITZZA", // Fatura do cartão (+10 pontos)
-            
-            // Informações adicionais para prevenção a fraudes (Boas Práticas)
-            additional_info: {
-                items: mpItems,
-                payer: {
-                    first_name: form.name.split(' ')[0],
-                    last_name: form.name.split(' ').slice(1).join(' ') || 'Cliente',
-                    phone: {
-                        area_code: form.phone.substring(0, 2),
-                        number: form.phone.substring(2)
-                    },
-                    address: {
-                        zip_code: form.cep.replace(/\D/g, ''),
-                        street_name: form.address,
-                        street_number: form.number
+                        const payload = { 
+                            transaction_amount: Number(total.toFixed(2)), 
+                            description: `Pedido ${settings.appName} - ${form.phone}`, 
+                            payment_method_id: "pix",
+                            external_reference: orderRef, 
+                            notification_url: "https://rodaa.onrender.com/api/webhook", 
+                            statement_descriptor: "FRITZZA", 
+                            additional_info: {
+                                items: mpItems,
+                                payer: {
+                                    first_name: form.name.split(' ')[0],
+                                    last_name: form.name.split(' ').slice(1).join(' ') || 'Cliente',
+                                    phone: { area_code: form.phone.substring(0, 2), number: form.phone.substring(2) },
+                                    address: { zip_code: form.cep.replace(/\D/g, ''), street_name: form.address, street_number: form.number }
+                                }
+                            },
+                            payer: { email: randomEmail, first_name: form.name.split(' ')[0], last_name: form.name.split(' ').slice(1).join(' ') || 'Cliente' }
+                        }; 
+
+                        if (form.cpf && form.cpf.length === 11) {
+                            payload.payer.identification = { type: "CPF", number: form.cpf };
+                        }
+
+                        const res = await fetch("https://rodaa.onrender.com/api/pix", { 
+                            method: "POST", 
+                            headers: { "Content-Type": "application/json", "X-Idempotency-Key": idempotencyKey }, 
+                            body: JSON.stringify(payload) 
+                        }); 
+                        
+                        if (res.ok) { 
+                            const data = await res.json(); 
+                            if (data.point_of_interaction) { 
+                                setPixData(data); 
+                                setPixPaymentId(data.id); 
+                                setPixStatus("pending"); 
+                                closeModal(); 
+                            } else { throw new Error("Falha no Mercado Pago."); }
+                        } else { throw new Error("Falha no servidor Render."); } 
+                    } catch (e) { 
+                        closeModal(); 
+                        showAlert("Erro", "Sistema de Pix indisponível no momento.", "error"); 
                     }
+                };
+
+                // Verifica se está fechado e exibe a confirmação
+                if (!isStoreOpen(settings.openTime, settings.closeTime)) {
+                    showConfirm(
+                        "Agendar Pedido com Pix? ⏰",
+                        `Estamos fechados e abriremos às ${settings.openTime}. Seu pedido será agendado para preparo. Deseja gerar o Pix e confirmar o agendamento?`,
+                        executePix
+                    );
+                } else {
+                    executePix();
                 }
-            },
-            
-            payer: { 
-                email: randomEmail, 
-                first_name: form.name.split(' ')[0], 
-                last_name: form.name.split(' ').slice(1).join(' ') || 'Cliente', 
-            }
-        }; 
-
-        if (form.cpf && form.cpf.length === 11) {
-            payload.payer.identification = { type: "CPF", number: form.cpf };
-        }
-
-        const res = await fetch("https://rodaa.onrender.com/api/pix", { 
-            method: "POST", 
-            headers: { 
-                "Content-Type": "application/json",
-                "X-Idempotency-Key": idempotencyKey
-            }, 
-            body: JSON.stringify(payload) 
-        }); 
-        
-        if (res.ok) { 
-            const data = await res.json(); 
-            if (data.point_of_interaction) { 
-                setPixData(data); 
-                setPixPaymentId(data.id); 
-                setPixStatus("pending"); 
-                closeModal(); 
-            } else { throw new Error("Falha no Mercado Pago."); }
-        } else { throw new Error("Falha no servidor Render."); } 
-    } catch (e) { 
-        closeModal(); 
-        showAlert("Erro", "Sistema de Pix indisponível no momento.", "error"); 
-    } 
-};
+            };
             
             // --- NOVO POLLING VERIFICANDO O STATUS PELO SEU RENDER ---
             useEffect(() => { 
@@ -551,34 +634,48 @@
                 return () => clearInterval(interval); 
             }, [pixPaymentId, pixStatus]);
 
-            useEffect(() => { if (pixStatus === 'approved') { showAlert("Pix Aprovado! 🎉", "Recebemos seu pagamento. Finalizando o pedido...", "success"); setTimeout(() => { finishOrder(); }, 2000); } }, [pixStatus]);
+            useEffect(() => { if (pixStatus === 'approved') { showAlert("Pix Aprovado! 🎉", "Recebemos seu pagamento. Finalizando o pedido...", "success"); setTimeout(() => { finishOrder(true); }, 2000); } }, [pixStatus]);
             
-            const finishOrder = async () => {
+            const finishOrder = async (skipCheck = false) => {
                 if(!form.name || !form.phone || !form.address || !form.number) return showAlert("Ops", "Preencha todos os campos de entrega.");
                 if(!payMethod) return showAlert("Ops", "Selecione o pagamento.");
                 if(del.fee === 0 && del.method !== 'bairro_fixo') return showAlert("Atenção", "Aguardando cálculo do frete...", "alert");
-                showLoading("Finalizando...");
-                try {
-                    const cleanPhone = form.phone.replace(/\D/g,'');
-                    const ref = await getCol('orders').add({ customer: form, items: cart, totals: { sub: totalItems, del: del.fee, discount, total: total }, payment: { method: payMethod, change: change }, coupon: appliedCoupon ? appliedCoupon.code : null, createdAt: new Date().toISOString(), status: 'pendente' });
-                    if(appliedCoupon) getCol('coupons').doc(appliedCoupon.id).update({ usageCount: firebase.firestore.FieldValue.increment(1) });
-                    const cRef = getCol('customers'); const cSnap = await cRef.where('phoneRaw', '==', cleanPhone).limit(1).get();
-                    if(cSnap.empty) cRef.add({ ...form, phoneRaw: cleanPhone, lastOrder: new Date().toISOString(), orderCount: 1 }); else cSnap.docs[0].ref.update({ ...form, lastOrder: new Date().toISOString(), orderCount: firebase.firestore.FieldValue.increment(1) });
-                    
-                    if(settings.whatsappServerUrl) {
-                        try {
-                            const baseUrl = window.location.href.substring(0, window.location.href.lastIndexOf('/')) + '/';
-                            const trackLink = `${baseUrl}acompanhar.html?fone=${cleanPhone}`;
-                            const plainMsg = formatTunnelMessage(settings.whatsappTemplate, form, cart, { sub: totalItems, del: del.fee, discount, total }, { method: payMethod, change, coupon: appliedCoupon?.code }, trackLink, settings.appName);
-                            let finalPhone = cleanPhone; if(finalPhone.length >= 10 && finalPhone.length <= 11) finalPhone = '55' + finalPhone;
-                            await fetch(settings.whatsappServerUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: finalPhone, message: plainMsg }) });
-                        } catch(err) { console.error("Erro ao tentar enviar WhatsApp automático:", err); }
-                    }
-                    
-                    localStorage.setItem('fritzza_last_order', ref.id); localStorage.setItem('fritzza_last_order_date', new Date().toISOString()); localStorage.setItem('fritzza_last_phone', cleanPhone);
-                    closeModal(); setCart([]); 
-                    window.location.href = `acompanhar.html?fone=${cleanPhone}`;
-                } catch(e) { closeModal(); showAlert("Erro", "Erro ao enviar: " + e.message); }
+                
+                const executeOrder = async () => {
+                    showLoading("Finalizando...");
+                    try {
+                        const cleanPhone = form.phone.replace(/\D/g,'');
+                        const ref = await getCol('orders').add({ customer: form, items: cart, totals: { sub: totalItems, del: del.fee, discount, total: total }, payment: { method: payMethod, change: change }, coupon: appliedCoupon ? appliedCoupon.code : null, createdAt: new Date().toISOString(), status: 'pendente' });
+                        if(appliedCoupon) getCol('coupons').doc(appliedCoupon.id).update({ usageCount: firebase.firestore.FieldValue.increment(1) });
+                        const cRef = getCol('customers'); const cSnap = await cRef.where('phoneRaw', '==', cleanPhone).limit(1).get();
+                        if(cSnap.empty) cRef.add({ ...form, phoneRaw: cleanPhone, lastOrder: new Date().toISOString(), orderCount: 1 }); else cSnap.docs[0].ref.update({ ...form, lastOrder: new Date().toISOString(), orderCount: firebase.firestore.FieldValue.increment(1) });
+                        
+                        if(settings.whatsappServerUrl) {
+                            try {
+                                const baseUrl = window.location.href.substring(0, window.location.href.lastIndexOf('/')) + '/';
+                                const trackLink = `${baseUrl}acompanhar.html?fone=${cleanPhone}`;
+                                const plainMsg = formatTunnelMessage(settings.whatsappTemplate, form, cart, { sub: totalItems, del: del.fee, discount, total }, { method: payMethod, change, coupon: appliedCoupon?.code }, trackLink, settings.appName);
+                                let finalPhone = cleanPhone; if(finalPhone.length >= 10 && finalPhone.length <= 11) finalPhone = '55' + finalPhone;
+                                await fetch(settings.whatsappServerUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: finalPhone, message: plainMsg }) });
+                            } catch(err) { console.error("Erro ao tentar enviar WhatsApp automático:", err); }
+                        }
+                        
+                        localStorage.setItem('fritzza_last_order', ref.id); localStorage.setItem('fritzza_last_order_date', new Date().toISOString()); localStorage.setItem('fritzza_last_phone', cleanPhone);
+                        closeModal(); setCart([]); 
+                        window.location.href = `acompanhar.html?fone=${cleanPhone}`;
+                    } catch(e) { closeModal(); showAlert("Erro", "Erro ao enviar: " + e.message); }
+                };
+
+                // Verifica se está fechado e se não deve pular a checagem (ex: Pix já pago)
+                if (skipCheck !== true && !isStoreOpen(settings.openTime, settings.closeTime)) {
+                    showConfirm(
+                        "Agendar Pedido? ⏰",
+                        `Estamos fechados e abriremos às ${settings.openTime}. Seu pedido será agendado para preparo assim que abrirmos. Deseja confirmar?`,
+                        executeOrder
+                    );
+                } else {
+                    executeOrder();
+                }
             };
             const copyPix = () => { if(pixData?.point_of_interaction?.transaction_data?.qr_code) { navigator.clipboard.writeText(pixData.point_of_interaction.transaction_data.qr_code); showAlert("Sucesso", "Código Pix copiado!", "success"); } };
 
@@ -663,7 +760,22 @@
                                         <button 
                                             key={m} 
                                             disabled={del.loading || (del.fee === 0 && del.method !== 'bairro_fixo')}
-                                            onClick={() => { setPayMethod(m); setPixData(null); }} 
+                                            onClick={() => { 
+                                                if (m === 'Pix') {
+                                                    // Verifica se os dados estão preenchidos ANTES de selecionar o Pix
+                                                    if (!form.name || !form.phone || !form.cep || !form.number) {
+                                                        showAlert("Atenção", "Preencha os dados de entrega antes de selecionar o Pix.", "alert");
+                                                        return;
+                                                    }
+                                                    setPayMethod(m); 
+                                                    setPixData(null); 
+                                                    // Dispara a geração automaticamente
+                                                    setTimeout(() => handlePix(), 50);
+                                                } else {
+                                                    setPayMethod(m); 
+                                                    setPixData(null); 
+                                                }
+                                            }} 
                                             className={`p-4 border md:text-base font-bold transition flex flex-col items-center gap-2 ${border} ${del.loading || (del.fee === 0 && del.method !== 'bairro_fixo') ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed' : (payMethod === m ? 'bg-gray-800 text-white border-gray-800 shadow-md transform scale-[1.02]' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300')}`} 
                                             style={payMethod === m && !(del.loading || (del.fee === 0 && del.method !== 'bairro_fixo')) ? theme : {}}
                                         >
@@ -673,13 +785,26 @@
                                     ))}
                                     <button 
                                         disabled={del.loading || (del.fee === 0 && del.method !== 'bairro_fixo')}
-                                        onClick={() => setPayMethod('Cartão Crédito/Débito')} 
+                                        onClick={() => { setPayMethod('Cartão Crédito/Débito'); setPixData(null); }} 
                                         className={`p-4 border md:text-base font-bold transition col-span-2 flex items-center justify-center gap-3 ${border} ${del.loading || (del.fee === 0 && del.method !== 'bairro_fixo') ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed' : (payMethod === 'Cartão Crédito/Débito' ? 'bg-gray-800 text-white border-gray-800 shadow-md transform scale-[1.01]' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300')}`} 
                                         style={payMethod === 'Cartão Crédito/Débito' && !(del.loading || (del.fee === 0 && del.method !== 'bairro_fixo')) ? theme : {}}
                                     >
                                         <i className="fa-regular fa-credit-card text-xl"></i>
                                         Cartão (Levamos a maquininha)
                                     </button>
+									<button 
+    disabled={del.loading || (del.fee === 0 && del.method !== 'bairro_fixo')}
+    onClick={() => { setPayMethod('Pagar Online (Google Pay/Cartão)'); setPixData(null); }} 
+    className={`p-4 border md:text-base font-bold transition col-span-2 flex items-center justify-center gap-3 ${border} ${del.loading || (del.fee === 0 && del.method !== 'bairro_fixo') ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed' : (payMethod === 'Pagar Online (Google Pay/Cartão)' ? 'bg-blue-600 text-white border-blue-600 shadow-md transform scale-[1.01]' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300')}`} 
+>
+    <i className="fa-brands fa-google-pay text-2xl"></i>
+    Pagar Online (Site)
+</button>
+
+{/* Contêiner onde o Mercado Pago vai aparecer magicamente */}
+{payMethod === 'Pagar Online (Google Pay/Cartão)' && (
+    <div id="payment-brick-container" className="col-span-2 mt-4 bg-white p-2 rounded-xl border border-gray-200"></div>
+)}
                                 </div>
 
                                 {payMethod === 'Dinheiro' && (
@@ -690,24 +815,14 @@
                                 )}
                                 
                                 {payMethod === 'Pix' && !pixData && (
-                                    <div className="animate-fadeIn mt-4 bg-gray-50 p-5 rounded-xl border border-gray-200">
-                                        <label className="text-sm font-bold text-gray-700 mb-2 block">CPF na Nota / Validação</label>
-                                        <input
-                                            type="tel"
-                                            placeholder="Apenas números (Opcional)"
-                                            className={`w-full p-3.5 border bg-white text-base font-medium focus:ring-2 outline-none transition mb-2 ${border}`}
-                                            style={{'--tw-ring-color': settings.themeColor}}
-                                            value={form.cpf}
-                                            onChange={e => setForm({...form, cpf: e.target.value.replace(/\D/g, '').slice(0, 11)})}
-                                        />
-                                        <p className="text-xs text-gray-500 mb-4">Preencher o CPF pode agilizar a aprovação do seu pagamento.</p>
-                                        
+                                    <div className="animate-fadeIn mt-4 bg-gray-50 p-5 rounded-xl border border-gray-200 text-center">
+                                        <p className="text-sm text-gray-600 mb-4 font-medium">Caso o código não tenha sido gerado automaticamente, tente novamente.</p>
                                         <button 
                                             onClick={handlePix} 
-                                            className={`w-full py-3.5 text-white font-bold transition shadow-md hover:opacity-90 active:scale-95 ${border}`}
+                                            className={`w-full py-3.5 text-white font-bold transition shadow-md hover:opacity-90 active:scale-95 flex items-center justify-center gap-2 ${border}`}
                                             style={theme}
                                         >
-                                            <i className="fa-brands fa-pix mr-2"></i> Gerar Chave Pix
+                                            <i className="fa-solid fa-rotate-right text-xl"></i> Tentar Novamente
                                         </button>
                                     </div>
                                 )}
