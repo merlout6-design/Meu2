@@ -490,8 +490,13 @@ useEffect(() => {
                         return new Promise(async (resolve, reject) => {
                             showLoading("Processando pagamento...");
                             try {
-                                const emailCliente = cardFormData.payer.email || `cliente_${Date.now()}@fritzza.online`;
-                                
+                                // === 🛡️ CORREÇÃO DE SEGURANÇA AQUI ===
+                                // Cria um objeto vazio se o Google Pay não enviar os dados do cliente
+                                const payerObj = cardFormData.payer || {};
+                                const emailCliente = payerObj.email || `cliente_${Date.now()}@fritzza.online`;
+                                const identObj = payerObj.identification || {}; 
+                                // =====================================
+
                                 const payload = {
                                     transaction_amount: Number(total.toFixed(2)),
                                     description: `Pedido ${settings.appName} - ${form.phone}`,
@@ -501,7 +506,7 @@ useEffect(() => {
                                     issuer_id: cardFormData.issuer_id,
                                     payer: {
                                         email: emailCliente,
-                                        identification: cardFormData.payer.identification
+                                        identification: identObj
                                     }
                                 };
 
@@ -516,12 +521,9 @@ useEffect(() => {
                                     body: JSON.stringify(payload)
                                 });
 
-                                // === CÓDIGO DETETIVE INÍCIO ===
                                 const text = await response.text(); 
                                 console.log("🕵️ RESPOSTA DO RENDER:", text);
-                                console.log("🕵️ STATUS DO RENDER:", response.status);
-                                // === CÓDIGO DETETIVE FIM ===
-
+                                
                                 const data = JSON.parse(text);
 
                                 if (response.ok && (data.status === "approved" || data.status === "in_process")) {
@@ -535,7 +537,7 @@ useEffect(() => {
                             } catch (error) {
                                 console.error("🕵️ ERRO FATAL NO FRONTEND:", error);
                                 closeModal();
-                                showAlert("Erro", "Falha ao processar o pagamento com o servidor.", "error");
+                                showAlert("Erro", "Falha ao processar o pagamento.", "error");
                                 reject();
                             }
                         });
