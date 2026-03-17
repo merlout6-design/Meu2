@@ -223,6 +223,7 @@
                 return () => { clearInterval(interval); unsubAuth(); };
             }, []);
 
+            // AQUI ESTÁ A NOSSA LÓGICA DE LOADING CORRIGIDA
             useEffect(() => {
                 const init = async () => {
                     if (!auth.currentUser) await auth.signInAnonymously();
@@ -237,18 +238,39 @@
                         return;
                     }
 
+                    let configLoaded = false;
+                    let categoriesLoaded = false;
+                    let productsLoaded = false;
+
+                    const checkLoading = () => {
+                        if (configLoaded && categoriesLoaded && productsLoaded) {
+                            setLoading(false);
+                        }
+                    };
+
                     root.collection('config').doc('main').onSnapshot(d => { 
                         if (d.exists) { 
                             const data = d.data();
                             setSettings(prev => ({...prev, ...data})); 
                             if(data.bgColor) document.body.style.backgroundColor = data.bgColor; 
-                        } 
+                        }
+                        configLoaded = true;
+                        checkLoading();
                     });
-                    root.collection('categories').orderBy('order').onSnapshot(s => setCategories(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-                    root.collection('products').onSnapshot(s => setProducts(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-                    root.collection('neighborhoods').onSnapshot(s => setNeighborhoods(s.docs.map(d => ({ id: d.id, ...d.data() }))));
                     
-                    setLoading(false);
+                    root.collection('categories').orderBy('order').onSnapshot(s => {
+                        setCategories(s.docs.map(d => ({ id: d.id, ...d.data() })));
+                        categoriesLoaded = true;
+                        checkLoading();
+                    });
+                    
+                    root.collection('products').onSnapshot(s => {
+                        setProducts(s.docs.map(d => ({ id: d.id, ...d.data() })));
+                        productsLoaded = true;
+                        checkLoading();
+                    });
+                    
+                    root.collection('neighborhoods').onSnapshot(s => setNeighborhoods(s.docs.map(d => ({ id: d.id, ...d.data() }))));
                 };
                 init();
             }, []);
@@ -424,52 +446,68 @@
             const getDiscount = () => { if(!appliedCoupon) return 0; if(appliedCoupon.type === 'fixed') return parseFloat(appliedCoupon.value); if(appliedCoupon.type === 'percent') { const d = totalItems * (parseFloat(appliedCoupon.value)/100); return appliedCoupon.maxDiscount ? Math.min(d, parseFloat(appliedCoupon.maxDiscount)) : d; } return 0; };
             const discount = getDiscount(); const total = Math.max(0, totalItems + del.fee - discount);
             
+            // --- NOVA FUNÇÃO HANDLE PIX APONTANDO PRO SEU RENDER ---
             const handlePix = async () => { 
                 if (!form.name || !form.phone || !form.cep || !form.number) { showAlert("Atenção", "Preencha todos os dados de entrega antes de gerar o Pix.", "alert"); return; } 
                 showLoading("Gerando Pix..."); 
                 try { 
-                    const mpUrl = "https://api.mercadopago.com/v1/payments"; 
-                    const proxies = ["https://corsproxy.io/?", "https://api.allorigins.win/raw?url=", "https://thingproxy.freeboard.io/fetch/"];
                     const randomEmail = `cliente_${Date.now()}@fritzza.online`;
                     
                     const payload = { 
                         transaction_amount: Number(total.toFixed(2)), 
                         description: `Pedido ${settings.appName} - ${form.phone}`, 
                         payment_method_id: "pix", 
-                        statement_descriptor: "FRITZZA", 
-                        binary_mode: true, 
-                        external_reference: `PED-${Date.now()}`, 
-                        notification_url: "https://fritzza.trycloudflare.com/webhook", 
                         payer: { 
                             email: randomEmail, 
                             first_name: form.name.split(' ')[0], 
                             last_name: form.name.split(' ').slice(1).join(' ') || 'Cliente', 
-                            phone: { area_code: form.phone.substring(0, 2), number: form.phone.substring(2) }, 
-                            address: { zip_code: form.cep, street_name: form.address, street_number: form.number, neighborhood: form.bairro, city: "Cascavel", federal_unit: "PR" } 
-                        }, 
-                        additional_info: { 
-                            items: cart.map(item => ({ 
-                                id: item.id || String(Date.now()), 
-                                title: item.name.substring(0, 250), 
-                                description: (item.description || "Produto Fritzza").substring(0, 250), 
-                                category_id: "food", 
-                                quantity: item.quantity, 
-                                unit_price: Number(item.price) 
-                            })) 
-                        } 
+                        }
                     }; 
 
+                    // Se preencheu 11 números, manda o CPF
                     if (form.cpf && form.cpf.length === 11) {
                         payload.payer.identification = { type: "CPF", number: form.cpf };
                     }
 
-                    let data = null; let success = false;
-                    for (let proxy of proxies) { try { const res = await fetch(proxy + encodeURIComponent(mpUrl), { method: "POST", headers: { "Authorization": `Bearer ${settings.mercadoPagoToken}`, "Content-Type": "application/json", "X-Idempotency-Key": Date.now().toString() + proxy.length }, body: JSON.stringify(payload) }); if (res.ok) { data = await res.json(); if (data.point_of_interaction) { success = true; break; } } } catch (err) { } }
-                    if (success) { setPixData(data); setPixPaymentId(data.id); setPixStatus("pending"); closeModal(); } else { throw new Error("Falha."); } 
-                } catch (e) { closeModal(); showAlert("Erro", "Sistema de Pix indisponível. Escolha outra forma de pagamento.", "error"); } 
+                    // A MÁGICA ACONTECE AQUI: Batemos na sua API no Render, sem erro de CORS!
+                    const res = await fetch("https://rodaa.onrender.com/api/pix", { 
+                        method: "POST", 
+                        headers: { "Content-Type": "application/json" }, 
+                        body: JSON.stringify(payload) 
+                    }); 
+                    
+                    if (res.ok) { 
+                        const data = await res.json(); 
+                        if (data.point_of_interaction) { 
+                            setPixData(data); 
+                            setPixPaymentId(data.id); 
+                            setPixStatus("pending"); 
+                            closeModal(); 
+                        } else { throw new Error("Falha no Mercado Pago."); }
+                    } else { throw new Error("Falha no servidor Render."); } 
+                } catch (e) { 
+                    closeModal(); 
+                    showAlert("Erro", "Sistema de Pix indisponível no momento.", "error"); 
+                } 
             };
             
-            useEffect(() => { let interval; if (pixPaymentId && pixStatus !== 'approved') { interval = setInterval(async () => { try { const mpUrl = `https://api.mercadopago.com/v1/payments/${pixPaymentId}`; const res = await fetch("https://corsproxy.io/?" + encodeURIComponent(mpUrl), { headers: { "Authorization": `Bearer ${settings.mercadoPagoToken}` } }); const data = await res.json(); if (data.status === 'approved') { setPixStatus('approved'); clearInterval(interval); } } catch(e) {} }, 5000); } return () => clearInterval(interval); }, [pixPaymentId, pixStatus, settings.mercadoPagoToken]);
+            // --- NOVO POLLING VERIFICANDO O STATUS PELO SEU RENDER ---
+            useEffect(() => { 
+                let interval; 
+                if (pixPaymentId && pixStatus !== 'approved') { 
+                    interval = setInterval(async () => { 
+                        try { 
+                            const res = await fetch(`https://rodaa.onrender.com/api/pix/${pixPaymentId}`); 
+                            if(res.ok) {
+                                const data = await res.json(); 
+                                if (data.status === 'approved') { setPixStatus('approved'); clearInterval(interval); } 
+                            }
+                        } catch(e) {} 
+                    }, 5000); 
+                } 
+                return () => clearInterval(interval); 
+            }, [pixPaymentId, pixStatus]);
+
             useEffect(() => { if (pixStatus === 'approved') { showAlert("Pix Aprovado! 🎉", "Recebemos seu pagamento. Finalizando o pedido...", "success"); setTimeout(() => { finishOrder(); }, 2000); } }, [pixStatus]);
             
             const finishOrder = async () => {
@@ -481,7 +519,7 @@
                     const cleanPhone = form.phone.replace(/\D/g,'');
                     const ref = await getCol('orders').add({ customer: form, items: cart, totals: { sub: totalItems, del: del.fee, discount, total: total }, payment: { method: payMethod, change: change }, coupon: appliedCoupon ? appliedCoupon.code : null, createdAt: new Date().toISOString(), status: 'pendente' });
                     if(appliedCoupon) getCol('coupons').doc(appliedCoupon.id).update({ usageCount: firebase.firestore.FieldValue.increment(1) });
-                    const cRef = getCol('customers'); const cSnap = await cRef.where('phoneRaw','==',cleanPhone).limit(1).get();
+                    const cRef = getCol('customers'); const cSnap = await cRef.where('phoneRaw','==cleanPhone').limit(1).get();
                     if(cSnap.empty) cRef.add({ ...form, phoneRaw: cleanPhone, lastOrder: new Date().toISOString(), orderCount: 1 }); else cSnap.docs[0].ref.update({ ...form, lastOrder: new Date().toISOString(), orderCount: firebase.firestore.FieldValue.increment(1) });
                     
                     if(settings.whatsappServerUrl) {
@@ -582,7 +620,6 @@
                                         <button 
                                             key={m} 
                                             disabled={del.loading || (del.fee === 0 && del.method !== 'bairro_fixo')}
-                                            // AQUI ESTÁ A CORREÇÃO: Removemos a chamada automática do handlePix
                                             onClick={() => { setPayMethod(m); setPixData(null); }} 
                                             className={`p-4 border md:text-base font-bold transition flex flex-col items-center gap-2 ${border} ${del.loading || (del.fee === 0 && del.method !== 'bairro_fixo') ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed' : (payMethod === m ? 'bg-gray-800 text-white border-gray-800 shadow-md transform scale-[1.02]' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300')}`} 
                                             style={payMethod === m && !(del.loading || (del.fee === 0 && del.method !== 'bairro_fixo')) ? theme : {}}
