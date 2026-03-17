@@ -639,10 +639,9 @@
                 <div className="pt-8">
                     <button onClick={onBack} className="mb-6 text-gray-500 hover:text-gray-800 transition font-bold flex items-center gap-2 text-sm"><i className="fa-solid fa-arrow-left"></i> Voltar ao Cardápio</button>
                     
-                    {/* NOVO CONTAINER GRID PARA CONTROLAR A ORDEM EXATA NO MOBILE E NO DESKTOP */}
                     <div className={`bg-white shadow-xl overflow-hidden ${border} grid grid-cols-1 md:grid-cols-12 md:items-start`}>
                         
-                        {/* 1. DADOS DE ENTREGA (Sempre no topo no celular: order-1) */}
+                        {/* 1. DADOS DE ENTREGA */}
                         <div className="p-6 md:p-8 md:pb-4 md:col-span-7 order-1 space-y-4">
                             <h3 className="font-bold text-lg md:text-xl text-gray-800 border-l-4 pl-3 flex items-center gap-2" style={{borderColor: settings.themeColor}}>
                                 <i className="fa-solid fa-location-dot text-gray-400"></i> Dados de Entrega
@@ -652,7 +651,6 @@
                                 <input placeholder="Seu Nome" className={`border p-3.5 bg-gray-50 w-full text-base font-medium focus:ring-2 focus:ring-opacity-50 outline-none transition ${border}`} style={{'--tw-ring-color': settings.themeColor}} value={form.name} onChange={e=>setForm({...form, name:e.target.value})} />
                             </div>
                             
-                            {/* CORREÇÃO DO CEP: Usando Grid col-cols-3 para evitar o "bug oval" */}
                             <div className="grid grid-cols-3 gap-4">
                                 <div className="relative col-span-2">
                                     <input type="tel" placeholder="CEP (Apenas Números)" className={`border p-3.5 bg-gray-50 w-full font-medium focus:ring-2 focus:ring-opacity-50 outline-none transition ${border}`} style={{'--tw-ring-color': settings.themeColor}} value={form.cep} onChange={handleCepChange} maxLength={9} />
@@ -668,7 +666,7 @@
                             <input placeholder="Complemento / Ponto de Referência (Opcional)" className={`border p-3.5 bg-gray-50 w-full focus:ring-2 focus:ring-opacity-50 outline-none transition ${border}`} style={{'--tw-ring-color': settings.themeColor}} value={form.complement} onChange={e=>setForm({...form, complement:e.target.value})} />
                         </div>
 
-                        {/* 2. RESUMO DO PEDIDO (Meio no celular: order-2 | Lateral no PC: col-span-5) */}
+                        {/* 2. RESUMO DO PEDIDO */}
                         <div className="bg-gray-50 p-6 border-y md:border-y-0 md:border-l md:col-span-5 md:row-span-2 md:sticky md:top-24 order-2">
                             <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
                                 <i className="fa-solid fa-receipt text-gray-400"></i> Resumo do Pedido
@@ -697,13 +695,12 @@
                                 </div>
                             </div>
                             
-                            {/* BOTÃO FINALIZAR - VERSÃO DESKTOP (Fica invisível no celular e visível no PC) */}
                             <button onClick={finishOrder} disabled={del.loading || (del.fee===0 && del.method!=='bairro_fixo') || pixStatus === 'approved'} className={`hidden md:flex w-full py-4 mt-6 bg-green-600 hover:bg-green-700 text-white font-bold shadow-xl transition transform hover:-translate-y-1 active:scale-95 items-center justify-center gap-3 disabled:opacity-50 disabled:transform-none ${border}`} style={{backgroundColor: settings.cartColor}}>
                                 <span className="text-lg">Finalizar Pedido</span><i className="fa-brands fa-whatsapp text-xl"></i>
                             </button>
                         </div>
 
-                        {/* 3. PAGAMENTO (Fim no celular: order-3) */}
+                        {/* 3. PAGAMENTO */}
                         <div className="p-6 md:p-8 md:pt-4 md:col-span-7 order-3 space-y-4">
                             <h3 className="font-bold text-lg md:text-xl text-gray-800 border-l-4 pl-3 flex items-center gap-2 mt-2 md:mt-0" style={{borderColor: settings.themeColor}}>
                                 <i className="fa-solid fa-wallet text-gray-400"></i> Pagamento
@@ -711,9 +708,10 @@
                             
                             <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
                                 <label className="text-xs font-bold text-gray-500 mb-2 block">TEM CUPOM DE DESCONTO?</label>
+                                {/* CORREÇÃO DO CUPOM: min-w-0 no input e flex-shrink-0 no botão */}
                                 <div className="flex gap-2">
-                                    <input placeholder="Digite aqui..." className={`border p-3 flex-1 uppercase font-bold tracking-wider outline-none focus:border-gray-400 ${border}`} value={couponCode} onChange={handleCouponChange} />
-                                    <button onClick={applyCoupon} className={`px-6 text-white font-bold hover:opacity-90 transition ${border}`} style={theme}>APLICAR</button>
+                                    <input placeholder="Digite aqui..." className={`border p-3 flex-1 min-w-0 uppercase text-sm md:text-base font-bold tracking-wider outline-none focus:border-gray-400 ${border}`} value={couponCode} onChange={handleCouponChange} />
+                                    <button onClick={applyCoupon} className={`px-4 md:px-6 text-white text-sm md:text-base font-bold whitespace-nowrap flex-shrink-0 hover:opacity-90 transition ${border}`} style={theme}>APLICAR</button>
                                 </div>
                                 {appliedCoupon && <div className="mt-3 bg-green-100 border border-green-200 text-green-700 p-3 text-sm font-bold rounded-lg flex justify-between items-center"><span className="flex items-center gap-2"><i className="fa-solid fa-tag"></i> {appliedCoupon.code}</span><span>- {formatMoney(discount)}</span></div>}
                             </div>
@@ -737,10 +735,11 @@
                                                 setPixData(null); 
                                             }
                                         }} 
-                                        className={`p-4 border md:text-base font-bold transition flex flex-col items-center gap-2 ${border} ${del.loading || (del.fee === 0 && del.method !== 'bairro_fixo') ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed' : (payMethod === m ? 'bg-gray-800 text-white border-gray-800 shadow-md transform scale-[1.02]' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300')}`} 
+                                        className={`p-4 border md:text-base font-bold transition flex flex-col items-center justify-center gap-2 ${border} ${del.loading || (del.fee === 0 && del.method !== 'bairro_fixo') ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed' : (payMethod === m ? 'bg-gray-800 text-white border-gray-800 shadow-md transform scale-[1.02]' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300')}`} 
                                         style={payMethod === m && !(del.loading || (del.fee === 0 && del.method !== 'bairro_fixo')) ? theme : {}}
                                     >
-                                        <i className={`fa-solid ${m === 'Dinheiro' ? 'fa-money-bill-wave' : 'fa-pix'} text-xl`}></i>
+                                        {/* CORREÇÃO DO ÍCONE PIX: fa-brands e cor oficial */}
+                                        <i className={`${m === 'Dinheiro' ? 'fa-solid fa-money-bill-wave' : 'fa-brands fa-pix'} text-2xl ${payMethod === m ? 'text-white' : (m === 'Pix' ? 'text-[#32bcad]' : 'text-green-600')}`}></i>
                                         {m}
                                     </button>
                                 ))}
@@ -779,14 +778,13 @@
                                 <div className={`bg-teal-50 p-6 border border-teal-200 text-center shadow-inner mt-4 ${border}`}>
                                     <p className="font-bold text-teal-800 mb-4">Escaneie o QR Code ou copie o código</p>
                                     <div className="bg-white p-2 inline-block rounded-xl border shadow-sm mb-4">
-                                        <img src={`data:image/png;base64,${pixData.point_of_interaction.transaction_data.qr_code_base64}`} className="w-48 h-48 mx-auto" />
+                                        <img src={`data:image/png;base64,${pixData.point_of_interaction.transaction_data.qr_code_base64}`} className="w-48 h-48 mx-auto" alt="QR Code PIX" />
                                     </div>
                                     <textarea className="w-full text-xs p-3 border rounded-lg bg-white text-gray-600 outline-none focus:border-teal-400" rows="3" readOnly value={pixData.point_of_interaction.transaction_data.qr_code} onClick={(e)=>e.target.select()}></textarea>
                                     <button onClick={copyPix} className="w-full mt-3 py-3.5 bg-teal-600 text-white font-bold rounded-xl hover:bg-teal-700 transition shadow-md flex items-center justify-center gap-2 text-base"><i className="fa-regular fa-copy"></i> Copiar Código Pix</button>
                                 </div>
                             )}
 
-                            {/* BOTÃO FINALIZAR - VERSÃO MOBILE (Fica no fim da tela, após selecionar o pagamento) */}
                             <button onClick={finishOrder} disabled={del.loading || (del.fee===0 && del.method!=='bairro_fixo') || pixStatus === 'approved'} className={`flex md:hidden w-full py-4 mt-8 bg-green-600 hover:bg-green-700 text-white font-bold shadow-xl transition transform hover:-translate-y-1 active:scale-95 items-center justify-center gap-3 disabled:opacity-50 disabled:transform-none ${border}`} style={{backgroundColor: settings.cartColor}}>
                                 <span className="text-lg">Finalizar Pedido</span><i className="fa-brands fa-whatsapp text-xl"></i>
                             </button>
