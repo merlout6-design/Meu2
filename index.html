@@ -478,6 +478,11 @@ useEffect(() => {
                         creditCard: "all",
                         debitCard: "all",
                     },
+                    // ADICIONE ESTE BLOCO PARA ATIVAR O GOOGLE PAY
+                    wallets: {
+                        googlePay: "all",
+                        applePay: "all"
+                    }
                 },
                 callbacks: {
                     onReady: () => { console.log('Google Pay / Cartão carregado!'); },
