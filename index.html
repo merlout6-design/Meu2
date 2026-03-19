@@ -207,7 +207,8 @@
 			// --- NOVO: RASTREAMENTO DE VISITAS E CARRINHOS (MÉTRICAS) ---
             useEffect(() => {
                 const uid = localStorage.getItem('fritzza_session_id');
-                const today = new Date().toISOString().split('T')[0]; // Pega a data no formato YYYY-MM-DD
+                const d = new Date();
+const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                 
                 // 1. Registra a visita (apenas 1 vez por sessão por dia)
                 const visitedToday = sessionStorage.getItem('visited_today');
