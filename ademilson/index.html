@@ -144,11 +144,15 @@ function AdminDashboard({ theme }) {
     const chartInstance = React.useRef(null);
 
     useEffect(() => { 
-        const startOfDay = new Date(); startOfDay.setHours(0,0,0,0); 
-        const todayStr = startOfDay.toISOString().split('T')[0];
+        const startOfDay = new Date(); 
+        startOfDay.setHours(0,0,0,0); 
+        
+        // Formata a data de hoje no fuso local (YYYY-MM-DD) para as visitas
+        const todayStr = `${startOfDay.getFullYear()}-${String(startOfDay.getMonth() + 1).padStart(2, '0')}-${String(startOfDay.getDate()).padStart(2, '0')}`;
 
         // 1. Puxar Vendas de Hoje e Produtos Mais Vendidos
-        const uOrders = getCol('orders').where('createdAt', '>=', startOfDay.toISOString()).onSnapshot(s => { 
+        // Usa o startOfDay (com a hora zerada) para puxar os pedidos do Firebase
+        const uOrders = getCol('orders').where('createdAt', '>=', startOfDay.toISOString()).onSnapshot(s => {
             let total = 0, count = 0, pending = 0; 
             let productCount = {};
 
@@ -184,7 +188,8 @@ function AdminDashboard({ theme }) {
         });
 
         // 4. Puxar histórico de visitas para o Gráfico (Últimos 7 dias)
-        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60000).toISOString().split('T')[0];
+        const d7 = new Date(Date.now() - 7 * 24 * 60 * 60000);
+        const sevenDaysAgo = `${d7.getFullYear()}-${String(d7.getMonth() + 1).padStart(2, '0')}-${String(d7.getDate()).padStart(2, '0')}`;
         getCol('daily_stats').where('date', '>=', sevenDaysAgo).get().then(snap => {
             const dataMap = {};
             snap.forEach(d => { dataMap[d.id] = d.data().visits; });
@@ -194,7 +199,7 @@ function AdminDashboard({ theme }) {
             const dataPoints = [];
             for (let i = 6; i >= 0; i--) {
                 const d = new Date(Date.now() - i * 24 * 60 * 60000);
-                const dStr = d.toISOString().split('T')[0];
+                const dStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                 labels.push(`${d.getDate()}/${d.getMonth()+1}`);
                 dataPoints.push(dataMap[dStr] || 0);
             }
@@ -1271,19 +1276,11 @@ function App() {
     
     useEffect(() => { auth.onAuthStateChanged(u => { setUser(u); if(u) fetchData(); else setLoading(false); }); }, []);
     
+    // Nova lógica para puxar os Visitantes Online direto da sua API do Render
     useEffect(() => {
-        let unsub = () => {}; let intervalId;
-        const startListener = () => {
-            unsub();
-            const fiveMinsAgoISO = new Date(Date.now() - 5 * 60000).toISOString();
-            unsub = getCol('active_visitors').where('last_seen', '>=', fiveMinsAgoISO).onSnapshot(snapshot => {
-                const now = new Date(); const preciseFiveMins = new Date(now.getTime() - 5 * 60000);
-                const active = snapshot.docs.filter(doc => { const data = doc.data(); return data.last_seen && new Date(data.last_seen) > preciseFiveMins; });
-                setOnlineCount(active.length);
-            });
-        };
-        startListener(); intervalId = setInterval(startListener, 5 * 60000);
-        return () => { unsub(); clearInterval(intervalId); };
+        fetchOnlineCount(); // Puxa assim que abrir o painel
+        const intervalId = setInterval(fetchOnlineCount, 15000); // Atualiza a cada 15 segundos sozinho
+        return () => clearInterval(intervalId);
     }, []);
 
     const fetchData = () => {
