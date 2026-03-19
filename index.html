@@ -203,7 +203,38 @@
             const showConfirm = (title, message, onConfirm) => setModal({ isOpen: true, type: 'confirm', title, message, onConfirm });
             const showLoading = (title='Carregando...') => setModal({ isOpen: true, type: 'loading', title, color: settings.themeColor });
             const closeModal = () => setModal({ ...modal, isOpen: false });
+			
+			// --- NOVO: RASTREAMENTO DE VISITAS E CARRINHOS (MÉTRICAS) ---
+            useEffect(() => {
+                const uid = localStorage.getItem('fritzza_session_id');
+                const today = new Date().toISOString().split('T')[0]; // Pega a data no formato YYYY-MM-DD
+                
+                // 1. Registra a visita (apenas 1 vez por sessão por dia)
+                const visitedToday = sessionStorage.getItem('visited_today');
+                if (!visitedToday) {
+                    getCol('daily_stats').doc(today).set({
+                        visits: firebase.firestore.FieldValue.increment(1),
+                        date: today
+                    }, { merge: true }).catch(() => {});
+                    sessionStorage.setItem('visited_today', 'true');
+                }
+            }, []);
 
+            useEffect(() => {
+                const uid = localStorage.getItem('fritzza_session_id');
+                // 2. Rastreia o Carrinho (Se tiver itens, salva no banco. Se esvaziar, apaga)
+                if (cart.length > 0) {
+                    getCol('active_carts').doc(uid).set({
+                        updatedAt: new Date().toISOString(),
+                        itemCount: cart.reduce((a,b)=>a+b.quantity,0),
+                        total: cart.reduce((a,b)=>a+(b.price*b.quantity),0),
+                        items: cart.map(i => `${i.quantity}x ${i.name}`)
+                    }).catch(() => {});
+                } else {
+                    getCol('active_carts').doc(uid).delete().catch(() => {});
+                }
+            }, [cart]);
+			
             // NOVO: Verifica se está fechado logo após terminar o loading inicial
             useEffect(() => {
                 if (!loading && !hasShownClosedAlert.current) {
