@@ -1233,10 +1233,13 @@ function App() {
                 };
 
                 const leavePresence = () => {
-                    // sendBeacon manda o dado pro servidor mesmo que a aba esteja sendo destruída
-                    const blob = new Blob([JSON.stringify({ uid: uid })], { type: 'application/json' });
-                    navigator.sendBeacon('https://rodaa.onrender.com/api/presence/leave', blob);
-                };
+    fetch('https://rodaa.onrender.com/api/presence/leave', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: uid }),
+        keepalive: true
+    }).catch(() => {});
+};
 
                 reportPresence(); // Avisa que entrou
                 const interval = setInterval(reportPresence, 15000); // Avisa a cada 15s
