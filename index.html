@@ -213,9 +213,14 @@
 			
 			// --- NOVO: RASTREAMENTO DE VISITAS E CARRINHOS (MÉTRICAS) ---
             useEffect(() => {
-                const uid = localStorage.getItem('fritzza_session_id');
+                let uid = localStorage.getItem('fritzza_session_id');
+                if (!uid) {
+                    uid = 'sess_' + Math.random().toString(36).substr(2, 9);
+                    localStorage.setItem('fritzza_session_id', uid);
+                }
+
                 const d = new Date();
-const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                 
                 // 1. Registra a visita (apenas 1 vez por sessão por dia)
                 const visitedToday = sessionStorage.getItem('visited_today');
@@ -231,18 +236,20 @@ const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-$
             useEffect(() => {
                 const uid = localStorage.getItem('fritzza_session_id');
                 // 2. Rastreia o Carrinho (Se tiver itens, salva no banco. Se esvaziar, apaga)
-                if (cart.length > 0) {
-                    getCol('active_carts').doc(uid).set({
-                        updatedAt: new Date().toISOString(),
-                        itemCount: cart.reduce((a,b)=>a+b.quantity,0),
-                        total: cart.reduce((a,b)=>a+(b.price*b.quantity),0),
-                        items: cart.map(i => `${i.quantity}x ${i.name}`)
-                    }).catch(() => {});
-                } else {
-                    getCol('active_carts').doc(uid).delete().catch(() => {});
+                if (uid) {
+                    if (cart.length > 0) {
+                        getCol('active_carts').doc(uid).set({
+                            updatedAt: new Date().toISOString(),
+                            itemCount: cart.reduce((a,b)=>a+b.quantity,0),
+                            total: cart.reduce((a,b)=>a+(b.price*b.quantity),0),
+                            items: cart.map(i => `${i.quantity}x ${i.name}`)
+                        }).catch(() => {});
+                    } else {
+                        getCol('active_carts').doc(uid).delete().catch(() => {});
+                    }
                 }
             }, [cart]);
-			
+            
             // NOVO: Verifica se está fechado logo após terminar o loading inicial
             useEffect(() => {
                 if (!loading && !hasShownClosedAlert.current) {
@@ -257,7 +264,7 @@ const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-$
                     hasShownClosedAlert.current = true;
                 }
             }, [loading, settings.openTime, settings.closeTime]);
-            
+
             const showToast = (msg) => { 
                 if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
                 setToast(null); setTimeout(() => { setToast(msg); toastTimeoutRef.current = setTimeout(() => setToast(null), 3000); }, 50);
@@ -265,28 +272,12 @@ const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-$
 
             useEffect(() => { localStorage.setItem('fritzza_cart', JSON.stringify(cart)); }, [cart]);
 
-            // --- NOVO: RASTREAMENTO DE VISITAS E CARRINHOS (MÉTRICAS) ---
-useEffect(() => {
-    let uid = localStorage.getItem('fritzza_session_id');
-    
-    // Se não tiver UID (primeira visita), cria um na hora para não quebrar o Firebase
-    if (!uid) {
-        uid = 'sess_' + Math.random().toString(36).substr(2, 9);
-        localStorage.setItem('fritzza_session_id', uid);
-    }
-
-    // 2. Rastreia o Carrinho (Se tiver itens, salva no banco. Se esvaziar, apaga)
-    if (cart.length > 0) {
-        getCol('active_carts').doc(uid).set({
-            updatedAt: new Date().toISOString(),
-            itemCount: cart.reduce((a,b)=>a+b.quantity,0),
-            total: cart.reduce((a,b)=>a+(b.price*b.quantity),0),
-            items: cart.map(i => `${i.quantity}x ${i.name}`)
-        }).catch(() => {});
-    } else {
-        getCol('active_carts').doc(uid).delete().catch(() => {});
-    }
-}, [cart]);
+            useEffect(() => {
+                let uid = localStorage.getItem('fritzza_session_id');
+                if (!uid) {
+                    uid = 'sess_' + Math.random().toString(36).substr(2, 9);
+                    localStorage.setItem('fritzza_session_id', uid);
+                }
 
                 const reportPresence = () => {
                     if (document.visibilityState === 'visible') {
@@ -299,13 +290,13 @@ useEffect(() => {
                 };
 
                 const leavePresence = () => {
-    fetch('https://rodaa.onrender.com/api/presence/leave', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid: uid }),
-        keepalive: true
-    }).catch(() => {});
-};
+                    fetch('https://rodaa.onrender.com/api/presence/leave', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ uid: uid }),
+                        keepalive: true
+                    }).catch(() => {});
+                };
 
                 reportPresence(); // Avisa que entrou
                 const interval = setInterval(reportPresence, 30000); // Avisa a cada 30s
