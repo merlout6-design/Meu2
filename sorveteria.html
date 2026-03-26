@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sistema Nuvem - Sorveteria</title>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    
+    <style>
+        /* CSS RESET & VARIAVEIS */
+        * { box-sizing: border-box; }
+        :root {
+            --primary: #007bff;
+            --primary-hover: #0056b3;
+            --success: #28a745;
+            --danger: #dc3545;
+            --warning: #ffc107;
+            --bg-body: #f4f7f6;
+            --bg-card: #ffffff;
+            --text-dark: #333;
+            --text-muted: #6c757d;
+        }
+
+        body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-body); margin: 0; padding: 10px; color: var(--text-dark); }
+        .container { max-width: 950px; margin: auto; background: var(--bg-card); padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        h2 { text-align: center; font-size: 1.5rem; margin-top: 0; margin-bottom: 20px; color: var(--primary); }
+        
+        /* SISTEMA DE ABAS RESPONSIVO */
+        .tabs { display: flex; overflow-x: auto; white-space: nowrap; border-bottom: 2px solid #e9ecef; margin-bottom: 20px; -webkit-overflow-scrolling: touch; }
+        .tabs::-webkit-scrollbar { height: 4px; }
+        .tabs::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
+        .tab { flex: 1; padding: 12px 15px; cursor: pointer; background: transparent; border: none; font-size: 0.95rem; font-weight: bold; color: var(--text-muted); transition: 0.3s; border-bottom: 3px solid transparent; }
+        .tab.active { color: var(--primary); border-bottom-color: var(--primary); background: rgba(0, 123, 255, 0.05); }
+        .tab-content { display: none; animation: fadeIn 0.3s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* FORMULÁRIOS */
+        .form-row { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 15px; align-items: flex-end; }
+        .form-group { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 5px; }
+        .form-group label { font-weight: 600; font-size: 0.9rem; color: #555; }
+        input, select { padding: 10px; border: 1px solid #ced4da; border-radius: 6px; font-size: 1rem; width: 100%; transition: border-color 0.2s; }
+        input:focus, select:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(0,123,255,0.15); }
+        
+        /* BOTÕES */
+        .acoes-form { display: flex; gap: 10px; margin-top: 10px; width: 100%; }
+        button { padding: 10px 15px; font-size: 0.95rem; background: var(--primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; display: flex; align-items: center; justify-content: center; text-align: center; }
+        button:hover { background: var(--primary-hover); }
+        button.btn-success { background: var(--success); }
+        button.btn-danger { background: var(--danger); }
+        button.btn-warning { background: var(--warning); color: #333; }
+        button.btn-block { width: 100%; margin-top: 10px; padding: 12px; font-size: 1.05rem; }
+        button.btn-sm { padding: 6px 10px; font-size: 0.85rem; }
+        
+        /* TABELAS RESPONSIVAS (CARDS NO MOBILE) */
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.95rem; }
+        th, td { border: 1px solid #e9ecef; padding: 12px; text-align: left; vertical-align: middle; }
+        th { background: #f8f9fa; font-weight: bold; color: #495057; }
+        .acoes-td { display: flex; gap: 5px; flex-wrap: wrap; }
+        
+        .destaque-valor { font-size: 1.1em; font-weight: bold; color: var(--primary); background: #e9f2ff; padding: 10px 15px; border-radius: 8px; display: inline-block;}
+        .destaque-venda { font-size: 1.1em; font-weight: bold; color: var(--success); }
+        .aviso { font-size: 0.85rem; color: var(--text-muted); display: block; margin-top: 5px;}
+        .erro { color: var(--danger); font-weight: bold; }
+        .card-destaque { background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #e9ecef; margin-bottom: 20px; }
+
+        /* MAGICA DO MOBILE: TABELA VIRA CARD */
+        @media (max-width: 768px) {
+            .container { padding: 15px 10px; }
+            table, thead, tbody, th, td, tr { display: block; }
+            thead tr { position: absolute; top: -9999px; left: -9999px; } /* Oculta o cabeçalho original */
+            tr { background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); padding: 5px; }
+            td { border: none; border-bottom: 1px solid #f0f0f0; position: relative; padding: 10px 10px 10px 45%; text-align: right; min-height: 45px; display: flex; align-items: center; justify-content: flex-end;}
+            td:last-child { border-bottom: 0; }
+            
+            /* Injeta o nome da coluna via CSS usando data-label */
+            td:before { position: absolute; left: 10px; width: 40%; padding-right: 10px; white-space: nowrap; font-weight: bold; text-align: left; color: #555; font-size: 0.9em; content: attr(data-label); top: 50%; transform: translateY(-50%);}
+            
+            .acoes-td { justify-content: flex-end; width: 100%; }
+            .form-group { width: 100%; min-width: 100%; }
+            .acoes-form { flex-direction: column; }
+            .destaque-valor { display: block; text-align: center; margin-bottom: 15px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>🍨 Sistema Sorveteria</h2>
+    
+    <div class="tabs">
+        <button class="tab active" onclick="abrirAba(event, 'aba-insumos')">1. Insumos</button>
+        <button class="tab" onclick="abrirAba(event, 'aba-receitas')">2. Fichas Técnicas</button>
+        <button class="tab" onclick="abrirAba(event, 'aba-produtos')">3. Produtos</button>
+    </div>
+
+    <div id="aba-insumos" class="tab-content active">
+        <div class="card-destaque">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Nome do Insumo:</label>
+                    <input type="text" id="ins-nome" placeholder="Ex: Leite Condensado">
+                </div>
+                <div class="form-group">
+                    <label>Unidade de Medida:</label>
+                    <select id="ins-un"><option value="g">Gramas (g)</option><option value="ml">Mililitros (ml)</option><option value="un">Unidade (un)</option></select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Preço Pago (R$):</label>
+                    <input type="number" id="ins-preco" placeholder="Ex: 15.50">
+                </div>
+                <div class="form-group">
+                    <label>Quantidade na Embalagem:</label>
+                    <input type="number" id="ins-fator" placeholder="Ex: 395" onkeypress="handleEnter(event, salvarInsumo)">
+                </div>
+            </div>
+            <div class="acoes-form">
+                <button onclick="salvarInsumo()" class="btn-success" style="flex: 2;">✔ Salvar Insumo</button>
+                <button onclick="limparFormInsumo()" class="btn-warning" style="flex: 1;">Limpar</button>
+            </div>
+        </div>
+        
+        <table id="tabela-insumos">
+            <thead><tr><th>Nome</th><th>Unidade</th><th>Preço</th><th>Qtd Emb.</th><th>Custo Un.</th><th>Ações</th></tr></thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <div id="aba-receitas" class="tab-content">
+        <div class="card-destaque">
+            <div class="form-group">
+                <label>Nome do Produto (Crie ou Edite):</label>
+                <input type="text" id="rec-produto" placeholder="Ex: Picolé de Morango" onchange="carregarReceitaEdicao()" list="lista-produtos-datalist">
+                <datalist id="lista-produtos-datalist"></datalist>
+            </div>
+            <div class="form-row" style="margin-top: 15px;">
+                <div class="form-group">
+                    <label>Custo Extra (Embalagem, etc) R$:</label>
+                    <input type="number" id="rec-custo-extra" placeholder="Ex: 1.50">
+                </div>
+                <div class="form-group">
+                    <label>Margem Específica (%) - Opcional:</label>
+                    <input type="number" id="rec-margem" placeholder="Ex: 120 (Vazio = Global)">
+                </div>
+            </div>
+        </div>
+
+        <h4 style="margin-bottom: 10px; color: var(--text-dark);">Adicionar Ingredientes:</h4>
+        <div class="form-row align-items-end">
+            <div class="form-group" style="flex: 2;">
+                <label>Ingrediente:</label>
+                <select id="rec-insumo"></select>
+            </div>
+            <div class="form-group" style="flex: 1;">
+                <label>Qtd:</label>
+                <input type="number" id="rec-qtd" placeholder="Ex: 50" onkeypress="handleEnter(event, adicionarItemReceita)">
+            </div>
+            <button class="btn-success" style="height: 42px; margin-bottom: 2px;" onclick="adicionarItemReceita()">➕ Add</button>
+        </div>
+        
+        <table id="tabela-receita">
+            <thead><tr><th>Insumo</th><th>Quantidade</th><th>Custo (R$)</th><th>Remover</th></tr></thead>
+            <tbody></tbody>
+        </table>
+        
+        <div style="margin-top: 25px;">
+            <div class="destaque-valor" id="rec-total-display">Custo Produção: R$ 0.00</div>
+            <button class="btn-block" onclick="salvarReceitaProduto()">💾 SALVAR RECEITA NO BANCO</button>
+        </div>
+    </div>
+
+    <div id="aba-produtos" class="tab-content">
+        <div class="card-destaque">
+            <div class="form-row align-items-end">
+                <div class="form-group">
+                    <label>Margem de Lucro GLOBAL Padrão (%):</label>
+                    <input type="number" id="conf-margem" style="font-weight: bold; font-size: 1.2rem;" onkeypress="handleEnter(event, salvarMargem)">
+                </div>
+                <button class="btn-success" style="height: 44px;" onclick="salvarMargem()">Atualizar Padrão</button>
+            </div>
+            <span class="aviso">A margem global será usada em produtos que não possuem uma "Margem Específica" configurada.</span>
+        </div>
+        
+        <table id="tabela-produtos">
+            <thead><tr><th>Produto</th><th>Custos</th><th>Margem</th><th>Preço Venda</th><th>Ações</th></tr></thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // ==========================================
+    // 1. CONFIGURAÇÃO DO FIREBASE
+    // ==========================================
+    const firebaseConfig = {
+      apiKey: "AIzaSyAOWWzlkooh2AfJ8Y8KsIKx3xo4Cw-oqO8",
+      authDomain: "assistente-39dc1.firebaseapp.com",
+      projectId: "assistente-39dc1",
+      storageBucket: "assistente-39dc1.appspot.com",
+      messagingSenderId: "419384375900",
+      appId: "1:419384375900:web:c9fb7532a35b4041340499"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // VARIÁVEIS GLOBAIS
+    let insumosGlobal = {}; 
+    let receitaAtual = []; 
+    let margemGlobal = 50; 
+
+    // ==========================================
+    // NAVEGAÇÃO DAS ABAS
+    // ==========================================
+    function abrirAba(evt, idAba) {
+        document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+        document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+        document.getElementById(idAba).classList.add('active');
+        evt.currentTarget.classList.add('active');
+    }
+
+    function handleEnter(e, funcao) {
+        if (e.key === 'Enter') { e.preventDefault(); funcao(); }
+    }
+
+    // ==========================================
+    // LÓGICA - ABA 1: INSUMOS 
+    // ==========================================
+    function salvarInsumo() {
+        const nome = document.getElementById('ins-nome').value.trim();
+        const unidade = document.getElementById('ins-un').value;
+        const preco = parseFloat(document.getElementById('ins-preco').value);
+        const fator = parseFloat(document.getElementById('ins-fator').value);
+
+        if (!nome || isNaN(preco) || isNaN(fator) || preco <= 0 || fator <= 0) {
+            alert("Preencha todos os campos corretamente!"); return;
+        }
+
+        const custo_unidade = preco / fator;
+
+        db.collection('insumos').doc(nome).set({
+            unidade, preco, fator, custo_unidade
+        }).then(() => {
+            limparFormInsumo();
+            document.getElementById('ins-nome').focus();
+        }).catch(err => alert("Erro ao salvar: " + err));
+    }
+
+    function limparFormInsumo() {
+        document.getElementById('ins-nome').value = '';
+        document.getElementById('ins-preco').value = '';
+        document.getElementById('ins-fator').value = '';
+        document.getElementById('ins-nome').disabled = false;
+    }
+
+    function editarInsumo(nome) {
+        const insumo = insumosGlobal[nome];
+        if (insumo) {
+            document.getElementById('ins-nome').value = nome;
+            document.getElementById('ins-un').value = insumo.unidade;
+            document.getElementById('ins-preco').value = insumo.preco;
+            document.getElementById('ins-fator').value = insumo.fator;
+            document.getElementById('ins-nome').disabled = true;
+            window.scrollTo({ top: 0, behavior: 'smooth' }); // Sobe a tela no mobile
+            document.getElementById('ins-preco').focus();
+        }
+    }
+
+    function deletarInsumo(nome) {
+        if (confirm(`Excluir o insumo '${nome}'? Produtos com ele ficarão com custo incorreto.`)) {
+            db.collection('insumos').doc(nome).delete().then(() => { limparFormInsumo(); });
+        }
+    }
+
+    db.collection('insumos').onSnapshot(snapshot => {
+        const tbody = document.querySelector('#tabela-insumos tbody');
+        const selectRec = document.getElementById('rec-insumo');
+        tbody.innerHTML = ''; selectRec.innerHTML = '<option value="">Selecione um Insumo...</option>';
+        insumosGlobal = {};
+
+        snapshot.forEach(doc => {
+            const val = doc.data();
+            insumosGlobal[doc.id] = val; 
+            
+            // Note os atributos data-label para o CSS Mobile funcionar!
+            tbody.innerHTML += `<tr>
+                <td data-label="Nome"><strong>${doc.id}</strong></td>
+                <td data-label="Unidade">${val.unidade}</td>
+                <td data-label="Preço">R$ ${val.preco.toFixed(2)}</td>
+                <td data-label="Qtd Emb.">${val.fator}</td>
+                <td data-label="Custo Un.">R$ ${val.custo_unidade.toFixed(4)}</td>
+                <td data-label="Ações">
+                    <div class="acoes-td">
+                        <button class="btn-warning btn-sm" onclick="editarInsumo('${doc.id}')">✏️ Editar</button>
+                        <button class="btn-danger btn-sm" onclick="deletarInsumo('${doc.id}')">🗑️</button>
+                    </div>
+                </td>
+            </tr>`;
+            selectRec.innerHTML += `<option value="${doc.id}">${doc.id} (${val.unidade})</option>`;
+        });
+        renderizarTabelaReceita(); 
+        renderizarTabelaProdutos(); 
+    });
+
+    // ==========================================
+    // LÓGICA - ABA 2: RECEITAS
+    // ==========================================
+    function adicionarItemReceita() {
+        const insumoNome = document.getElementById('rec-insumo').value;
+        const qtd = parseFloat(document.getElementById('rec-qtd').value);
+
+        if (!insumoNome || isNaN(qtd) || qtd <= 0) { alert("Selecione o insumo e informe a quantidade."); return; }
+
+        const itemExistente = receitaAtual.find(i => i.insumo === insumoNome);
+        if (itemExistente) { itemExistente.qtd += qtd; } 
+        else { receitaAtual.push({ insumo: insumoNome, qtd: qtd }); }
+
+        document.getElementById('rec-qtd').value = '';
+        renderizarTabelaReceita();
+    }
+
+    function removerItemReceita(index) {
+        receitaAtual.splice(index, 1);
+        renderizarTabelaReceita();
+    }
+
+    function renderizarTabelaReceita() {
+        const tbody = document.querySelector('#tabela-receita tbody');
+        tbody.innerHTML = '';
+        let custoTotal = 0;
+
+        receitaAtual.forEach((item, index) => {
+            const infoInsumo = insumosGlobal[item.insumo];
+            const tr = document.createElement('tr');
+            
+            if (infoInsumo) {
+                const custoCalc = infoInsumo.custo_unidade * item.qtd;
+                custoTotal += custoCalc;
+                tr.innerHTML = `
+                    <td data-label="Insumo">${item.insumo}</td>
+                    <td data-label="Qtd">${item.qtd} ${infoInsumo.unidade}</td>
+                    <td data-label="Custo (R$)">R$ ${custoCalc.toFixed(2)}</td>
+                    <td data-label="Ação"><button class="btn-danger btn-sm" onclick="removerItemReceita(${index})">Remover</button></td>`;
+            } else {
+                tr.innerHTML = `
+                    <td data-label="Insumo"><span class="erro">⚠️ ${item.insumo} (Excluído)</span></td>
+                    <td data-label="Qtd">${item.qtd}</td>
+                    <td data-label="Custo (R$)"><span class="erro">R$ 0.00</span></td>
+                    <td data-label="Ação"><button class="btn-danger btn-sm" onclick="removerItemReceita(${index})">Remover</button></td>`;
+            }
+            tbody.appendChild(tr);
+        });
+
+        const custoExtra = parseFloat(document.getElementById('rec-custo-extra').value) || 0;
+        custoTotal += custoExtra;
+
+        document.getElementById('rec-total-display').innerText = `Custo Produção: R$ ${custoTotal.toFixed(2)}`;
+    }
+
+    document.getElementById('rec-custo-extra').addEventListener('input', renderizarTabelaReceita);
+
+    function salvarReceitaProduto() {
+        const nomeProd = document.getElementById('rec-produto').value.trim();
+        if (!nomeProd || receitaAtual.length === 0) { alert("Informe o nome do produto e adicione ingredientes."); return; }
+
+        const margemEspecifica = document.getElementById('rec-margem').value;
+        const custoExtra = document.getElementById('rec-custo-extra').value;
+
+        const dadosProduto = {
+            itens: receitaAtual,
+            margem_individual: margemEspecifica !== "" ? parseFloat(margemEspecifica) : null,
+            custo_extra: custoExtra !== "" ? parseFloat(custoExtra) : 0
+        };
+
+        db.collection('produtos').doc(nomeProd).set(dadosProduto).then(() => {
+            alert("✅ Receita salva com sucesso!");
+            receitaAtual = [];
+            document.getElementById('rec-produto').value = '';
+            document.getElementById('rec-margem').value = '';
+            document.getElementById('rec-custo-extra').value = '';
+            renderizarTabelaReceita();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+    }
+
+    function carregarReceitaEdicao() {
+        const nomeProd = document.getElementById('rec-produto').value;
+        db.collection('produtos').doc(nomeProd).get().then(doc => {
+            if (doc.exists) {
+                const dados = doc.data();
+                receitaAtual = dados.itens || [];
+                document.getElementById('rec-margem').value = dados.margem_individual !== null ? dados.margem_individual : '';
+                document.getElementById('rec-custo-extra').value = dados.custo_extra || '';
+            } else {
+                receitaAtual = [];
+                document.getElementById('rec-margem').value = '';
+                document.getElementById('rec-custo-extra').value = '';
+            }
+            renderizarTabelaReceita();
+        });
+    }
+
+    // ==========================================
+    // LÓGICA - ABA 3: PRODUTOS E PREÇOS
+    // ==========================================
+    function salvarMargem() {
+        const margem = parseFloat(document.getElementById('conf-margem').value);
+        if (!isNaN(margem)) { db.collection('configuracoes').doc('global').set({ margem_lucro: margem }); }
+    }
+
+    function deletarProduto(nome) {
+        if (confirm(`Deseja excluir o produto '${nome}' permanentemente?`)) {
+            db.collection('produtos').doc(nome).delete();
+            if(document.getElementById('rec-produto').value === nome) {
+                document.getElementById('rec-produto').value = '';
+                receitaAtual = [];
+                document.getElementById('rec-margem').value = '';
+                document.getElementById('rec-custo-extra').value = '';
+                renderizarTabelaReceita();
+            }
+        }
+    }
+
+    db.collection('configuracoes').doc('global').onSnapshot(doc => {
+        if (doc.exists) {
+            margemGlobal = doc.data().margem_lucro;
+            document.getElementById('conf-margem').value = margemGlobal;
+            renderizarTabelaProdutos();
+        }
+    });
+
+    let produtosCache = [];
+    db.collection('produtos').onSnapshot(snapshot => {
+        produtosCache = [];
+        const datalist = document.getElementById('lista-produtos-datalist');
+        datalist.innerHTML = '';
+        
+        snapshot.forEach(doc => {
+            const dados = doc.data();
+            produtosCache.push({ nome: doc.id, itens: dados.itens, margem_individual: dados.margem_individual, custo_extra: dados.custo_extra || 0 });
+            datalist.innerHTML += `<option value="${doc.id}">`;
+        });
+        renderizarTabelaProdutos();
+    });
+
+    function renderizarTabelaProdutos() {
+        const tbody = document.querySelector('#tabela-produtos tbody');
+        tbody.innerHTML = '';
+
+        produtosCache.forEach(prod => {
+            let custoIngredientes = 0;
+            let temFaltante = false;
+            
+            prod.itens.forEach(item => {
+                if(insumosGlobal[item.insumo]) { custoIngredientes += insumosGlobal[item.insumo].custo_unidade * item.qtd; } 
+                else { temFaltante = true; }
+            });
+
+            const custoTotal = custoIngredientes + prod.custo_extra;
+            const margemUsada = (prod.margem_individual !== null && prod.margem_individual !== undefined) ? prod.margem_individual : margemGlobal;
+            const tipoMargem = (prod.margem_individual !== null && prod.margem_individual !== undefined) ? 'Específica' : 'Global';
+
+            const precoVenda = custoTotal * (1 + (margemUsada / 100));
+            const avisoIncompleto = temFaltante ? '<br><span class="erro" style="font-size: 0.8em;">⚠️ Insumo ausente</span>' : '';
+
+            tbody.innerHTML += `<tr>
+                <td data-label="Produto"><strong>${prod.nome}</strong>${avisoIncompleto}</td>
+                <td data-label="Custo Total">R$ ${custoTotal.toFixed(2)} <span class="aviso">(Ing: R$${custoIngredientes.toFixed(2)} | Ext: R$${prod.custo_extra.toFixed(2)})</span></td>
+                <td data-label="Margem">${margemUsada}% <span class="aviso">(${tipoMargem})</span></td>
+                <td data-label="Preço de Venda" class="destaque-venda">R$ ${precoVenda.toFixed(2)}</td>
+                <td data-label="Ações">
+                    <button class="btn-danger btn-sm" onclick="deletarProduto('${prod.nome}')">🗑️ Excluir</button>
+                </td>
+            </tr>`;
+        });
+    }
+</script>
+</body>
+</html>
