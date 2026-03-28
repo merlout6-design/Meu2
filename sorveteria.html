@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sistema Nuvem - Sorveteria</title>
+    <title>Sistema Nuvem - Sorveteria Pro</title>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     
@@ -11,22 +11,17 @@
         /* CSS RESET & VARIAVEIS */
         * { box-sizing: border-box; }
         :root {
-            --primary: #007bff;
-            --primary-hover: #0056b3;
-            --success: #28a745;
-            --danger: #dc3545;
-            --warning: #ffc107;
-            --bg-body: #f4f7f6;
-            --bg-card: #ffffff;
-            --text-dark: #333;
-            --text-muted: #6c757d;
+            --primary: #007bff; --primary-hover: #0056b3;
+            --success: #28a745; --danger: #dc3545; --warning: #ffc107; --info: #17a2b8;
+            --bg-body: #f4f7f6; --bg-card: #ffffff;
+            --text-dark: #333; --text-muted: #6c757d;
         }
 
         body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-body); margin: 0; padding: 10px; color: var(--text-dark); }
-        .container { max-width: 950px; margin: auto; background: var(--bg-card); padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .container { max-width: 1000px; margin: auto; background: var(--bg-card); padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
         h2 { text-align: center; font-size: 1.5rem; margin-top: 0; margin-bottom: 20px; color: var(--primary); }
         
-        /* SISTEMA DE ABAS RESPONSIVO */
+        /* SISTEMA DE ABAS */
         .tabs { display: flex; overflow-x: auto; white-space: nowrap; border-bottom: 2px solid #e9ecef; margin-bottom: 20px; -webkit-overflow-scrolling: touch; }
         .tabs::-webkit-scrollbar { height: 4px; }
         .tabs::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
@@ -38,61 +33,58 @@
         
         /* FORMULÁRIOS */
         .form-row { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 15px; align-items: flex-end; }
-        .form-group { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 5px; }
-        .form-group label { font-weight: 600; font-size: 0.9rem; color: #555; }
-        input, select { padding: 10px; border: 1px solid #ced4da; border-radius: 6px; font-size: 1rem; width: 100%; transition: border-color 0.2s; }
+        .form-group { flex: 1; min-width: 180px; display: flex; flex-direction: column; gap: 5px; }
+        .form-group label { font-weight: 600; font-size: 0.85rem; color: #555; }
+        input, select { padding: 10px; border: 1px solid #ced4da; border-radius: 6px; font-size: 1rem; width: 100%; transition: 0.2s; }
         input:focus, select:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(0,123,255,0.15); }
         
         /* BOTÕES */
         .acoes-form { display: flex; gap: 10px; margin-top: 10px; width: 100%; }
         button { padding: 10px 15px; font-size: 0.95rem; background: var(--primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; display: flex; align-items: center; justify-content: center; text-align: center; }
-        button:hover { background: var(--primary-hover); }
+        button:hover { filter: brightness(0.9); }
         button.btn-success { background: var(--success); }
         button.btn-danger { background: var(--danger); }
         button.btn-warning { background: var(--warning); color: #333; }
+        button.btn-info { background: var(--info); }
         button.btn-block { width: 100%; margin-top: 10px; padding: 12px; font-size: 1.05rem; }
         button.btn-sm { padding: 6px 10px; font-size: 0.85rem; }
         
-        /* TABELAS RESPONSIVAS (CARDS NO MOBILE) */
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.95rem; }
+        /* TABELAS */
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.90rem; }
         th, td { border: 1px solid #e9ecef; padding: 12px; text-align: left; vertical-align: middle; }
         th { background: #f8f9fa; font-weight: bold; color: #495057; }
         .acoes-td { display: flex; gap: 5px; flex-wrap: wrap; }
         
         .destaque-valor { font-size: 1.1em; font-weight: bold; color: var(--primary); background: #e9f2ff; padding: 10px 15px; border-radius: 8px; display: inline-block;}
         .destaque-venda { font-size: 1.1em; font-weight: bold; color: var(--success); }
-        .aviso { font-size: 0.85rem; color: var(--text-muted); display: block; margin-top: 5px;}
+        .aviso { font-size: 0.80rem; color: var(--text-muted); display: block; margin-top: 5px; line-height: 1.2;}
         .erro { color: var(--danger); font-weight: bold; }
         .card-destaque { background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #e9ecef; margin-bottom: 20px; }
 
-        /* MAGICA DO MOBILE: TABELA VIRA CARD */
+        /* MOBILE */
         @media (max-width: 768px) {
             .container { padding: 15px 10px; }
             table, thead, tbody, th, td, tr { display: block; }
-            thead tr { position: absolute; top: -9999px; left: -9999px; } /* Oculta o cabeçalho original */
-            tr { background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); padding: 5px; }
+            thead tr { position: absolute; top: -9999px; left: -9999px; }
+            tr { background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; margin-bottom: 15px; padding: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
             td { border: none; border-bottom: 1px solid #f0f0f0; position: relative; padding: 10px 10px 10px 45%; text-align: right; min-height: 45px; display: flex; align-items: center; justify-content: flex-end;}
             td:last-child { border-bottom: 0; }
-            
-            /* Injeta o nome da coluna via CSS usando data-label */
             td:before { position: absolute; left: 10px; width: 40%; padding-right: 10px; white-space: nowrap; font-weight: bold; text-align: left; color: #555; font-size: 0.9em; content: attr(data-label); top: 50%; transform: translateY(-50%);}
-            
             .acoes-td { justify-content: flex-end; width: 100%; }
             .form-group { width: 100%; min-width: 100%; }
             .acoes-form { flex-direction: column; }
-            .destaque-valor { display: block; text-align: center; margin-bottom: 15px; }
         }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>🍨 Sistema Sorveteria</h2>
+    <h2>🍨 Sistema Sorveteria Pro</h2>
     
     <div class="tabs">
-        <button class="tab active" onclick="abrirAba(event, 'aba-insumos')">1. Insumos</button>
-        <button class="tab" onclick="abrirAba(event, 'aba-receitas')">2. Fichas Técnicas</button>
-        <button class="tab" onclick="abrirAba(event, 'aba-produtos')">3. Produtos</button>
+        <button class="tab active" id="tab-btn-insumos" onclick="abrirAba('aba-insumos', this)">1. Insumos</button>
+        <button class="tab" id="tab-btn-receitas" onclick="abrirAba('aba-receitas', this)">2. Fichas Técnicas</button>
+        <button class="tab" id="tab-btn-produtos" onclick="abrirAba('aba-produtos', this)">3. Produtos & Preços</button>
     </div>
 
     <div id="aba-insumos" class="tab-content active">
@@ -110,15 +102,15 @@
             <div class="form-row">
                 <div class="form-group">
                     <label>Preço Pago (R$):</label>
-                    <input type="number" id="ins-preco" placeholder="Ex: 15.50">
+                    <input type="number" id="ins-preco" placeholder="Ex: 15.50" step="0.01">
                 </div>
                 <div class="form-group">
                     <label>Quantidade na Embalagem:</label>
-                    <input type="number" id="ins-fator" placeholder="Ex: 395" onkeypress="handleEnter(event, salvarInsumo)">
+                    <input type="number" id="ins-fator" placeholder="Ex: 395" step="0.01" onkeypress="handleEnter(event, salvarInsumo)">
                 </div>
             </div>
             <div class="acoes-form">
-                <button onclick="salvarInsumo()" class="btn-success" style="flex: 2;">✔ Salvar Insumo</button>
+                <button id="btn-salvar-insumo" onclick="salvarInsumo()" class="btn-success" style="flex: 2;">✔ Salvar Insumo</button>
                 <button onclick="limparFormInsumo()" class="btn-warning" style="flex: 1;">Limpar</button>
             </div>
         </div>
@@ -138,12 +130,16 @@
             </div>
             <div class="form-row" style="margin-top: 15px;">
                 <div class="form-group">
-                    <label>Custo Extra (Embalagem, etc) R$:</label>
-                    <input type="number" id="rec-custo-extra" placeholder="Ex: 1.50">
+                    <label>Perda/Desperdício (%):</label>
+                    <input type="number" id="rec-perda" placeholder="Ex: 5 (Sobras, derretimento)">
+                </div>
+                <div class="form-group">
+                    <label>Repasse Final (R$ - Embalagem, etc):</label>
+                    <input type="number" id="rec-repasse" placeholder="Ex: 1.50 (Não afeta a margem)" step="0.01">
                 </div>
                 <div class="form-group">
                     <label>Margem Específica (%) - Opcional:</label>
-                    <input type="number" id="rec-margem" placeholder="Ex: 120 (Vazio = Global)">
+                    <input type="number" id="rec-margem" placeholder="Vazio = Usa a global">
                 </div>
             </div>
         </div>
@@ -156,36 +152,45 @@
             </div>
             <div class="form-group" style="flex: 1;">
                 <label>Qtd:</label>
-                <input type="number" id="rec-qtd" placeholder="Ex: 50" onkeypress="handleEnter(event, adicionarItemReceita)">
+                <input type="number" id="rec-qtd" placeholder="Ex: 50" step="0.01" onkeypress="handleEnter(event, adicionarItemReceita)">
             </div>
             <button class="btn-success" style="height: 42px; margin-bottom: 2px;" onclick="adicionarItemReceita()">➕ Add</button>
         </div>
         
         <table id="tabela-receita">
-            <thead><tr><th>Insumo</th><th>Quantidade</th><th>Custo (R$)</th><th>Remover</th></tr></thead>
+            <thead><tr><th>Insumo</th><th>Quantidade</th><th>Custo Bruto</th><th>Remover</th></tr></thead>
             <tbody></tbody>
         </table>
         
         <div style="margin-top: 25px;">
-            <div class="destaque-valor" id="rec-total-display">Custo Produção: R$ 0.00</div>
-            <button class="btn-block" onclick="salvarReceitaProduto()">💾 SALVAR RECEITA NO BANCO</button>
+            <div class="destaque-valor" id="rec-total-display">Custo Base: R$ 0,00</div>
+            <button id="btn-salvar-receita" class="btn-block" onclick="salvarReceitaProduto()">💾 SALVAR RECEITA NO BANCO</button>
         </div>
     </div>
 
     <div id="aba-produtos" class="tab-content">
         <div class="card-destaque">
+            <h4 style="margin-top:0; color:var(--primary);">Configurações Globais de Precificação</h4>
             <div class="form-row align-items-end">
                 <div class="form-group">
-                    <label>Margem de Lucro GLOBAL Padrão (%):</label>
-                    <input type="number" id="conf-margem" style="font-weight: bold; font-size: 1.2rem;" onkeypress="handleEnter(event, salvarMargem)">
+                    <label>Margem de Lucro (%):</label>
+                    <input type="number" id="conf-margem" placeholder="Ex: 40">
                 </div>
-                <button class="btn-success" style="height: 44px;" onclick="salvarMargem()">Atualizar Padrão</button>
+                <div class="form-group">
+                    <label>Impostos (%):</label>
+                    <input type="number" id="conf-impostos" placeholder="Ex: 6 (Simples Nacional)">
+                </div>
+                <div class="form-group">
+                    <label>Taxa Cartão (%):</label>
+                    <input type="number" id="conf-taxas" placeholder="Ex: 3" onkeypress="handleEnter(event, salvarConfigGlobais)">
+                </div>
+                <button id="btn-salvar-config" class="btn-success" style="height: 44px;" onclick="salvarConfigGlobais()">Atualizar Padrão</button>
             </div>
-            <span class="aviso">A margem global será usada em produtos que não possuem uma "Margem Específica" configurada.</span>
+            <span class="aviso">O preço é calculado usando <b>Margem de Lucro Real</b>. O valor de "Repasse (Embalagem)" na ficha técnica é somado ao final do cálculo, livre de taxas.</span>
         </div>
         
         <table id="tabela-produtos">
-            <thead><tr><th>Produto</th><th>Custos</th><th>Margem</th><th>Preço Venda</th><th>Ações</th></tr></thead>
+            <thead><tr><th>Produto</th><th>Análise de Custos</th><th>Configuração (%)</th><th>Preço Sugerido</th><th>Ações</th></tr></thead>
             <tbody></tbody>
         </table>
     </div>
@@ -193,7 +198,7 @@
 
 <script>
     // ==========================================
-    // 1. CONFIGURAÇÃO DO FIREBASE
+    // 1. CONFIGURAÇÃO DO FIREBASE (MANTIDA)
     // ==========================================
     const firebaseConfig = {
       apiKey: "AIzaSyAOWWzlkooh2AfJ8Y8KsIKx3xo4Cw-oqO8",
@@ -210,20 +215,40 @@
     // VARIÁVEIS GLOBAIS
     let insumosGlobal = {}; 
     let receitaAtual = []; 
-    let margemGlobal = 50; 
+    let configGlobal = { margem_lucro: 50, impostos: 0, taxas: 0 }; 
 
     // ==========================================
-    // NAVEGAÇÃO DAS ABAS
+    // FUNÇÕES UTILITÁRIAS
     // ==========================================
-    function abrirAba(evt, idAba) {
+    function formatarMoeda(valor) {
+        return (valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+
+    function abrirAba(idAba, elementoClicado = null) {
         document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
         document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
         document.getElementById(idAba).classList.add('active');
-        evt.currentTarget.classList.add('active');
+        
+        if(elementoClicado) { elementoClicado.classList.add('active'); } 
+        else {
+            // Se chamado via código (ex: botão Editar), ativa a aba certa no menu superior
+            const abaBtnMap = { 'aba-insumos': 'tab-btn-insumos', 'aba-receitas': 'tab-btn-receitas', 'aba-produtos': 'tab-btn-produtos' };
+            document.getElementById(abaBtnMap[idAba]).classList.add('active');
+        }
     }
 
     function handleEnter(e, funcao) {
         if (e.key === 'Enter') { e.preventDefault(); funcao(); }
+    }
+
+    function animarBotao(id, textoOriginal) {
+        const btn = document.getElementById(id);
+        btn.innerText = "✔ Salvo!";
+        btn.style.backgroundColor = "#20c997";
+        setTimeout(() => {
+            btn.innerText = textoOriginal;
+            btn.style.backgroundColor = ""; // volta ao CSS original
+        }, 1500);
     }
 
     // ==========================================
@@ -244,6 +269,7 @@
         db.collection('insumos').doc(nome).set({
             unidade, preco, fator, custo_unidade
         }).then(() => {
+            animarBotao('btn-salvar-insumo', '✔ Salvar Insumo');
             limparFormInsumo();
             document.getElementById('ins-nome').focus();
         }).catch(err => alert("Erro ao salvar: " + err));
@@ -264,7 +290,7 @@
             document.getElementById('ins-preco').value = insumo.preco;
             document.getElementById('ins-fator').value = insumo.fator;
             document.getElementById('ins-nome').disabled = true;
-            window.scrollTo({ top: 0, behavior: 'smooth' }); // Sobe a tela no mobile
+            window.scrollTo({ top: 0, behavior: 'smooth' });
             document.getElementById('ins-preco').focus();
         }
     }
@@ -285,13 +311,12 @@
             const val = doc.data();
             insumosGlobal[doc.id] = val; 
             
-            // Note os atributos data-label para o CSS Mobile funcionar!
             tbody.innerHTML += `<tr>
                 <td data-label="Nome"><strong>${doc.id}</strong></td>
                 <td data-label="Unidade">${val.unidade}</td>
-                <td data-label="Preço">R$ ${val.preco.toFixed(2)}</td>
+                <td data-label="Preço">${formatarMoeda(val.preco)}</td>
                 <td data-label="Qtd Emb.">${val.fator}</td>
-                <td data-label="Custo Un.">R$ ${val.custo_unidade.toFixed(4)}</td>
+                <td data-label="Custo Un.">${formatarMoeda(val.custo_unidade)}</td>
                 <td data-label="Ações">
                     <div class="acoes-td">
                         <button class="btn-warning btn-sm" onclick="editarInsumo('${doc.id}')">✏️ Editar</button>
@@ -330,7 +355,7 @@
     function renderizarTabelaReceita() {
         const tbody = document.querySelector('#tabela-receita tbody');
         tbody.innerHTML = '';
-        let custoTotal = 0;
+        let custoIngredientes = 0;
 
         receitaAtual.forEach((item, index) => {
             const infoInsumo = insumosGlobal[item.insumo];
@@ -338,49 +363,58 @@
             
             if (infoInsumo) {
                 const custoCalc = infoInsumo.custo_unidade * item.qtd;
-                custoTotal += custoCalc;
+                custoIngredientes += custoCalc;
                 tr.innerHTML = `
                     <td data-label="Insumo">${item.insumo}</td>
                     <td data-label="Qtd">${item.qtd} ${infoInsumo.unidade}</td>
-                    <td data-label="Custo (R$)">R$ ${custoCalc.toFixed(2)}</td>
+                    <td data-label="Custo Bruto">${formatarMoeda(custoCalc)}</td>
                     <td data-label="Ação"><button class="btn-danger btn-sm" onclick="removerItemReceita(${index})">Remover</button></td>`;
             } else {
                 tr.innerHTML = `
                     <td data-label="Insumo"><span class="erro">⚠️ ${item.insumo} (Excluído)</span></td>
                     <td data-label="Qtd">${item.qtd}</td>
-                    <td data-label="Custo (R$)"><span class="erro">R$ 0.00</span></td>
+                    <td data-label="Custo Bruto"><span class="erro">R$ 0,00</span></td>
                     <td data-label="Ação"><button class="btn-danger btn-sm" onclick="removerItemReceita(${index})">Remover</button></td>`;
             }
             tbody.appendChild(tr);
         });
 
-        const custoExtra = parseFloat(document.getElementById('rec-custo-extra').value) || 0;
-        custoTotal += custoExtra;
+        // Atualiza a visualização do display somando as perdas e repasses para o usuário ter noção
+        const perdaPerc = parseFloat(document.getElementById('rec-perda').value) || 0;
+        const repasse = parseFloat(document.getElementById('rec-repasse').value) || 0;
+        
+        const custoComPerda = custoIngredientes * (1 + (perdaPerc / 100));
+        const custoFinalProducao = custoComPerda + repasse;
 
-        document.getElementById('rec-total-display').innerText = `Custo Produção: R$ ${custoTotal.toFixed(2)}`;
+        document.getElementById('rec-total-display').innerText = `Custo Total de Produção: ${formatarMoeda(custoFinalProducao)}`;
     }
 
-    document.getElementById('rec-custo-extra').addEventListener('input', renderizarTabelaReceita);
+    // Recalcula o total visualmente se mexer nesses campos
+    document.getElementById('rec-perda').addEventListener('input', renderizarTabelaReceita);
+    document.getElementById('rec-repasse').addEventListener('input', renderizarTabelaReceita);
 
     function salvarReceitaProduto() {
         const nomeProd = document.getElementById('rec-produto').value.trim();
         if (!nomeProd || receitaAtual.length === 0) { alert("Informe o nome do produto e adicione ingredientes."); return; }
 
         const margemEspecifica = document.getElementById('rec-margem').value;
-        const custoExtra = document.getElementById('rec-custo-extra').value;
+        const repasse = document.getElementById('rec-repasse').value;
+        const perda = document.getElementById('rec-perda').value;
 
         const dadosProduto = {
             itens: receitaAtual,
             margem_individual: margemEspecifica !== "" ? parseFloat(margemEspecifica) : null,
-            custo_extra: custoExtra !== "" ? parseFloat(custoExtra) : 0
+            custo_repasse: repasse !== "" ? parseFloat(repasse) : 0,
+            perda_percentual: perda !== "" ? parseFloat(perda) : 0
         };
 
         db.collection('produtos').doc(nomeProd).set(dadosProduto).then(() => {
-            alert("✅ Receita salva com sucesso!");
+            animarBotao('btn-salvar-receita', '💾 SALVAR RECEITA NO BANCO');
             receitaAtual = [];
             document.getElementById('rec-produto').value = '';
             document.getElementById('rec-margem').value = '';
-            document.getElementById('rec-custo-extra').value = '';
+            document.getElementById('rec-repasse').value = '';
+            document.getElementById('rec-perda').value = '';
             renderizarTabelaReceita();
             window.scrollTo({ top: 0, behavior: 'smooth' });
         });
@@ -393,11 +427,13 @@
                 const dados = doc.data();
                 receitaAtual = dados.itens || [];
                 document.getElementById('rec-margem').value = dados.margem_individual !== null ? dados.margem_individual : '';
-                document.getElementById('rec-custo-extra').value = dados.custo_extra || '';
+                document.getElementById('rec-repasse').value = dados.custo_repasse || '';
+                document.getElementById('rec-perda').value = dados.perda_percentual || '';
             } else {
                 receitaAtual = [];
                 document.getElementById('rec-margem').value = '';
-                document.getElementById('rec-custo-extra').value = '';
+                document.getElementById('rec-repasse').value = '';
+                document.getElementById('rec-perda').value = '';
             }
             renderizarTabelaReceita();
         });
@@ -406,9 +442,16 @@
     // ==========================================
     // LÓGICA - ABA 3: PRODUTOS E PREÇOS
     // ==========================================
-    function salvarMargem() {
-        const margem = parseFloat(document.getElementById('conf-margem').value);
-        if (!isNaN(margem)) { db.collection('configuracoes').doc('global').set({ margem_lucro: margem }); }
+    function salvarConfigGlobais() {
+        const margem = parseFloat(document.getElementById('conf-margem').value) || 0;
+        const impostos = parseFloat(document.getElementById('conf-impostos').value) || 0;
+        const taxas = parseFloat(document.getElementById('conf-taxas').value) || 0;
+        
+        db.collection('configuracoes').doc('global').set({ 
+            margem_lucro: margem,
+            impostos: impostos,
+            taxas: taxas
+        }).then(() => animarBotao('btn-salvar-config', 'Atualizar Padrão'));
     }
 
     function deletarProduto(nome) {
@@ -417,17 +460,28 @@
             if(document.getElementById('rec-produto').value === nome) {
                 document.getElementById('rec-produto').value = '';
                 receitaAtual = [];
-                document.getElementById('rec-margem').value = '';
-                document.getElementById('rec-custo-extra').value = '';
                 renderizarTabelaReceita();
             }
         }
     }
 
+    function editarProduto(nome) {
+        abrirAba('aba-receitas');
+        document.getElementById('rec-produto').value = nome;
+        carregarReceitaEdicao();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
     db.collection('configuracoes').doc('global').onSnapshot(doc => {
         if (doc.exists) {
-            margemGlobal = doc.data().margem_lucro;
-            document.getElementById('conf-margem').value = margemGlobal;
+            configGlobal = doc.data();
+            // Previne falhas se o banco for antigo e não tiver esses campos
+            configGlobal.impostos = configGlobal.impostos || 0;
+            configGlobal.taxas = configGlobal.taxas || 0;
+
+            document.getElementById('conf-margem').value = configGlobal.margem_lucro;
+            document.getElementById('conf-impostos').value = configGlobal.impostos;
+            document.getElementById('conf-taxas').value = configGlobal.taxas;
             renderizarTabelaProdutos();
         }
     });
@@ -440,7 +494,13 @@
         
         snapshot.forEach(doc => {
             const dados = doc.data();
-            produtosCache.push({ nome: doc.id, itens: dados.itens, margem_individual: dados.margem_individual, custo_extra: dados.custo_extra || 0 });
+            produtosCache.push({ 
+                nome: doc.id, 
+                itens: dados.itens, 
+                margem_individual: dados.margem_individual, 
+                custo_repasse: dados.custo_repasse || 0,
+                perda_percentual: dados.perda_percentual || 0
+            });
             datalist.innerHTML += `<option value="${doc.id}">`;
         });
         renderizarTabelaProdutos();
@@ -451,28 +511,62 @@
         tbody.innerHTML = '';
 
         produtosCache.forEach(prod => {
-            let custoIngredientes = 0;
+            let custoBrutoIngredientes = 0;
             let temFaltante = false;
             
             prod.itens.forEach(item => {
-                if(insumosGlobal[item.insumo]) { custoIngredientes += insumosGlobal[item.insumo].custo_unidade * item.qtd; } 
+                if(insumosGlobal[item.insumo]) { custoBrutoIngredientes += insumosGlobal[item.insumo].custo_unidade * item.qtd; } 
                 else { temFaltante = true; }
             });
 
-            const custoTotal = custoIngredientes + prod.custo_extra;
-            const margemUsada = (prod.margem_individual !== null && prod.margem_individual !== undefined) ? prod.margem_individual : margemGlobal;
-            const tipoMargem = (prod.margem_individual !== null && prod.margem_individual !== undefined) ? 'Específica' : 'Global';
+            // 1. Aplica o Fator de Perda/Desperdício sobre os ingredientes
+            const custoComPerda = custoBrutoIngredientes * (1 + (prod.perda_percentual / 100));
 
-            const precoVenda = custoTotal * (1 + (margemUsada / 100));
+            // 2. Define Margens e Taxas
+            const margemUsada = (prod.margem_individual !== null && prod.margem_individual !== undefined) ? prod.margem_individual : configGlobal.margem_lucro;
+            const tipoMargem = (prod.margem_individual !== null && prod.margem_individual !== undefined) ? 'Específica' : 'Global';
+            const impostos = configGlobal.impostos;
+            const taxas = configGlobal.taxas;
+
+            // 3. FÓRMULA DE PRECIFICAÇÃO REAL (MARGEM DE LUCRO)
+            // Preço = Custo / (1 - (Margem% + Impostos% + Taxas%) / 100)
+            const somaPercentuais = (margemUsada + impostos + taxas) / 100;
+            let precoBaseCalculado = 0;
+            let erroMargem = false;
+
+            if (somaPercentuais >= 1) {
+                // Se a soma de impostos, taxas e lucros passar de 100%, a conta fica negativa (inviável)
+                erroMargem = true; 
+            } else {
+                precoBaseCalculado = custoComPerda / (1 - somaPercentuais);
+            }
+
+            // 4. Adiciona o repasse direto (Embalagem, não entra na divisão acima)
+            const precoFinalVenda = precoBaseCalculado + prod.custo_repasse;
+
             const avisoIncompleto = temFaltante ? '<br><span class="erro" style="font-size: 0.8em;">⚠️ Insumo ausente</span>' : '';
+            const avisoErroMargem = erroMargem ? '<br><span class="erro" style="font-size: 0.85em;">⚠️ Margem + Taxas >= 100%. Reduza as %!</span>' : '';
 
             tbody.innerHTML += `<tr>
                 <td data-label="Produto"><strong>${prod.nome}</strong>${avisoIncompleto}</td>
-                <td data-label="Custo Total">R$ ${custoTotal.toFixed(2)} <span class="aviso">(Ing: R$${custoIngredientes.toFixed(2)} | Ext: R$${prod.custo_extra.toFixed(2)})</span></td>
-                <td data-label="Margem">${margemUsada}% <span class="aviso">(${tipoMargem})</span></td>
-                <td data-label="Preço de Venda" class="destaque-venda">R$ ${precoVenda.toFixed(2)}</td>
+                <td data-label="Análise de Custos">
+                    <span class="aviso">Ingredientes: ${formatarMoeda(custoBrutoIngredientes)}</span>
+                    <span class="aviso">Com Perda (${prod.perda_percentual}%): ${formatarMoeda(custoComPerda)}</span>
+                    <span class="aviso">Repasse Fix: ${formatarMoeda(prod.custo_repasse)}</span>
+                </td>
+                <td data-label="Configuração (%)">
+                    <span class="aviso">Lucro: ${margemUsada}% (${tipoMargem})</span>
+                    <span class="aviso">Imposto: ${impostos}% | Taxa: ${taxas}%</span>
+                </td>
+                <td data-label="Preço Sugerido" class="destaque-venda">
+                    ${erroMargem ? '<span class="erro">ERRO</span>' : formatarMoeda(precoFinalVenda)}
+                    ${avisoErroMargem}
+                </td>
                 <td data-label="Ações">
-                    <button class="btn-danger btn-sm" onclick="deletarProduto('${prod.nome}')">🗑️ Excluir</button>
+                    <div class="acoes-td">
+                        <button class="btn-info btn-sm" onclick="editarProduto('${prod.nome}')">✏️ Editar</button>
+                        <button class="btn-danger btn-sm" onclick="deletarProduto('${prod.nome}')">🗑️</button>
+                    </div>
                 </td>
             </tr>`;
         });
