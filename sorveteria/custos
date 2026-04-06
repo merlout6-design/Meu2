@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sistema Nuvem - Sorveteria Pro</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    
+    <style>
+        /* CSS RESET & VARIAVEIS MODERNAS */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --primary: #4f46e5; --primary-hover: #4338ca; --primary-light: #e0e7ff;
+            --success: #10b981; --danger: #ef4444; --warning: #f59e0b; --info: #0ea5e9;
+            --purple: #8b5cf6; --purple-light: #ede9fe; --pink: #ec4899;
+            --bg-body: #f8fafc; --bg-card: #ffffff;
+            --text-dark: #1e293b; --text-muted: #64748b; --border-color: #e2e8f0;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --radius-md: 10px; --radius-lg: 16px;
+        }
+
+        body { font-family: 'Nunito', sans-serif; background-color: var(--bg-body); color: var(--text-dark); padding: 20px 10px; line-height: 1.5; }
+        .container { max-width: 1100px; margin: auto; background: var(--bg-card); padding: 30px; border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); }
+        h2 { text-align: center; font-size: 1.8rem; font-weight: 800; margin-bottom: 25px; color: var(--text-dark); display: flex; align-items: center; justify-content: center; gap: 10px; }
+        
+        .tabs { display: flex; gap: 8px; overflow-x: auto; white-space: nowrap; padding: 6px; background: #f1f5f9; border-radius: var(--radius-md); margin-bottom: 25px; -webkit-overflow-scrolling: touch; }
+        .tabs::-webkit-scrollbar { display: none; }
+        .tab { flex: 1; padding: 12px 15px; cursor: pointer; background: transparent; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 700; color: var(--text-muted); transition: all 0.3s ease; text-align: center;}
+        .tab.active { color: var(--primary); background: var(--bg-card); box-shadow: var(--shadow-sm); }
+        .tab-content { display: none; animation: fadeIn 0.4s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .form-row { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 15px; align-items: flex-end; }
+        .form-group { flex: 1; min-width: 180px; display: flex; flex-direction: column; gap: 6px; }
+        .form-group label { font-weight: 700; font-size: 0.9rem; color: var(--text-dark); }
+        
+        input, select, textarea { padding: 12px 15px; border: 2px solid transparent; background-color: #f8fafc; border-radius: var(--radius-md); font-size: 1rem; font-family: inherit; width: 100%; transition: all 0.2s ease; box-shadow: inset 0 1px 2px rgba(0,0,0,0.02); }
+        input:focus, select:focus, textarea:focus { background-color: #ffffff; border-color: var(--primary); outline: none; box-shadow: 0 0 0 4px var(--primary-light); }
+        
+        .acoes-form { display: flex; gap: 12px; margin-top: 15px; width: 100%; }
+        button { padding: 12px 20px; font-size: 1rem; font-family: inherit; background: var(--primary); color: white; border: none; border-radius: var(--radius-md); cursor: pointer; font-weight: 700; transition: all 0.2s ease; box-shadow: var(--shadow-sm); }
+        button:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); filter: brightness(1.05); }
+        button.btn-success { background: var(--success); } button.btn-danger { background: var(--danger); }
+        button.btn-warning { background: var(--warning); color: #78350f; } button.btn-info { background: var(--info); }
+        button.btn-purple { background: var(--purple); } button.btn-block { width: 100%; margin-top: 15px; padding: 15px; font-size: 1.1rem; }
+        button.btn-sm { padding: 6px 12px; font-size: 0.85rem; border-radius: 6px; }
+        
+        .card-destaque { background: #ffffff; padding: 20px; border-radius: var(--radius-lg); border: 1px solid var(--border-color); margin-bottom: 25px; box-shadow: var(--shadow-sm); }
+        .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .mini-card { background: #f8fafc; padding: 15px; border-radius: var(--radius-md); border: 1px solid var(--border-color); text-align: center; }
+        .mini-card h5 { color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; margin-bottom: 5px; }
+        .mini-card span { font-size: 1.2rem; font-weight: 800; color: var(--primary); }
+
+        table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 10px; font-size: 0.95rem; }
+        th, td { border-bottom: 1px solid var(--border-color); padding: 15px 12px; text-align: left; vertical-align: middle; }
+        th { background: #f8fafc; font-weight: 800; color: var(--text-muted); text-transform: uppercase; font-size: 0.80rem; }
+        th:first-child { border-top-left-radius: var(--radius-md); } th:last-child { border-top-right-radius: var(--radius-md); }
+        
+        .destaque-valor { font-size: 1.2rem; font-weight: 800; color: var(--primary); background: var(--primary-light); padding: 12px 20px; border-radius: var(--radius-md); display: inline-block; border: 1px solid rgba(79, 70, 229, 0.1); }
+        .destaque-venda { font-size: 1.15rem; font-weight: 800; color: var(--success); }
+        .badge { font-size: 0.75rem; padding: 4px 8px; border-radius: 20px; font-weight: 800; text-transform: uppercase; display: inline-block;}
+        .bg-sorvete { background: #e0f2fe; color: #0369a1; } .bg-basico { background: #fef3c7; color: #b45309; }
+        .bg-premium { background: #fae8ff; color: #a21caf; } .bg-receita { background: #e2e8f0; color: #334155; }
+        .bg-embalagem { background: #fce7f3; color: #be185d; } .bg-calda { background: #f5f3ff; color: #7c3aed; }
+        .aviso { font-size: 0.85rem; color: var(--text-muted); display: block; margin-top: 6px; line-height: 1.4; font-weight: 600;}
+        .erro { color: var(--danger); font-weight: 700; background: #fef2f2; padding: 2px 6px; border-radius: 4px; }
+
+        @media (max-width: 768px) {
+            .container { padding: 20px 15px; border-radius: 0; box-shadow: none; background: transparent; }
+            body { padding: 0; background: var(--bg-body); }
+            .tabs { flex-wrap: wrap; } .tab { flex: 1 1 45%; font-size: 0.85rem; padding: 10px; }
+            table, thead, tbody, th, td, tr { display: block; }
+            thead tr { position: absolute; top: -9999px; left: -9999px; }
+            tr { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); margin-bottom: 15px; padding: 10px; box-shadow: var(--shadow-sm); }
+            td { border: none; border-bottom: 1px solid #f1f5f9; position: relative; padding: 12px 10px 12px 45%; text-align: right; min-height: 45px; display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 5px;}
+            td:before { position: absolute; left: 10px; width: 40%; font-weight: 800; text-align: left; color: var(--text-muted); font-size: 0.85rem; content: attr(data-label); top: 50%; transform: translateY(-50%);}
+            .form-group { width: 100%; min-width: 100%; } .acoes-form { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>🍨 Sistema Sorveteria Pro</h2>
+    
+    <div class="tabs">
+        <button class="tab active" id="tab-btn-insumos" onclick="abrirAba('aba-insumos', this)">1. Matéria Prima</button>
+        <button class="tab" id="tab-btn-receitas" onclick="abrirAba('aba-receitas', this)">2. Produção & Embalagem</button>
+        <button class="tab" id="tab-btn-buffet" onclick="abrirAba('aba-buffet', this)">3. Simulador Buffet</button>
+        <button class="tab" id="tab-btn-produtos" onclick="abrirAba('aba-produtos', this)">4. Preços Finais</button>
+    </div>
+
+    <div id="aba-insumos" class="tab-content active">
+        
+        <div style="display: flex; justify-content: flex-end; margin-bottom: 15px; gap: 10px; flex-wrap: wrap;">
+            <button class="btn-info" onclick="exportarInsumosJSON()" style="font-size: 0.9rem;">📤 Exportar Base P/ IA</button>
+            <button class="btn-purple" onclick="toggleImportacao()" style="font-size: 0.9rem;">📥 Importar via IA</button>
+        </div>
+
+        <div id="area-importacao" class="card-destaque" style="display: none; background: #f5f3ff; border-color: var(--purple);">
+            <h4 style="color: var(--purple); margin-bottom: 10px;">Cole o código gerado pela IA:</h4>
+            <textarea id="texto-importacao" rows="5" placeholder='Ex: [{"nome": "Leite", "preco": 5.00...}]'></textarea>
+            <div class="acoes-form" style="margin-top: 10px;">
+                <button id="btn-processar-lote" class="btn-purple" onclick="processarImportacaoLote()" style="flex: 2;">⚡ Salvar Tudo</button>
+                <button class="btn-warning" onclick="toggleImportacao()" style="flex: 1;">Cancelar</button>
+            </div>
+        </div>
+
+        <div class="card-destaque">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Nome do Insumo ou Embalagem</label>
+                    <input type="text" id="ins-nome" placeholder="Ex: Leite / Pote 2L">
+                </div>
+                <div class="form-group">
+                    <label>Categoria (Onde ele será usado?)</label>
+                    <select id="ins-cat" style="font-weight: bold;">
+                        <option value="receita_base">🧪 Base p/ Receita (Ligas, Pós, Pastas, Leite)</option>
+                        <option value="embalagem" style="color: var(--pink);">🥡 Embalagens (Potes, Copos, Colheres)</option>
+                        <option value="sorvete">🍨 Buffet - Vai direto como Sorvete</option>
+                        <option value="basico">🍬 Buffet - Guarnição Básica (Granulado)</option>
+                        <option value="premium">🍫 Buffet - Guarnição Premium (Nutella)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Unid. Medida</label>
+                    <select id="ins-un"><option value="g">Gramas (g)</option><option value="ml">Mililitros (ml)</option><option value="un">Unidades (un)</option></select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Preço Pago (R$)</label><input type="number" id="ins-preco" placeholder="Ex: 15.50" step="0.01"></div>
+                <div class="form-group"><label>Qtd na Embalagem (G/ML/UN)</label><input type="number" id="ins-fator" placeholder="Ex: 395" step="0.01" onkeypress="handleEnter(event, salvarInsumo)"></div>
+            </div>
+            <div class="acoes-form">
+                <button id="btn-salvar-insumo" onclick="salvarInsumo()" class="btn-success" style="flex: 2;">✔ Salvar Manualmente</button>
+                <button onclick="limparFormInsumo()" class="btn-warning" style="flex: 1;">Limpar</button>
+            </div>
+        </div>
+        <table id="tabela-insumos">
+            <thead><tr><th>Item</th><th>Categoria</th><th>Unid.</th><th>Preço</th><th>Qtd</th><th>Custo Un.</th><th>Ações</th></tr></thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <div id="aba-receitas" class="tab-content">
+        <div class="card-destaque">
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label>Nome do Produto ou Calda Base</label>
+                <input type="text" id="rec-produto" placeholder="Ex: Calda Base Branca OU Pote 2L de Morango" onchange="carregarReceitaEdicao()" list="lista-produtos-datalist">
+                <datalist id="lista-produtos-datalist"></datalist>
+            </div>
+            
+            <div class="form-row" style="background: #f5f3ff; padding: 15px; border-radius: 8px; border: 2px dashed #a78bfa;">
+                <div class="form-group" style="flex: 1.5;">
+                    <label style="color: var(--purple);">1. O que você está criando?</label>
+                    <select id="rec-tipo" onchange="toggleTipoReceita()" style="font-weight: bold; color: var(--purple);">
+                        <option value="produto">🍦 Produto Final (Pote, Picolé, Sorvete Buffet)</option>
+                        <option value="sub_receita">🧪 Sub-Receita (Calda Base p/ usar como Ingrediente)</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label style="color: var(--purple);">2. Rendimento (Rende quantos KG/L?)</label>
+                    <input type="number" id="rec-rendimento" placeholder="Ex: 10" step="0.01">
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label style="color: var(--purple);">3. Perda na Produção (%)</label>
+                    <input type="number" id="rec-perda" placeholder="Ex: 5" value="0">
+                </div>
+            </div>
+
+            <div id="area-venda-receita" class="form-row" style="margin-top: 15px;">
+                <div class="form-group">
+                    <label>Esse sorvete vai pro Buffet?</label>
+                    <select id="rec-cat-buffet">
+                        <option value="outro">❌ Não (Ex: Produto Fechado)</option>
+                        <option value="sorvete">🍨 Sim - Vai para Cuba de Sorvete</option>
+                        <option value="basico">🍬 Sim - Como BÁSICO</option>
+                        <option value="premium">🍫 Sim - Como PREMIUM</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Margem Específica de Lucro (%)</label><input type="number" id="rec-margem" placeholder="Vazio = usa global"></div>
+            </div>
+        </div>
+
+        <h4 style="margin-bottom: 15px; font-weight: 800;">🧪 Ingredientes (Matéria-prima e Caldas Base)</h4>
+        <div class="form-row align-items-end">
+            <div class="form-group" style="flex: 2;"><select id="rec-insumo"></select></div>
+            <div class="form-group" style="flex: 1;"><label>Qtd (em Gramas/Ml/Un)</label><input type="number" id="rec-qtd" step="0.01"></div>
+            <button class="btn-primary" style="height: 46px;" onclick="adicionarItem('ingrediente')">➕ Add Ingrediente</button>
+        </div>
+        <table id="tabela-ingredientes" style="margin-bottom: 30px;">
+            <thead><tr><th>Ingrediente / Calda</th><th>Qtd</th><th>Custo Bruto</th><th>Remover</th></tr></thead>
+            <tbody></tbody>
+        </table>
+
+        <div id="area-embalagens-receita">
+            <h4 style="margin-bottom: 15px; font-weight: 800; color: var(--pink);">🥡 Embalagens Usadas no Produto Final</h4>
+            <div class="form-row align-items-end">
+                <div class="form-group" style="flex: 2;"><select id="rec-emb"></select></div>
+                <div class="form-group" style="flex: 1;"><label>Qtd Usada</label><input type="number" id="rec-qtd-emb" step="1" value="1"></div>
+                <button class="btn-primary" style="height: 46px; background: var(--pink);" onclick="adicionarItem('embalagem')">➕ Add Embalagem</button>
+            </div>
+            <table id="tabela-embalagens-receita">
+                <thead><tr><th>Embalagem</th><th>Qtd</th><th>Custo do Repasse</th><th>Remover</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        
+        <div style="margin-top: 30px; display: flex; flex-direction: column; gap: 15px;">
+            <div align="center">
+                <div class="destaque-valor" id="rec-total-display">Custo Produção Total: R$ 0,00</div><br>
+                <div class="destaque-valor" id="rec-kg-display" style="background: var(--purple-light); color: var(--purple); margin-top: 10px; font-size: 1rem;">Custo por KG ou UN Rendida: R$ 0,00</div>
+            </div>
+            <button id="btn-salvar-receita" class="btn-block btn-success" onclick="salvarReceitaProduto()">💾 GRAVAR FICHA TÉCNICA</button>
+        </div>
+    </div>
+
+    <div id="aba-buffet" class="tab-content">
+        <div class="card-destaque" style="background: var(--primary-light); border-color: var(--primary); text-align: center;">
+            <h3 style="color: var(--primary); font-weight: 800; margin-bottom: 10px;">⚖️ Custo Médio Ponderado por KG</h3>
+            <div class="card-grid">
+                <div class="mini-card" style="background: white;"><h5>🍨 Média Sorvetes</h5><span id="media-sorvete-display">R$ 0,00</span></div>
+                <div class="mini-card" style="background: white;"><h5>🍬 Média Básicos</h5><span id="media-basico-display">R$ 0,00</span></div>
+                <div class="mini-card" style="background: white;"><h5>🍫 Média Premium</h5><span id="media-premium-display">R$ 0,00</span></div>
+            </div>
+        </div>
+
+        <h4 style="margin-bottom: 15px; font-weight: 800;">1. Proporção do "Prato/Copo Médio" do Cliente:</h4>
+        <div class="card-destaque">
+            <div class="form-row">
+                <div class="form-group"><label>Sorvete (%)</label><input type="number" id="buf-perc-sorvete" value="75" oninput="calcularBuffet()"></div>
+                <div class="form-group"><label>Básicos (%)</label><input type="number" id="buf-perc-basico" value="15" oninput="calcularBuffet()"></div>
+                <div class="form-group"><label>Premium (%)</label><input type="number" id="buf-perc-premium" value="10" oninput="calcularBuffet()"></div>
+                <div class="form-group"><label>Perda Geral (%)</label><input type="number" id="buf-perda" value="10" oninput="calcularBuffet()"></div>
+            </div>
+            <span class="aviso" id="aviso-soma-buffet" style="color: var(--danger); font-weight: 800; display: none;">⚠️ A soma das proporções de insumos deve ser 100%!</span>
+        </div>
+
+        <h4 style="margin-bottom: 15px; font-weight: 800; color: var(--pink);">2. Embalagens Padrão Oferecidas (Copos, Colheres):</h4>
+        <div class="card-destaque">
+            <div class="form-row align-items-end">
+                <div class="form-group" style="flex: 2;"><select id="buf-emb"></select></div>
+                <div class="form-group" style="flex: 1;"><label>Qtd</label><input type="number" id="buf-qtd-emb" step="1" value="1"></div>
+                <button class="btn-primary" style="height: 46px; background: var(--pink);" onclick="adicionarEmbalagemBuffet()">➕ Add Embalagem</button>
+            </div>
+            <table id="tabela-embalagens-buffet" style="margin-top: 15px;">
+                <thead><tr><th>Embalagem Padrão</th><th>Qtd</th><th>Custo Repasse</th><th>Remover</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <div style="margin-top: 30px; text-align: center;">
+            <h4 style="color: var(--text-muted); text-transform: uppercase; font-size: 0.85rem;">Custo Real de 1KG do seu Buffet (C/ Embalagem Média)</h4>
+            <div class="destaque-valor" id="buf-custo-display" style="font-size: 1.5rem; margin-bottom: 15px;">R$ 0,00</div>
+            
+            <h4 style="color: var(--text-muted); text-transform: uppercase; font-size: 0.85rem; margin-top: 15px;">Preço Sugerido de Venda por KG</h4>
+            <div class="destaque-venda" id="buf-venda-display" style="font-size: 2rem; display: block;">R$ 0,00</div>
+            
+            <button id="btn-salvar-buffet" class="btn-block btn-purple" onclick="salvarBuffetComoProduto()" style="margin-top: 25px;">💾 SALVAR PREÇO DO BUFFET (ABA 4)</button>
+        </div>
+    </div>
+
+    <div id="aba-produtos" class="tab-content">
+        <div class="card-destaque">
+            <h4 style="margin-top:0; margin-bottom: 15px; color:var(--primary); font-weight: 800;">⚙️ Parâmetros Globais de Precificação</h4>
+            <div class="form-row align-items-end">
+                <div class="form-group"><label>Margem de Lucro Real (%)</label><input type="number" id="conf-margem" placeholder="Ex: 40"></div>
+                <div class="form-group"><label>Impostos (%)</label><input type="number" id="conf-impostos" placeholder="Ex: 6"></div>
+                <div class="form-group"><label>Taxa de Cartão (%)</label><input type="number" id="conf-taxas" placeholder="Ex: 3.5" onkeypress="handleEnter(event, salvarConfigGlobais)"></div>
+                <button id="btn-salvar-config" class="btn-primary" style="height: 46px;" onclick="salvarConfigGlobais()">Aplicar</button>
+            </div>
+        </div>
+        <table id="tabela-produtos">
+            <thead><tr><th>Produto ou Calda</th><th>Análise de Custos</th><th>Variáveis</th><th>Preço Venda</th><th>Ações</th></tr></thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAOWWzlkooh2AfJ8Y8KsIKx3xo4Cw-oqO8",
+      authDomain: "assistente-39dc1.firebaseapp.com",
+      projectId: "assistente-39dc1",
+      storageBucket: "assistente-39dc1.appspot.com",
+      messagingSenderId: "419384375900",
+      appId: "1:419384375900:web:c9fb7532a35b4041340499"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // BANCOS DE DADOS EM MEMÓRIA (Nova Arquitetura Robusta)
+    let insumosDB = {};         // Dados puros da coleção "insumos"
+    let subReceitasDB = [];     // Dados puros da coleção "produtos" (apenas tipo = sub_receita)
+    let produtosFinaisDB = [];  // Dados puros da coleção "produtos" (resto)
+
+    let insumosGlobal = {};     // O Mega-Dicionário (insumosDB + subReceitas processadas)
+    let produtosFinaisCache = []; // O que vai ser renderizado na Aba 4
+    
+    let configGlobal = { margem_lucro: 50, impostos: 0, taxas: 0 }; 
+    let mediasBuffet = { sorvete: 0, basico: 0, premium: 0 }; 
+    let bufferInsumos = { sorvete: { soma: 0, qtd: 0 }, basico: { soma: 0, qtd: 0 }, premium: { soma: 0, qtd: 0 } };
+    let bufferProdutos = { sorvete: { soma: 0, qtd: 0 }, basico: { soma: 0, qtd: 0 }, premium: { soma: 0, qtd: 0 } };
+
+    // Arrays para abas
+    let receitaAtualIng = []; 
+    let receitaAtualEmb = [];
+    let buffetAtualEmb = [];
+
+    function formatarMoeda(valor) { return (valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
+
+    function abrirAba(idAba, elementoClicado = null) {
+        document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+        document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+        document.getElementById(idAba).classList.add('active');
+        if(elementoClicado) { elementoClicado.classList.add('active'); } 
+        else { document.getElementById('tab-btn-' + idAba.split('-')[1]).classList.add('active'); }
+        if(idAba === 'aba-buffet') carregarBuffetDB(); 
+    }
+
+    function handleEnter(e, funcao) { if (e.key === 'Enter') { e.preventDefault(); funcao(); } }
+
+    function animarBotao(id, textoOriginal) {
+        const btn = document.getElementById(id);
+        btn.innerHTML = "✔ Feito!"; btn.style.backgroundColor = "var(--success)";
+        setTimeout(() => { btn.innerHTML = textoOriginal; btn.style.backgroundColor = ""; }, 2000);
+    }
+
+    function infoCategoria(catId) {
+        const mapas = { 
+            'sorvete': { nome: 'Buffet: Sorvete', classe: 'bg-sorvete' }, 
+            'basico': { nome: 'Buffet: Básico', classe: 'bg-basico' }, 
+            'premium': { nome: 'Buffet: Premium', classe: 'bg-premium' }, 
+            'receita_base': { nome: 'Base p/ Receita', classe: 'bg-receita' },
+            'embalagem': { nome: 'Embalagem', classe: 'bg-embalagem' },
+            'sub_receita': { nome: 'Calda Base', classe: 'bg-calda' }
+        };
+        return mapas[catId] || { nome: 'Outro', classe: 'bg-receita' };
+    }
+
+    // ==========================================
+    // EXPORTAÇÃO E IMPORTAÇÃO
+    // ==========================================
+    async function exportarInsumosJSON() {
+        try {
+            let arrExport = [];
+            for(let key in insumosDB) {
+                let v = insumosDB[key];
+                arrExport.push({ nome: key, categoria: v.categoria, unidade: v.unidade, preco: v.preco, fator: v.fator });
+            }
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(arrExport, null, 2));
+            const dlAnchorElem = document.createElement('a');
+            dlAnchorElem.setAttribute("href", dataStr);
+            dlAnchorElem.setAttribute("download", "meus_insumos_backup.json");
+            document.body.appendChild(dlAnchorElem); dlAnchorElem.click(); dlAnchorElem.remove();
+        } catch (error) { alert("Erro ao exportar banco de dados: " + error); }
+    }
+
+    function toggleImportacao() {
+        const area = document.getElementById('area-importacao');
+        area.style.display = area.style.display === 'none' ? 'block' : 'none';
+        document.getElementById('texto-importacao').value = '';
+    }
+
+    async function processarImportacaoLote() {
+        const texto = document.getElementById('texto-importacao').value;
+        if (!texto.trim()) { alert("Cole o código gerado pela IA."); return; }
+        try {
+            const itens = JSON.parse(texto);
+            if (!Array.isArray(itens)) throw new Error("O código não é uma lista válida.");
+            let salvos = 0;
+            const promessas = itens.map(item => {
+                if (item.nome && item.preco && item.fator) {
+                    const dados = {
+                        categoria: item.categoria || 'receita_base', unidade: item.unidade || 'un',
+                        preco: parseFloat(item.preco), fator: parseFloat(item.fator),
+                        custo_unidade: parseFloat(item.preco) / parseFloat(item.fator)
+                    };
+                    salvos++; return db.collection('insumos').doc(item.nome.trim()).set(dados);
+                }
+            });
+            await Promise.all(promessas);
+            animarBotao('btn-processar-lote', `⚡ Salvar Tudo`); alert(`✅ Sucesso! ${salvos} itens salvos.`); toggleImportacao();
+        } catch (erro) { alert("Erro ao ler o código!\nDetalhes: " + erro.message); }
+    }
+
+    // ==========================================
+    // ABA 1: INSUMOS MANUAIS
+    // ==========================================
+    function salvarInsumo() {
+        const nome = document.getElementById('ins-nome').value.trim();
+        const categoria = document.getElementById('ins-cat').value;
+        const unidade = document.getElementById('ins-un').value;
+        const preco = parseFloat(document.getElementById('ins-preco').value);
+        const fator = parseFloat(document.getElementById('ins-fator').value);
+
+        if (!nome || isNaN(preco) || isNaN(fator) || preco <= 0 || fator <= 0) { alert("Preencha todos os campos!"); return; }
+        db.collection('insumos').doc(nome).set({ categoria, unidade, preco, fator, custo_unidade: preco / fator })
+        .then(() => { animarBotao('btn-salvar-insumo', '✔ Salvar Manualmente'); limparFormInsumo(); document.getElementById('ins-nome').focus(); });
+    }
+
+    function limparFormInsumo() {
+        document.getElementById('ins-nome').value = ''; document.getElementById('ins-preco').value = '';
+        document.getElementById('ins-fator').value = ''; document.getElementById('ins-nome').disabled = false;
+        document.getElementById('ins-cat').value = 'receita_base';
+    }
+
+    function editarInsumo(nome) {
+        const insumo = insumosDB[nome];
+        if (insumo) {
+            document.getElementById('ins-nome').value = nome; document.getElementById('ins-cat').value = insumo.categoria || 'receita_base';
+            document.getElementById('ins-un').value = insumo.unidade; document.getElementById('ins-preco').value = insumo.preco;
+            document.getElementById('ins-fator').value = insumo.fator; document.getElementById('ins-nome').disabled = true;
+            window.scrollTo({ top: 0, behavior: 'smooth' }); document.getElementById('ins-preco').focus();
+        }
+    }
+
+    function deletarInsumo(nome) {
+        if (confirm(`Excluir '${nome}'? Fichas Técnicas que usam este item perderão o custo dele.`)) { db.collection('insumos').doc(nome).delete().then(() => limparFormInsumo()); }
+    }
+
+    // ==========================================
+    // O CORAÇÃO DO SISTEMA: RECALCULAR TUDO
+    // ==========================================
+    db.collection('insumos').onSnapshot(snapshot => {
+        insumosDB = {};
+        snapshot.forEach(doc => {
+            let val = doc.data();
+            if(!val.categoria) val.categoria = 'receita_base'; 
+            insumosDB[doc.id] = val; 
+        });
+        recalcularTudo();
+    });
+
+    db.collection('produtos').onSnapshot(snapshot => {
+        subReceitasDB = [];
+        produtosFinaisDB = [];
+        snapshot.forEach(doc => {
+            let dados = doc.data();
+            dados.id = doc.id;
+            if (dados.tipo === 'sub_receita') subReceitasDB.push(dados);
+            else produtosFinaisDB.push(dados);
+        });
+        recalcularTudo();
+    });
+
+    function recalcularTudo() {
+        // 1. Reseta Globais
+        insumosGlobal = { ...insumosDB };
+        bufferInsumos = { sorvete: { soma: 0, qtd: 0 }, basico: { soma: 0, qtd: 0 }, premium: { soma: 0, qtd: 0 } };
+        bufferProdutos = { sorvete: { soma: 0, qtd: 0 }, basico: { soma: 0, qtd: 0 }, premium: { soma: 0, qtd: 0 } };
+        produtosFinaisCache = [];
+
+        // 2. Acumula Médias de Buffet (Apenas Insumos Prontos)
+        for (let key in insumosDB) {
+            let val = insumosDB[key];
+            if (['sorvete', 'basico', 'premium'].includes(val.categoria) && (val.unidade === 'g' || val.unidade === 'ml')) {
+                bufferInsumos[val.categoria].soma += (val.custo_unidade * 1000);
+                bufferInsumos[val.categoria].qtd++;
+            }
+        }
+
+        // 3. Processa Sub-Receitas (Caldas Base) - 2 Passos para caso uma calda use outra calda
+        for(let i=0; i<2; i++) {
+            subReceitasDB.forEach(sub => {
+                let cIng = 0;
+                sub.itens.forEach(item => { if(insumosGlobal[item.insumo]) cIng += insumosGlobal[item.insumo].custo_unidade * item.qtd; });
+                const rend = sub.rendimento_kg || 1; 
+                const perda = sub.perda_percentual || 0;
+                const cFinal = cIng * (1 + (perda / 100)); 
+                
+                // Injeta no mega-dicionário como se fosse um ingrediente comprável (em gramas)
+                insumosGlobal[sub.id] = {
+                    categoria: 'sub_receita',
+                    unidade: 'g', 
+                    preco: cFinal,
+                    fator: rend * 1000,
+                    custo_unidade: cFinal / (rend * 1000)
+                };
+            });
+        }
+
+        // Passa as sub-receitas para a tabela de Preços Finais para o usuário ver
+        subReceitasDB.forEach(sub => { produtosFinaisCache.push({ nome: sub.id, dados_completos: sub }); });
+
+        // 4. Processa Produtos Finais e Buffet
+        produtosFinaisDB.forEach(prod => {
+            produtosFinaisCache.push({ nome: prod.id, dados_completos: prod });
+            
+            // Acumula no Buffet se ele for para lá
+            if(!prod.is_buffet && ['sorvete', 'basico', 'premium'].includes(prod.categoria_buffet)) {
+                let cIng = 0; prod.itens.forEach(item => { if(insumosGlobal[item.insumo]) cIng += insumosGlobal[item.insumo].custo_unidade * item.qtd; });
+                let cEmb = 0; if(prod.embalagens) prod.embalagens.forEach(e => { if(insumosGlobal[e.insumo]) cEmb += insumosGlobal[e.insumo].custo_unidade * e.qtd; });
+                
+                const rend = prod.rendimento_kg || 1; const perda = prod.perda_percentual || 0;
+                const cFinal = (cIng * (1 + (perda / 100))) + cEmb;
+                
+                bufferProdutos[prod.categoria_buffet].soma += (cFinal / rend);
+                bufferProdutos[prod.categoria_buffet].qtd++;
+            }
+        });
+
+        // 5. Atualiza a Tela
+        atualizarDropdowns();
+        renderizarTabelaInsumos();
+        atualizarMediasBuffet();
+        renderizarListasReceita();
+        renderizarTabelaProdutos();
+    }
+
+    function atualizarDropdowns() {
+        const selectRecIng = document.getElementById('rec-insumo');
+        const selectRecEmb = document.getElementById('rec-emb');
+        const selectBufEmb = document.getElementById('buf-emb');
+        const datalist = document.getElementById('lista-produtos-datalist'); 
+
+        const valIng = selectRecIng.value; const valEmb = selectRecEmb.value; const valBuf = selectBufEmb.value;
+
+        selectRecIng.innerHTML = '<option value="">Selecione Ingrediente ou Calda Base...</option>';
+        selectRecEmb.innerHTML = '<option value="">Selecione uma Embalagem...</option>';
+        selectBufEmb.innerHTML = '<option value="">Selecione uma Embalagem...</option>';
+        datalist.innerHTML = '';
+
+        const keys = Object.keys(insumosGlobal).sort();
+        keys.forEach(id => {
+            const val = insumosGlobal[id];
+            if (val.categoria === 'embalagem') {
+                const opt = `<option value="${id}">${id} (${formatarMoeda(val.custo_unidade)}/${val.unidade})</option>`;
+                selectRecEmb.innerHTML += opt; selectBufEmb.innerHTML += opt;
+            } else if (val.categoria === 'sub_receita') {
+                selectRecIng.innerHTML += `<option value="${id}">🧪 CALDA BASE: ${id} (${formatarMoeda(val.custo_unidade)}/${val.unidade})</option>`;
+            } else {
+                selectRecIng.innerHTML += `<option value="${id}">${id} (${val.unidade})</option>`;
+            }
+        });
+
+        produtosFinaisCache.forEach(p => { if(!p.dados_completos.is_buffet) datalist.innerHTML += `<option value="${p.nome}">`; });
+
+        if(insumosGlobal[valIng]) selectRecIng.value = valIng;
+        if(insumosGlobal[valEmb]) selectRecEmb.value = valEmb;
+        if(insumosGlobal[valBuf]) selectBufEmb.value = valBuf;
+    }
+
+    function renderizarTabelaInsumos() {
+        const tbody = document.querySelector('#tabela-insumos tbody'); tbody.innerHTML = ''; 
+        for (let key in insumosDB) {
+            const val = insumosDB[key]; const catInfo = infoCategoria(val.categoria);
+            tbody.innerHTML += `<tr>
+                <td data-label="Item"><strong>${key}</strong></td>
+                <td data-label="Categoria"><span class="badge ${catInfo.classe}">${catInfo.nome}</span></td>
+                <td data-label="Unid.">${val.unidade}</td><td data-label="Preço">${formatarMoeda(val.preco)}</td>
+                <td data-label="Qtd">${val.fator}</td><td data-label="Custo Un.">${formatarMoeda(val.custo_unidade)}</td>
+                <td data-label="Ações"><div class="acoes-td"><button class="btn-info btn-sm" onclick="editarInsumo('${key}')">✏️</button><button class="btn-danger btn-sm" onclick="deletarInsumo('${key}')">🗑️</button></div></td>
+            </tr>`;
+        }
+    }
+
+    function atualizarMediasBuffet() {
+        ['sorvete', 'basico', 'premium'].forEach(cat => {
+            let totalSoma = bufferInsumos[cat].soma + bufferProdutos[cat].soma;
+            let totalQtd = bufferInsumos[cat].qtd + bufferProdutos[cat].qtd;
+            mediasBuffet[cat] = totalQtd > 0 ? (totalSoma / totalQtd) : 0;
+        });
+        document.getElementById('media-sorvete-display').innerText = formatarMoeda(mediasBuffet.sorvete);
+        document.getElementById('media-basico-display').innerText = formatarMoeda(mediasBuffet.basico);
+        document.getElementById('media-premium-display').innerText = formatarMoeda(mediasBuffet.premium);
+        calcularBuffet();
+    }
+
+    // ==========================================
+    // ABA 2: RECEITAS (ING & EMB & SUB-RECEITAS)
+    // ==========================================
+    function toggleTipoReceita() {
+        const tipo = document.getElementById('rec-tipo').value;
+        const areaVenda = document.getElementById('area-venda-receita');
+        const areaEmb = document.getElementById('area-embalagens-receita');
+        if(tipo === 'sub_receita') { areaVenda.style.display = 'none'; areaEmb.style.display = 'none'; } 
+        else { areaVenda.style.display = 'flex'; areaEmb.style.display = 'block'; }
+    }
+
+    function adicionarItem(tipo) {
+        let insumoNome, qtd, arrayDestino;
+        if(tipo === 'ingrediente') {
+            insumoNome = document.getElementById('rec-insumo').value; qtd = parseFloat(document.getElementById('rec-qtd').value);
+            arrayDestino = receitaAtualIng;
+        } else {
+            insumoNome = document.getElementById('rec-emb').value; qtd = parseFloat(document.getElementById('rec-qtd-emb').value);
+            arrayDestino = receitaAtualEmb;
+        }
+
+        if (!insumoNome || isNaN(qtd) || qtd <= 0) { alert("Selecione o item e a quantidade."); return; }
+        const itemExistente = arrayDestino.find(i => i.insumo === insumoNome);
+        if (itemExistente) { itemExistente.qtd += qtd; } else { arrayDestino.push({ insumo: insumoNome, qtd: qtd }); }
+        
+        if(tipo === 'ingrediente') document.getElementById('rec-qtd').value = ''; 
+        else document.getElementById('rec-qtd-emb').value = '1';
+        
+        renderizarListasReceita();
+    }
+    
+    function removerItemReceita(tipo, index) { 
+        if(tipo === 'ingrediente') receitaAtualIng.splice(index, 1); else receitaAtualEmb.splice(index, 1); 
+        renderizarListasReceita(); 
+    }
+
+    function renderizarListasReceita() {
+        const tbIng = document.querySelector('#tabela-ingredientes tbody'); tbIng.innerHTML = '';
+        let custoIngredientes = 0;
+        receitaAtualIng.forEach((item, index) => {
+            const info = insumosGlobal[item.insumo]; const tr = document.createElement('tr');
+            if (info) {
+                const calc = info.custo_unidade * item.qtd; custoIngredientes += calc;
+                const icone = info.categoria === 'sub_receita' ? '🧪 ' : '';
+                tr.innerHTML = `<td data-label="Ingrediente"><strong>${icone}${item.insumo}</strong></td><td data-label="Qtd">${item.qtd} ${info.unidade}</td><td data-label="Custo">${formatarMoeda(calc)}</td><td data-label="Ação"><button class="btn-danger btn-sm" onclick="removerItemReceita('ingrediente',${index})">X</button></td>`;
+            } else { tr.innerHTML = `<td colspan="4"><span class="erro">⚠️ Insumo ${item.insumo} não encontrado!</span></td>`; }
+            tbIng.appendChild(tr);
+        });
+
+        const tbEmb = document.querySelector('#tabela-embalagens-receita tbody'); tbEmb.innerHTML = '';
+        let custoEmbalagens = 0;
+        receitaAtualEmb.forEach((item, index) => {
+            const info = insumosGlobal[item.insumo]; const tr = document.createElement('tr');
+            if (info) {
+                const calc = info.custo_unidade * item.qtd; custoEmbalagens += calc;
+                tr.innerHTML = `<td data-label="Embalagem"><strong style="color:var(--pink);">${item.insumo}</strong></td><td data-label="Qtd">${item.qtd} ${info.unidade}</td><td data-label="Custo">${formatarMoeda(calc)}</td><td data-label="Ação"><button class="btn-danger btn-sm" onclick="removerItemReceita('embalagem',${index})">X</button></td>`;
+            } else { tr.innerHTML = `<td colspan="4"><span class="erro">⚠️ Embalagem ${item.insumo} não encontrada!</span></td>`; }
+            tbEmb.appendChild(tr);
+        });
+
+        const tipo = document.getElementById('rec-tipo').value;
+        const perdaPerc = parseFloat(document.getElementById('rec-perda').value) || 0;
+        const rendimento = parseFloat(document.getElementById('rec-rendimento').value) || 1; 
+        
+        // Se for Sub-Receita, ignora embalagem no calculo visual
+        const custoEmbFinal = tipo === 'sub_receita' ? 0 : custoEmbalagens;
+        const custoFinalProducao = (custoIngredientes * (1 + (perdaPerc / 100))) + custoEmbFinal;
+        const custoPorKg = custoFinalProducao / rendimento;
+
+        document.getElementById('rec-total-display').innerText = `Custo Produção Total: ${formatarMoeda(custoFinalProducao)}`;
+        document.getElementById('rec-kg-display').innerText = `Custo por KG ou UN Rendida: ${formatarMoeda(custoPorKg)}`;
+    }
+
+    document.getElementById('rec-perda').addEventListener('input', renderizarListasReceita);
+    document.getElementById('rec-rendimento').addEventListener('input', renderizarListasReceita);
+
+    function salvarReceitaProduto() {
+        const nomeProd = document.getElementById('rec-produto').value.trim();
+        const tipo = document.getElementById('rec-tipo').value;
+        
+        if (!nomeProd || receitaAtualIng.length === 0) { alert("Informe o nome e os ingredientes."); return; }
+        const rendimento = parseFloat(document.getElementById('rec-rendimento').value);
+        if(isNaN(rendimento) || rendimento <= 0) { alert("Informe o Rendimento (maior que 0)."); return; }
+
+        let dadosProduto = {
+            tipo: tipo,
+            itens: receitaAtualIng,
+            rendimento_kg: rendimento,
+            perda_percentual: parseFloat(document.getElementById('rec-perda').value) || 0,
+        };
+
+        if (tipo === 'produto') {
+            let custoRepasseCalculado = 0;
+            receitaAtualEmb.forEach(e => { if(insumosGlobal[e.insumo]) custoRepasseCalculado += insumosGlobal[e.insumo].custo_unidade * e.qtd; });
+            const m = document.getElementById('rec-margem').value;
+
+            dadosProduto.is_buffet = false;
+            dadosProduto.embalagens = receitaAtualEmb;
+            dadosProduto.custo_repasse = custoRepasseCalculado;
+            dadosProduto.categoria_buffet = document.getElementById('rec-cat-buffet').value;
+            dadosProduto.margem_individual = m !== "" ? parseFloat(m) : null;
+        }
+
+        db.collection('produtos').doc(nomeProd).set(dadosProduto).then(() => {
+            animarBotao('btn-salvar-receita', '💾 GRAVAR FICHA TÉCNICA');
+            receitaAtualIng = []; receitaAtualEmb = []; 
+            document.getElementById('rec-produto').value = ''; document.getElementById('rec-margem').value = '';
+            document.getElementById('rec-perda').value = '0'; document.getElementById('rec-rendimento').value = ''; 
+            document.getElementById('rec-cat-buffet').value = 'outro';
+            renderizarListasReceita();
+        });
+    }
+
+    function carregarReceitaEdicao() {
+        const nomeProd = document.getElementById('rec-produto').value;
+        db.collection('produtos').doc(nomeProd).get().then(doc => {
+            if (doc.exists && !doc.data().is_buffet) {
+                const dados = doc.data();
+                document.getElementById('rec-tipo').value = dados.tipo || 'produto';
+                toggleTipoReceita();
+
+                receitaAtualIng = dados.itens || [];
+                receitaAtualEmb = dados.embalagens || [];
+                document.getElementById('rec-rendimento').value = dados.rendimento_kg || '';
+                document.getElementById('rec-perda').value = dados.perda_percentual || 0;
+                
+                if(dados.tipo !== 'sub_receita') {
+                    document.getElementById('rec-cat-buffet').value = dados.categoria_buffet || 'outro';
+                    document.getElementById('rec-margem').value = dados.margem_individual !== null ? dados.margem_individual : '';
+                }
+            } else {
+                receitaAtualIng = []; receitaAtualEmb = []; document.getElementById('rec-rendimento').value = ''; 
+                document.getElementById('rec-perda').value = '0'; document.getElementById('rec-margem').value = '';
+            }
+            renderizarListasReceita();
+        });
+    }
+
+    // ==========================================
+    // ABA 3: SIMULADOR DE BUFFET
+    // ==========================================
+    function adicionarEmbalagemBuffet() {
+        const insumoNome = document.getElementById('buf-emb').value; const qtd = parseFloat(document.getElementById('buf-qtd-emb').value);
+        if (!insumoNome || isNaN(qtd) || qtd <= 0) { return; }
+        const item = buffetAtualEmb.find(i => i.insumo === insumoNome);
+        if (item) item.qtd += qtd; else buffetAtualEmb.push({ insumo: insumoNome, qtd: qtd });
+        renderizarEmbalagensBuffet();
+    }
+    
+    function removerEmbBuffet(index) { buffetAtualEmb.splice(index, 1); renderizarEmbalagensBuffet(); }
+
+    function renderizarEmbalagensBuffet() {
+        const tbEmb = document.querySelector('#tabela-embalagens-buffet tbody'); tbEmb.innerHTML = '';
+        buffetAtualEmb.forEach((item, index) => {
+            const info = insumosGlobal[item.insumo]; const tr = document.createElement('tr');
+            if (info) {
+                const calc = info.custo_unidade * item.qtd;
+                tr.innerHTML = `<td data-label="Embalagem"><strong style="color:var(--pink);">${item.insumo}</strong></td><td data-label="Qtd">${item.qtd} ${info.unidade}</td><td data-label="Custo">${formatarMoeda(calc)}</td><td data-label="Ação"><button class="btn-danger btn-sm" onclick="removerEmbBuffet(${index})">X</button></td>`;
+            }
+            tbEmb.appendChild(tr);
+        });
+        calcularBuffet();
+    }
+
+    function calcularBuffet() {
+        const pSorvete = parseFloat(document.getElementById('buf-perc-sorvete').value) || 0;
+        const pBasico = parseFloat(document.getElementById('buf-perc-basico').value) || 0;
+        const pPremium = parseFloat(document.getElementById('buf-perc-premium').value) || 0;
+        const perda = parseFloat(document.getElementById('buf-perda').value) || 0;
+        
+        let repasseEmbalagens = 0;
+        buffetAtualEmb.forEach(e => { if(insumosGlobal[e.insumo]) repasseEmbalagens += insumosGlobal[e.insumo].custo_unidade * e.qtd; });
+
+        const avisoEl = document.getElementById('aviso-soma-buffet');
+        const displayCusto = document.getElementById('buf-custo-display');
+        const displayVenda = document.getElementById('buf-venda-display');
+
+        if (Math.round(pSorvete + pBasico + pPremium) !== 100) {
+            avisoEl.style.display = 'block'; displayCusto.innerText = "Corrija as %"; displayVenda.innerText = "---"; return;
+        } else { avisoEl.style.display = 'none'; }
+
+        const custoKiloPonderado = (mediasBuffet.sorvete * (pSorvete/100)) + (mediasBuffet.basico * (pBasico/100)) + (mediasBuffet.premium * (pPremium/100));
+        const custoFinalKg = (custoKiloPonderado * (1 + (perda / 100))) + repasseEmbalagens;
+        displayCusto.innerText = formatarMoeda(custoFinalKg);
+
+        const somaTributos = (configGlobal.margem_lucro + configGlobal.impostos + configGlobal.taxas) / 100;
+        if (somaTributos >= 1) { displayVenda.innerHTML = `<span class="erro">Taxas >= 100% (Aba 4)</span>`; } 
+        else { displayVenda.innerText = formatarMoeda(( (custoKiloPonderado * (1 + (perda / 100))) / (1 - somaTributos) ) + repasseEmbalagens); }
+    }
+
+    function salvarBuffetComoProduto() {
+        const percSorvete = parseFloat(document.getElementById('buf-perc-sorvete').value) || 0;
+        const percBasico = parseFloat(document.getElementById('buf-perc-basico').value) || 0;
+        const percPremium = parseFloat(document.getElementById('buf-perc-premium').value) || 0;
+        if (percSorvete + percBasico + percPremium !== 100) { alert("Soma deve ser 100%."); return; }
+
+        let repasseEmbalagens = 0;
+        buffetAtualEmb.forEach(e => { if(insumosGlobal[e.insumo]) repasseEmbalagens += insumosGlobal[e.insumo].custo_unidade * e.qtd; });
+
+        db.collection('produtos').doc('BUFFET SELF-SERVICE (1KG)').set({
+            is_buffet: true,
+            proporcoes: { sorvete: percSorvete, basico: percBasico, premium: percPremium },
+            embalagens: buffetAtualEmb,
+            custo_repasse: repasseEmbalagens,
+            perda_percentual: parseFloat(document.getElementById('buf-perda').value) || 0,
+            margem_individual: null 
+        }).then(() => { animarBotao('btn-salvar-buffet', '💾 SALVO NA LISTA DE PREÇOS (ABA 4)'); abrirAba('aba-produtos'); });
+    }
+
+    function carregarBuffetDB() {
+        db.collection('produtos').doc('BUFFET SELF-SERVICE (1KG)').get().then(doc => {
+            if(doc.exists) {
+                const d = doc.data();
+                document.getElementById('buf-perc-sorvete').value = d.proporcoes.sorvete;
+                document.getElementById('buf-perc-basico').value = d.proporcoes.basico;
+                document.getElementById('buf-perc-premium').value = d.proporcoes.premium;
+                document.getElementById('buf-perda').value = d.perda_percentual;
+                buffetAtualEmb = d.embalagens || [];
+                renderizarEmbalagensBuffet();
+            }
+        });
+    }
+
+    // ==========================================
+    // ABA 4: PRECIFICAÇÃO GLOBAL
+    // ==========================================
+    function salvarConfigGlobais() {
+        db.collection('configuracoes').doc('global').set({ 
+            margem_lucro: parseFloat(document.getElementById('conf-margem').value) || 0,
+            impostos: parseFloat(document.getElementById('conf-impostos').value) || 0,
+            taxas: parseFloat(document.getElementById('conf-taxas').value) || 0
+        }).then(() => animarBotao('btn-salvar-config', 'Aplicar'));
+    }
+
+    function deletarProduto(nome) {
+        if (confirm(`Deseja excluir permanentemente '${nome}'? Caldas excluídas sumirão das receitas que as utilizam.`)) {
+            db.collection('produtos').doc(nome).delete();
+            if(document.getElementById('rec-produto').value === nome) { document.getElementById('rec-produto').value = ''; receitaAtualIng = []; receitaAtualEmb = []; renderizarListasReceita(); }
+        }
+    }
+
+    function editarProduto(nome, isBuffet) {
+        if(isBuffet) { abrirAba('aba-buffet'); } 
+        else { abrirAba('aba-receitas'); document.getElementById('rec-produto').value = nome; carregarReceitaEdicao(); }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    db.collection('configuracoes').doc('global').onSnapshot(doc => {
+        if (doc.exists) {
+            configGlobal = doc.data();
+            configGlobal.impostos = configGlobal.impostos || 0; configGlobal.taxas = configGlobal.taxas || 0;
+            document.getElementById('conf-margem').value = configGlobal.margem_lucro;
+            document.getElementById('conf-impostos').value = configGlobal.impostos;
+            document.getElementById('conf-taxas').value = configGlobal.taxas;
+            renderizarTabelaProdutos(); calcularBuffet();
+        }
+    });
+
+    function renderizarTabelaProdutos() {
+        const tbody = document.querySelector('#tabela-produtos tbody'); tbody.innerHTML = '';
+
+        produtosFinaisCache.forEach(prod => {
+            const dados = prod.dados_completos; let custoBase = 0; let temFaltante = false; let descCustos = "";
+            let cEmb = 0;
+
+            // Tratamento Diferenciado para CALDAS BASE (Sub-Receitas)
+            if (dados.tipo === 'sub_receita') {
+                dados.itens.forEach(item => { if(insumosGlobal[item.insumo]) { custoBase += insumosGlobal[item.insumo].custo_unidade * item.qtd; } else { temFaltante = true; } });
+                const perdaPerc = dados.perda_percentual || 0;
+                const cFinal = custoBase * (1 + (perdaPerc / 100));
+                const rend = dados.rendimento_kg || 1;
+
+                tbody.innerHTML += `<tr>
+                    <td data-label="Calda Base"><strong style="font-size: 1.1em; color: var(--purple);">🧪 ${prod.nome}</strong><br><span class="badge bg-calda">Calda Base</span></td>
+                    <td data-label="Análise Custos"><span class="aviso">Ingredientes: <b>${formatarMoeda(custoBase)}</b></span><span class="aviso">Com Perda (${perdaPerc}%): <b>${formatarMoeda(cFinal)}</b></span><span class="aviso" style="color:var(--primary);">Rendimento: <b>${rend} KG/L</b></span></td>
+                    <td data-label="Variáveis"><span class="aviso" style="font-style:italic;">Não vendido diretamente. Usado em outras receitas.</span></td>
+                    <td data-label="Preço Venda" class="destaque-venda" style="color:var(--purple); font-size: 1rem;">Custo Limpo (Kg/L):<br>${formatarMoeda(cFinal/rend)}</td>
+                    <td data-label="Ações"><div class="acoes-td"><button class="btn-info btn-sm" onclick="editarProduto('${prod.nome}', false)">✏️</button><button class="btn-danger btn-sm" onclick="deletarProduto('${prod.nome}')">🗑️</button></div></td>
+                </tr>`;
+                return;
+            }
+
+            if(dados.embalagens) dados.embalagens.forEach(e => { if(insumosGlobal[e.insumo]) cEmb += insumosGlobal[e.insumo].custo_unidade * e.qtd; });
+
+            if (dados.is_buffet) {
+                const p = dados.proporcoes;
+                custoBase = (mediasBuffet.sorvete * (p.sorvete/100)) + (mediasBuffet.basico * (p.basico/100)) + (mediasBuffet.premium * (p.premium/100));
+                descCustos = `<span class="badge" style="color:white; background:var(--purple); margin-bottom:5px;">ITEM DE BUFFET</span><br>`;
+                descCustos += `<span class="aviso">Composição: Sorvete ${p.sorvete}% | Básico ${p.basico}% | Premium ${p.premium}%</span>`;
+            } else {
+                dados.itens.forEach(item => { if(insumosGlobal[item.insumo]) { custoBase += insumosGlobal[item.insumo].custo_unidade * item.qtd; } else { temFaltante = true; } });
+                descCustos = `<span class="aviso">Custo Ingredientes: <b>${formatarMoeda(custoBase)}</b></span>`;
+                if(dados.rendimento_kg) descCustos += `<span class="aviso" style="color:var(--primary);">Rendimento: <b>${dados.rendimento_kg} UN/KG</b></span>`;
+            }
+
+            const perdaPerc = dados.perda_percentual || 0;
+            const custoComPerda = custoBase * (1 + (perdaPerc / 100));
+            
+            descCustos += `<span class="aviso">Custo com Perda (${perdaPerc}%): <b>${formatarMoeda(custoComPerda)}</b></span>`;
+            if(cEmb > 0) descCustos += `<span class="aviso" style="color:var(--pink);">Custo Embalagens: <b>${formatarMoeda(cEmb)}</b></span>`;
+
+            const margemUsada = (dados.margem_individual !== null && dados.margem_individual !== undefined) ? dados.margem_individual : configGlobal.margem_lucro;
+            const tipoMargem = (dados.margem_individual !== null && dados.margem_individual !== undefined) ? 'Espec.' : 'Global';
+            
+            const somaPercentuais = (margemUsada + configGlobal.impostos + configGlobal.taxas) / 100;
+            let precoFinalVenda = 0; let erroMargem = false;
+
+            if (somaPercentuais >= 1) { erroMargem = true; } else { precoFinalVenda = (custoComPerda / (1 - somaPercentuais)) + cEmb; }
+            const avisoIncompleto = temFaltante ? '<br><span class="erro" style="font-size: 0.8em;">⚠️ Insumo ausente</span>' : '';
+
+            tbody.innerHTML += `<tr>
+                <td data-label="Produto"><strong style="font-size: 1.1em; color: var(--primary);">${prod.nome}</strong>${avisoIncompleto}</td>
+                <td data-label="Análise Custos">${descCustos}</td>
+                <td data-label="Variáveis"><span class="aviso">Lucro: <b>${margemUsada}%</b> (${tipoMargem})</span><span class="aviso">Imp: <b>${configGlobal.impostos}%</b> | Taxa: <b>${configGlobal.taxas}%</b></span></td>
+                <td data-label="Preço Venda" class="destaque-venda">${erroMargem ? '<span class="erro">ERRO MARGEM</span>' : formatarMoeda(precoFinalVenda)}</td>
+                <td data-label="Ações"><div class="acoes-td"><button class="btn-info btn-sm" onclick="editarProduto('${prod.nome}', ${dados.is_buffet})">✏️ Editar</button><button class="btn-danger btn-sm" onclick="deletarProduto('${prod.nome}')">🗑️</button></div></td>
+            </tr>`;
+        });
+    }
+</script>
+</body>
+</html>
