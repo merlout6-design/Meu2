@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDV Sorveteria Gedasko</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+        }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        .modal-enter { opacity: 0; transform: scale(0.95); transition: all 0.2s ease-out; }
+        .modal-enter-active { opacity: 1; transform: scale(1); }
+
+        /* Estilos Otimizados para Impressora 58mm */
+        @media print {
+            @page {
+                margin: 0; 
+                size: 58mm auto; 
+            }
+            body {
+                background: white;
+                color: black;
+            }
+        }
+    </style>
+</head>
+<body class="bg-pink-50 h-screen overflow-hidden flex text-slate-800 selection:bg-pink-200 relative">
+
+    <div id="print-section" class="hidden print:block absolute top-0 left-0 w-[58mm] bg-white text-black font-mono z-[99999] p-[2mm]">
+        </div>
+
+    <div id="loading-overlay" class="fixed inset-0 bg-white z-50 flex flex-col items-center justify-center print:hidden">
+        <i data-lucide="ice-cream" class="w-16 h-16 text-pink-500 animate-bounce mb-4"></i>
+        <h2 class="text-xl font-semibold text-slate-700">Carregando PDV...</h2>
+        <p class="text-slate-400 mt-2">Conectando ao banco de dados</p>
+    </div>
+
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 print:hidden"></div>
+
+    <aside class="w-20 md:w-64 bg-white shadow-xl flex flex-col justify-between transition-all duration-300 z-20 relative print:hidden">
+        <div>
+            <div class="h-20 flex items-center justify-center md:justify-start md:px-6 border-b border-pink-100">
+                <div class="bg-pink-100 text-pink-600 p-2 rounded-xl">
+                    <i data-lucide="ice-cream-2" class="w-8 h-8"></i>
+                </div>
+                <h1 class="hidden md:block ml-3 font-bold text-xl text-slate-800 tracking-tight">Gedasko<span class="text-pink-500"></span></h1>
+            </div>
+            
+            <nav class="mt-6 flex flex-col gap-2 px-3">
+                <button onclick="window.switchTab('pdv')" id="nav-pdv" class="nav-btn flex items-center justify-center md:justify-start p-3 md:px-4 rounded-xl transition-colors bg-pink-50 text-pink-600 font-medium group">
+                    <i data-lucide="monitor" class="w-6 h-6 md:mr-3 group-hover:scale-110 transition-transform"></i>
+                    <span class="hidden md:block">Ponto de Venda</span>
+                </button>
+                <button onclick="window.switchTab('produtos')" id="nav-produtos" class="nav-btn flex items-center justify-center md:justify-start p-3 md:px-4 rounded-xl transition-colors text-slate-500 hover:bg-slate-50 hover:text-slate-800 font-medium group">
+                    <i data-lucide="package" class="w-6 h-6 md:mr-3 group-hover:scale-110 transition-transform"></i>
+                    <span class="hidden md:block">Estoque e Produtos</span>
+                </button>
+                <button onclick="window.switchTab('vendas')" id="nav-vendas" class="nav-btn flex items-center justify-center md:justify-start p-3 md:px-4 rounded-xl transition-colors text-slate-500 hover:bg-slate-50 hover:text-slate-800 font-medium group">
+                    <i data-lucide="bar-chart-3" class="w-6 h-6 md:mr-3 group-hover:scale-110 transition-transform"></i>
+                    <span class="hidden md:block">Vendas do Dia</span>
+                </button>
+                <button onclick="window.switchTab('config')" id="nav-config" class="nav-btn flex items-center justify-center md:justify-start p-3 md:px-4 rounded-xl transition-colors text-slate-500 hover:bg-slate-50 hover:text-slate-800 font-medium group">
+                    <i data-lucide="settings" class="w-6 h-6 md:mr-3 group-hover:scale-110 transition-transform"></i>
+                    <span class="hidden md:block">Configurações</span>
+                </button>
+            </nav>
+        </div>
+        <div class="p-4 border-t border-slate-100">
+            <div class="flex items-center justify-center md:justify-start gap-3">
+                <div class="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 font-bold overflow-hidden">
+                    <i data-lucide="user" class="w-5 h-5"></i>
+                </div>
+                <div class="hidden md:block overflow-hidden">
+                    <p class="text-sm font-semibold truncate" id="user-id-display">Usuário</p>
+                    <p class="text-xs text-green-500 flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-green-500 inline-block"></span> Online</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col relative z-10 overflow-hidden print:hidden">
+        
+        <section id="tab-pdv" class="tab-content flex-1 flex flex-col md:flex-row h-full">
+            <div class="flex-1 p-6 overflow-y-auto flex flex-col gap-6">
+                
+                <div class="flex flex-col gap-2">
+                    <div class="flex justify-between items-end">
+                        <h2 class="text-lg font-semibold text-slate-700">Ações Rápidas</h2>
+                        <span class="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded-md">Dica: Pressione <b>Enter</b> para finalizar</span>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <button onclick="window.openBuffetModal()" class="group relative overflow-hidden bg-gradient-to-br from-pink-500 to-rose-400 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col items-center justify-center gap-3 border-2 border-transparent hover:border-pink-300 text-left h-36">
+                            <div class="absolute -right-6 -top-6 text-white/20 group-hover:scale-110 transition-transform duration-500">
+                                <i data-lucide="scale" class="w-32 h-32"></i>
+                            </div>
+                            <div class="z-10 bg-white/20 p-3 rounded-full backdrop-blur-sm">
+                                <i data-lucide="scale" class="w-8 h-8 text-white"></i>
+                            </div>
+                            <div class="z-10 text-center">
+                                <span class="block font-bold text-xl drop-shadow-md">Buffet por Kg</span>
+                                <span class="block text-pink-100 text-sm mt-1" id="display-price-kg">Carregando...</span>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-4 mt-2" id="pdv-products-container">
+                    </div>
+            </div>
+
+            <div class="w-full md:w-96 bg-white shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)] border-l border-slate-100 flex flex-col h-full z-20">
+                <div class="p-5 border-b border-slate-100 bg-slate-50/50">
+                    <div class="flex justify-between items-center mb-3">
+                        <h2 class="text-xl font-bold text-slate-800">Pedido Atual</h2>
+                        <div class="flex gap-2">
+                            <button onclick="window.openOpenOrdersModal()" class="relative p-2 text-slate-500 bg-white border border-slate-200 hover:border-blue-300 hover:text-blue-500 shadow-sm rounded-lg transition-colors" title="Comandas Abertas">
+                                <i data-lucide="list-todo" class="w-5 h-5"></i>
+                                <span id="open-orders-count" class="absolute -top-2 -right-2 bg-blue-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full hidden">0</span>
+                            </button>
+                            <button onclick="window.clearCart()" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Limpar pedido">
+                                <i data-lucide="trash-2" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i data-lucide="user" class="w-4 h-4 text-slate-400"></i>
+                        </div>
+                        <input type="text" id="order-customer-name" placeholder="Nome do Cliente ou Mesa (Opcional)" class="w-full pl-9 pr-3 py-2 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition-all font-medium text-slate-700" />
+                    </div>
+                </div>
+                
+                <div id="cart-items" class="flex-1 overflow-y-auto p-4 flex flex-col gap-3"></div>
+
+                <div class="p-6 bg-slate-50 border-t border-slate-200">
+                    <div class="flex justify-between items-center mb-4">
+                        <span class="text-slate-500 font-medium">Total a Pagar</span>
+                        <span class="text-3xl font-bold text-slate-800" id="cart-total">R$ 0,00</span>
+                    </div>
+                    
+                    <button onclick="window.saveOpenOrder()" id="btn-save-order" class="w-full bg-white border border-slate-200 hover:bg-slate-100 hover:border-slate-300 text-slate-700 font-bold py-3 rounded-xl shadow-sm transition-all flex justify-center items-center gap-2 mb-3 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i data-lucide="save" class="w-5 h-5"></i>
+                        <span>Salvar na Comanda</span>
+                    </button>
+
+                    <button onclick="window.checkout()" id="btn-checkout" class="w-full bg-pink-500 hover:bg-pink-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-pink-200 transition-all transform hover:-translate-y-0.5 flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i data-lucide="check-circle" class="w-6 h-6"></i>
+                        <span>Finalizar Venda (Enter)</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <section id="tab-produtos" class="tab-content hidden h-full overflow-y-auto p-6 md:p-10 bg-slate-50">
+            <div class="max-w-6xl mx-auto">
+                <div class="flex justify-between items-end mb-8">
+                    <div>
+                        <h2 class="text-3xl font-bold text-slate-800">Estoque e Produtos</h2>
+                        <p class="text-slate-500 mt-1">Gerencie os itens da sua loja, categorias e monitore o estoque.</p>
+                    </div>
+                    <button onclick="window.openAddProductModal()" class="bg-blue-500 hover:bg-blue-600 text-white px-5 py-2.5 rounded-xl font-medium shadow-md shadow-blue-200 flex items-center gap-2 transition-colors">
+                        <i data-lucide="plus" class="w-5 h-5"></i>
+                        <span class="hidden sm:inline">Novo Produto</span>
+                    </button>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 text-slate-500 text-sm border-b border-slate-200">
+                                <th class="p-4 font-medium w-16">Img</th>
+                                <th class="p-4 font-medium">Nome do Produto</th>
+                                <th class="p-4 font-medium">Categoria</th>
+                                <th class="p-4 font-medium w-24 text-center">Estoque</th>
+                                <th class="p-4 font-medium w-32">Preço</th>
+                                <th class="p-4 font-medium w-28 text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="products-table-body" class="divide-y divide-slate-100">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section id="tab-vendas" class="tab-content hidden h-full overflow-y-auto p-6 md:p-10 bg-slate-50">
+            <div class="max-w-5xl mx-auto">
+                <div class="mb-8">
+                    <h2 class="text-3xl font-bold text-slate-800">Histórico de Vendas</h2>
+                    <p class="text-slate-500 mt-1">Acompanhe as vendas registradas.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                        <p class="text-slate-500 text-sm font-medium mb-1">Total de Vendas (Qtd)</p>
+                        <h3 class="text-3xl font-bold text-slate-800" id="stats-qty">0</h3>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                        <p class="text-slate-500 text-sm font-medium mb-1">Faturamento Total</p>
+                        <h3 class="text-3xl font-bold text-green-500" id="stats-revenue">R$ 0,00</h3>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 text-slate-500 text-sm border-b border-slate-200">
+                                <th class="p-4 font-medium">Data/Hora</th>
+                                <th class="p-4 font-medium">Cliente/Mesa</th>
+                                <th class="p-4 font-medium">Itens</th>
+                                <th class="p-4 font-medium text-right w-32">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sales-table-body" class="divide-y divide-slate-100 text-sm"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section id="tab-config" class="tab-content hidden h-full overflow-y-auto p-6 md:p-10 bg-slate-50">
+            <div class="max-w-2xl mx-auto pb-20">
+                <div class="mb-8">
+                    <h2 class="text-3xl font-bold text-slate-800">Configurações do Sistema</h2>
+                    <p class="text-slate-500 mt-1">Ajuste os valores, impressões e parâmetros da sua sorveteria.</p>
+                </div>
+
+                <form id="form-settings" onsubmit="window.saveSettings(event)">
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 mb-6">
+                        <h3 class="text-xl font-semibold text-slate-800 mb-6 flex items-center gap-2">
+                            <i data-lucide="scale" class="text-pink-500"></i> Configuração do Buffet (Kg)
+                        </h3>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Valor Cobrado por Kg (R$)</label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><span class="text-slate-400 font-medium">R$</span></div>
+                                <input type="number" step="0.01" id="price-kg-input" required class="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-pink-500 outline-none transition-all text-lg font-semibold text-slate-800">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 mb-6">
+                        <h3 class="text-xl font-semibold text-slate-800 mb-6 flex items-center gap-2">
+                            <i data-lucide="printer" class="text-slate-700"></i> Personalização do Recibo (58mm)
+                        </h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Nome do Estabelecimento</label>
+                                <input type="text" id="receipt-store-name" class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-pink-500" placeholder="Ex: Sorveteria Gedasko">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Cabeçalho Secundário</label>
+                                <input type="text" id="receipt-header" class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-pink-500" placeholder="Ex: Cupom Nao Fiscal">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Texto do "Total"</label>
+                                <input type="text" id="receipt-total-word" class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-pink-500" placeholder="Ex: TOTAL A PAGAR">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Mensagem de Rodapé</label>
+                                <input type="text" id="receipt-footer" class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-pink-500" placeholder="Ex: Obrigado pela preferencia!">
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 mt-2">
+                            <input type="checkbox" id="receipt-show-date" class="w-4 h-4 text-pink-600 rounded focus:ring-pink-500">
+                            <label for="receipt-show-date" class="text-sm font-medium text-slate-700">Imprimir Data, Hora e Num do Pedido</label>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-medium py-4 rounded-xl shadow-md transition-colors flex items-center justify-center gap-2 text-lg">
+                        <i data-lucide="save" class="w-6 h-6"></i> Salvar Todas as Configurações
+                    </button>
+                </form>
+            </div>
+        </section>
+    </main>
+
+    <div id="modal-buffet" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden flex items-center justify-center opacity-0 transition-opacity duration-200 print:hidden p-4">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden transform scale-95 transition-transform duration-200" id="modal-buffet-content">
+            <div class="p-6 bg-pink-500 text-white flex justify-between items-center">
+                <h3 class="text-xl font-bold flex items-center gap-2"><i data-lucide="scale"></i> Pesar Buffet</h3>
+                <button onclick="window.closeModals()" class="text-pink-200 hover:text-white transition-colors"><i data-lucide="x"></i></button>
+            </div>
+            <div class="p-6">
+                <form onsubmit="window.confirmBuffet(event)">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-slate-700 mb-2">Peso do Prato (em Gramas)</label>
+                        <div class="relative">
+                            <input type="number" step="1" id="weight-input" required autocomplete="off" class="w-full px-4 py-4 bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-0 focus:border-pink-500 outline-none transition-all text-2xl font-bold text-center text-slate-800" placeholder="0">
+                            <span class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">g</span>
+                        </div>
+                    </div>
+                    <div class="bg-slate-50 p-4 rounded-xl mb-6 flex justify-between items-center border border-slate-100">
+                        <span class="text-slate-500 text-sm font-medium">Valor Calculado:</span>
+                        <span class="text-xl font-bold text-pink-600" id="calculated-buffet-price">R$ 0,00</span>
+                    </div>
+                    <div class="flex gap-3">
+                        <button type="button" onclick="window.closeModals()" class="flex-1 px-4 py-3 text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl font-medium transition-colors">Cancelar</button>
+                        <button type="submit" class="flex-1 px-4 py-3 text-white bg-pink-500 hover:bg-pink-600 rounded-xl font-medium shadow-lg shadow-pink-200 transition-colors">Adicionar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-product" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden flex items-center justify-center opacity-0 transition-opacity duration-200 p-4 print:hidden">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden transform scale-95 transition-transform duration-200 flex flex-col max-h-full" id="modal-product-content">
+            <div class="p-6 bg-blue-500 text-white flex justify-between items-center shrink-0">
+                <h3 class="text-xl font-bold flex items-center gap-2" id="modal-product-title"><i data-lucide="package-plus"></i> Novo Produto</h3>
+                <button onclick="window.closeModals()" class="text-blue-200 hover:text-white transition-colors"><i data-lucide="x"></i></button>
+            </div>
+            <div class="p-6 overflow-y-auto">
+                <form onsubmit="window.saveProduct(event)">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Nome do Produto</label>
+                        <input type="text" id="prod-name-input" required class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" placeholder="Ex: Pote 2L Morango">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Categoria</label>
+                        <input type="text" id="prod-category-input" required class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" placeholder="Ex: Clássicos, Bebidas">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Preço (R$)</label>
+                            <input type="number" step="0.01" id="prod-price-input" required class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" placeholder="Ex: 25.00">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Qtd no Estoque</label>
+                            <input type="number" step="1" id="prod-stock-input" required class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" placeholder="Ex: 50">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-slate-700 mb-1">URL da Imagem (Opcional)</label>
+                        <input type="url" id="prod-image-input" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" placeholder="https://link-da-imagem.com/emblema.png">
+                    </div>
+
+                    <div class="flex gap-3">
+                        <button type="button" onclick="window.closeModals()" class="flex-1 px-4 py-3 text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl font-medium transition-colors">Cancelar</button>
+                        <button type="submit" class="flex-1 px-4 py-3 text-white bg-blue-500 hover:bg-blue-600 rounded-xl font-medium shadow-lg shadow-blue-200 transition-colors">Salvar Produto</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-open-orders" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden flex items-center justify-center opacity-0 transition-opacity duration-200 print:hidden p-4">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden transform scale-95 transition-transform duration-200 flex flex-col max-h-[80vh]" id="modal-open-orders-content">
+            <div class="p-6 bg-blue-500 text-white flex justify-between items-center shrink-0">
+                <h3 class="text-xl font-bold flex items-center gap-2"><i data-lucide="list-todo"></i> Comandas Abertas</h3>
+                <button onclick="window.closeModals()" class="text-blue-200 hover:text-white transition-colors"><i data-lucide="x"></i></button>
+            </div>
+            <div class="p-6 overflow-y-auto flex-1 flex flex-col gap-3 bg-slate-50" id="open-orders-list">
+                </div>
+        </div>
+    </div>
+
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, updateDoc, onSnapshot, addDoc, deleteDoc, serverTimestamp, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const state = {
+            user: null,
+            settings: { 
+                pricePerKg: 60.00,
+                receiptStoreName: "Sorveteria Gedasko",
+                receiptHeader: "Cupom Não Fiscal",
+                receiptTotalWord: "TOTAL",
+                receiptFooter: "Obrigado pela preferência!",
+                receiptShowDate: true
+            },
+            products: [],
+            sales: [],
+            openOrders: [], // Nova variável para armazenar as comandas
+            cart: [],
+            editingProductId: null,
+            currentOpenOrderId: null, // Identifica se o carrinho atual pertence a uma comanda salva
+            unsubscribeFuncs: []
+        };
+
+        let db, auth, appId;
+        const initFirebase = async () => {
+            try {
+                appId = typeof __app_id !== 'undefined' ? __app_id : 'Gedasko-pdv-default';
+                let firebaseConfig = null;
+                try {
+                    firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+                } catch(e) {}
+
+                if (!firebaseConfig) {
+                    firebaseConfig = {
+                        apiKey: "AIzaSyAscmck5Z_MIUb28LQNtfhUob9Xyv1Cm9Y",
+                        authDomain: "fritzza-dd4b1.firebaseapp.com",
+                        projectId: "fritzza-dd4b1",
+                        storageBucket: "fritzza-dd4b1.firebasestorage.app",
+                        messagingSenderId: "260612214754",
+                        appId: "1:260612214754:web:313a5b95bc9a470bd3b3bb",
+                    };
+                }
+
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        state.user = user;
+                        document.getElementById('user-id-display').textContent = user.uid.substring(0,8) + '...';
+                        setupRealtimeListeners();
+                        hideLoading();
+                    } else {
+                        state.user = null;
+                        clearListeners();
+                    }
+                });
+
+            } catch (error) {
+                console.error("Firebase Init Error:", error);
+                showToast("Erro ao conectar.", "error");
+            }
+        };
+
+        const hideLoading = () => {
+            const el = document.getElementById('loading-overlay');
+            el.style.opacity = '0';
+            setTimeout(() => el.style.display = 'none', 300);
+            updateDateDisplay();
+            setInterval(updateDateDisplay, 60000);
+        };
+
+        const clearListeners = () => {
+            state.unsubscribeFuncs.forEach(unsub => unsub());
+            state.unsubscribeFuncs = [];
+        };
+
+        const setupRealtimeListeners = () => {
+            if (!state.user) return;
+            clearListeners();
+            const userId = state.user.uid;
+
+            // Configurações
+            const settingsDocRef = doc(db, 'artifacts', appId, 'users', userId, 'settings', 'config');
+            const unsubSettings = onSnapshot(settingsDocRef, (docSnap) => {
+                if (docSnap.exists()) state.settings = { ...state.settings, ...docSnap.data() };
+                updateSettingsUI();
+            });
+            state.unsubscribeFuncs.push(unsubSettings);
+
+            // Produtos
+            const productsCollRef = collection(db, 'artifacts', appId, 'users', userId, 'products');
+            const unsubProducts = onSnapshot(productsCollRef, (snapshot) => {
+                state.products = snapshot.docs.map(doc => ({ id: doc.id, stock: 0, ...doc.data() }));
+                state.products.sort((a,b) => a.name.localeCompare(b.name));
+                renderProductsGrid();
+                renderProductsTable();
+            });
+            state.unsubscribeFuncs.push(unsubProducts);
+
+            // Vendas Concluídas
+            const salesCollRef = collection(db, 'artifacts', appId, 'users', userId, 'sales');
+            const unsubSales = onSnapshot(salesCollRef, (snapshot) => {
+                state.sales = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                state.sales.sort((a,b) => {
+                    const timeA = a.createdAt ? a.createdAt.toMillis() : 0;
+                    const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
+                    return timeB - timeA;
+                });
+                renderSalesTable();
+            });
+            state.unsubscribeFuncs.push(unsubSales);
+
+            // Comandas Abertas (Novo)
+            const openOrdersCollRef = collection(db, 'artifacts', appId, 'users', userId, 'openOrders');
+            const unsubOpenOrders = onSnapshot(openOrdersCollRef, (snapshot) => {
+                state.openOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                updateOpenOrdersUI();
+            });
+            state.unsubscribeFuncs.push(unsubOpenOrders);
+        };
+
+        const formatMoney = (val) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+        const formatWeight = (val) => new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 }).format(val) + ' Kg';
+        
+        const updateDateDisplay = () => {
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            const str = new Date().toLocaleDateString('pt-BR', options);
+            document.getElementById('order-date-display').textContent = str.charAt(0).toUpperCase() + str.slice(1);
+        };
+
+        window.showToast = (message, type = 'success') => {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const bgClass = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-slate-800';
+            toast.className = `${bgClass} text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 transform transition-all translate-y-10 opacity-0`;
+            toast.innerHTML = `<i data-lucide="${type === 'success' ? 'check-circle' : type === 'error' ? 'alert-circle' : 'info'}" class="w-5 h-5"></i> <span>${message}</span>`;
+            container.appendChild(toast);
+            lucide.createIcons({root: toast});
+            setTimeout(() => toast.classList.remove('translate-y-10', 'opacity-0'), 10);
+            setTimeout(() => {
+                toast.classList.add('translate-y-10', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        };
+
+        window.switchTab = (tabId) => {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+            document.querySelectorAll('.nav-btn').forEach(el => {
+                el.classList.remove('bg-pink-50', 'text-pink-600');
+                el.classList.add('text-slate-500', 'hover:bg-slate-50');
+            });
+            const activeBtn = document.getElementById(`nav-${tabId}`);
+            activeBtn.classList.remove('text-slate-500', 'hover:bg-slate-50');
+            activeBtn.classList.add('bg-pink-50', 'text-pink-600');
+        };
+
+        const updateSettingsUI = () => {
+            const p = parseFloat(state.settings.pricePerKg);
+            document.getElementById('display-price-kg').textContent = isNaN(p) ? 'R$ --' : `${formatMoney(p)} / Kg`;
+            document.getElementById('price-kg-input').value = p.toFixed(2);
+            document.getElementById('receipt-store-name').value = state.settings.receiptStoreName || '';
+            document.getElementById('receipt-header').value = state.settings.receiptHeader || '';
+            document.getElementById('receipt-total-word').value = state.settings.receiptTotalWord || '';
+            document.getElementById('receipt-footer').value = state.settings.receiptFooter || '';
+            document.getElementById('receipt-show-date').checked = state.settings.receiptShowDate !== false; 
+        };
+
+        const renderProductsGrid = () => {
+            const container = document.getElementById('pdv-products-container');
+            if(state.products.length === 0) {
+                container.innerHTML = `<div class="p-6 text-center text-slate-400 bg-white rounded-2xl border border-slate-100 border-dashed">Nenhum produto cadastrado. Vá em "Produtos".</div>`;
+                return;
+            }
+
+            const categories = [...new Set(state.products.map(p => p.category || 'Geral'))].sort();
+            container.innerHTML = categories.map(cat => {
+                const prods = state.products.filter(p => (p.category || 'Geral') === cat);
+                return `
+                    <div class="flex flex-col gap-3 mb-2">
+                        <h3 class="text-sm font-bold text-slate-400 uppercase tracking-wider pl-1">${cat}</h3>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                            ${prods.map(p => {
+                                const lowStock = p.stock <= 5;
+                                return `
+                                <button onclick="window.addFixedProductToCart('${p.id}')" class="bg-white rounded-2xl shadow-sm border border-slate-100 hover:shadow-md hover:border-pink-300 transition-all text-left flex flex-col group overflow-hidden h-44 relative">
+                                    <span class="absolute top-2 right-2 text-[10px] font-bold px-2 py-0.5 rounded-md backdrop-blur-sm z-10 shadow-sm ${lowStock ? 'bg-red-500 text-white animate-pulse' : 'bg-slate-800/80 text-white'}">
+                                        Estq: ${p.stock || 0}
+                                    </span>
+                                    ${p.imageUrl 
+                                        ? `<div class="h-24 w-full bg-cover bg-center border-b border-slate-50" style="background-image: url('${p.imageUrl}')"></div>` 
+                                        : `<div class="h-24 w-full bg-slate-50 flex items-center justify-center border-b border-slate-100"><i data-lucide="image" class="w-8 h-8 text-slate-300 group-hover:scale-110 transition-transform"></i></div>`}
+                                    <div class="p-3 flex-1 flex flex-col justify-between bg-white">
+                                        <span class="font-medium text-slate-700 text-sm leading-tight group-hover:text-pink-600 transition-colors line-clamp-2">${p.name}</span>
+                                        <span class="font-bold text-slate-800 text-lg">${formatMoney(p.price)}</span>
+                                    </div>
+                                    <div class="absolute inset-0 bg-pink-500/0 group-hover:bg-pink-500/5 transition-colors"></div>
+                                </button>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            lucide.createIcons({root: container});
+        };
+
+        const renderProductsTable = () => {
+            const tbody = document.getElementById('products-table-body');
+            if(state.products.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-400">Nenhum produto cadastrado.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = state.products.map(p => {
+                const lowStock = p.stock <= 5;
+                return `
+                <tr class="hover:bg-slate-50 transition-colors group">
+                    <td class="p-4">
+                        ${p.imageUrl ? `<img src="${p.imageUrl}" class="w-10 h-10 rounded-lg object-cover border border-slate-200">` : `<div class="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center"><i data-lucide="image" class="w-5 h-5 text-slate-400"></i></div>`}
+                    </td>
+                    <td class="p-4 text-slate-800 font-medium">${p.name}</td>
+                    <td class="p-4"><span class="px-2 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-medium">${p.category || 'Geral'}</span></td>
+                    <td class="p-4 text-center">
+                        <span class="px-2 py-1 rounded-lg text-xs font-bold ${lowStock ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}">${p.stock || 0} un</span>
+                    </td>
+                    <td class="p-4 text-slate-600">${formatMoney(p.price)}</td>
+                    <td class="p-4 flex justify-center gap-2">
+                        <button onclick="window.openAddProductModal('${p.id}')" class="text-slate-400 hover:text-blue-500 p-2 rounded-lg hover:bg-blue-50 transition-colors opacity-0 group-hover:opacity-100" title="Editar"><i data-lucide="edit" class="w-5 h-5"></i></button>
+                        <button onclick="window.deleteProduct('${p.id}')" class="text-slate-400 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100" title="Excluir"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
+                    </td>
+                </tr>
+            `}).join('');
+            lucide.createIcons({root: tbody});
+        };
+
+        const renderSalesTable = () => {
+            const tbody = document.getElementById('sales-table-body');
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            
+            let totalQty = 0;
+            let totalRevenue = 0;
+
+            state.sales.forEach(s => {
+                const sDate = s.createdAt ? s.createdAt.toDate() : new Date();
+                if(sDate >= today) {
+                    totalQty++;
+                    totalRevenue += s.total;
+                }
+            });
+
+            document.getElementById('stats-qty').textContent = totalQty;
+            document.getElementById('stats-revenue').textContent = formatMoney(totalRevenue);
+
+            if(state.sales.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-slate-400">Nenhuma venda registrada.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = state.sales.map(s => {
+                const dateObj = s.createdAt ? s.createdAt.toDate() : new Date();
+                const dateStr = dateObj.toLocaleDateString('pt-BR') + ' ' + dateObj.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+                const itemsStr = s.items.map(i => `${i.qty}x ${i.name}`).join(', ');
+                return `
+                <tr class="hover:bg-slate-50 transition-colors">
+                    <td class="p-4 text-slate-600">${dateStr}</td>
+                    <td class="p-4 text-slate-800 font-medium">${s.customerName || '-'}</td>
+                    <td class="p-4 text-slate-500 max-w-xs truncate" title="${itemsStr}">${itemsStr}</td>
+                    <td class="p-4 text-slate-800 font-bold text-right">${formatMoney(s.total)}</td>
+                </tr>
+            `}).join('');
+        };
+
+        // --- SISTEMA DE COMANDAS (NOVO) ---
+        const updateOpenOrdersUI = () => {
+            const badge = document.getElementById('open-orders-count');
+            if(state.openOrders.length > 0) {
+                badge.textContent = state.openOrders.length;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+            
+            // Se o modal estiver aberto, atualiza a lista de comandas ao vivo
+            if(!document.getElementById('modal-open-orders').classList.contains('hidden')) {
+                window.openOpenOrdersModal(); 
+            }
+        };
+
+        window.openOpenOrdersModal = () => {
+            const listEl = document.getElementById('open-orders-list');
+            if (state.openOrders.length === 0) {
+                listEl.innerHTML = `<div class="text-center text-slate-400 py-10 flex flex-col items-center"><i data-lucide="inbox" class="w-12 h-12 mb-3 opacity-50"></i><p>Nenhuma comanda aberta.</p></div>`;
+            } else {
+                listEl.innerHTML = state.openOrders.map(order => {
+                    const isCurrent = order.id === state.currentOpenOrderId;
+                    const dateStr = order.updatedAt ? order.updatedAt.toDate().toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}) : '';
+                    return `
+                    <div class="border ${isCurrent ? 'border-blue-400 bg-blue-50' : 'border-slate-200 bg-white'} rounded-xl p-4 flex justify-between items-center shadow-sm">
+                        <div>
+                            <h4 class="font-bold text-slate-800 text-lg">${order.customerName || 'Sem Nome'} ${isCurrent ? '<span class="text-[10px] bg-blue-500 text-white px-2 py-0.5 rounded-full ml-2 align-middle">Atual</span>' : ''}</h4>
+                            <p class="text-xs text-slate-500 mt-1">${order.items.length} itens • Atualizado às ${dateStr}</p>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <span class="font-bold text-slate-800 text-lg">${formatMoney(order.total)}</span>
+                            <div class="flex gap-2">
+                                ${!isCurrent ? `<button onclick="window.loadOpenOrder('${order.id}')" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg font-medium text-sm transition-colors shadow-sm">Abrir</button>` : ''}
+                                <button onclick="window.deleteOpenOrder('${order.id}')" class="bg-slate-100 hover:bg-red-100 text-slate-400 hover:text-red-500 px-3 py-2 rounded-lg transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                    `;
+                }).join('');
+            }
+            lucide.createIcons({root: listEl});
+            toggleModal('modal-open-orders', true);
+        };
+
+        window.saveOpenOrder = async () => {
+            if(!state.user || state.cart.length === 0) return;
+            const nameInput = document.getElementById('order-customer-name');
+            let name = nameInput.value.trim();
+            
+            if(!name) {
+                name = prompt("Digite o nome do cliente ou número da mesa para identificar a comanda:");
+                if(!name) return; // Cancela se não digitar nada
+                nameInput.value = name;
+            }
+
+            const total = state.cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
+            
+            const btn = document.getElementById('btn-save-order');
+            btn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i> Salvando...';
+            lucide.createIcons({root: btn});
+
+            try {
+                if (state.currentOpenOrderId) {
+                    // Atualiza a comanda existente
+                    const docRef = doc(db, 'artifacts', appId, 'users', state.user.uid, 'openOrders', state.currentOpenOrderId);
+                    await updateDoc(docRef, { items: state.cart, customerName: name, total, updatedAt: serverTimestamp() });
+                    showToast("Comanda atualizada com sucesso!");
+                } else {
+                    // Cria uma nova comanda
+                    const collRef = collection(db, 'artifacts', appId, 'users', state.user.uid, 'openOrders');
+                    await addDoc(collRef, { items: state.cart, customerName: name, total, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+                    showToast("Comanda salva e deixada em aberto!");
+                }
+                
+                // Limpa o carrinho para o próximo cliente
+                state.cart = [];
+                state.currentOpenOrderId = null;
+                nameInput.value = '';
+                renderCart();
+            } catch(error) {
+                console.error(error);
+                showToast("Erro ao salvar comanda", "error");
+            } finally {
+                btn.innerHTML = '<i data-lucide="save" class="w-5 h-5"></i> <span>Salvar na Comanda</span>';
+                lucide.createIcons({root: btn});
+            }
+        };
+
+        window.loadOpenOrder = (id) => {
+            const order = state.openOrders.find(o => o.id === id);
+            if(!order) return;
+            
+            if(state.cart.length > 0 && !confirm("O pedido que está no carrinho atualmente será apagado para abrir esta comanda. Deseja continuar?")) return;
+
+            state.cart = [...order.items];
+            state.currentOpenOrderId = id;
+            document.getElementById('order-customer-name').value = order.customerName || '';
+            renderCart();
+            window.closeModals();
+            showToast(`Comanda de ${order.customerName || 'Sem Nome'} aberta.`);
+        };
+
+        window.deleteOpenOrder = async (id) => {
+            if(!confirm("Tem certeza que deseja excluir esta comanda permanentemente?")) return;
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'users', state.user.uid, 'openOrders', id);
+                await deleteDoc(docRef);
+                
+                // Se a comanda excluída for a que está ativa na tela, limpa a tela
+                if(state.currentOpenOrderId === id) {
+                    state.currentOpenOrderId = null;
+                    state.cart = [];
+                    document.getElementById('order-customer-name').value = '';
+                    renderCart();
+                }
+                showToast("Comanda excluída com sucesso.");
+            } catch(error) { 
+                showToast("Erro ao excluir", "error"); 
+            }
+        };
+
+        // --- ATUALIZAÇÕES DO CARRINHO ---
+        const renderCart = () => {
+            const container = document.getElementById('cart-items');
+            const totalEl = document.getElementById('cart-total');
+            const btnCheckout = document.getElementById('btn-checkout');
+            const btnSaveOrder = document.getElementById('btn-save-order');
+
+            if (state.cart.length === 0) {
+                container.innerHTML = `<div class="h-full flex flex-col items-center justify-center text-slate-300"><i data-lucide="shopping-bag" class="w-16 h-16 mb-4"></i><p class="font-medium">O pedido está vazio</p></div>`;
+                totalEl.textContent = 'R$ 0,00';
+                btnCheckout.disabled = true;
+                btnSaveOrder.disabled = true;
+                lucide.createIcons({root: container});
+                return;
+            }
+
+            let total = 0;
+            container.innerHTML = state.cart.map((item, index) => {
+                const lineTotal = item.price * item.qty;
+                total += lineTotal;
+                const isBuffet = item.type === 'buffet';
+                let subtext = isBuffet ? formatWeight(item.weight) : `${formatMoney(item.price)} un`;
+
+                return `
+                <div class="bg-white border border-slate-100 p-3 rounded-xl shadow-sm flex justify-between items-center group relative overflow-hidden">
+                    <div class="flex-1 pr-2">
+                        <h4 class="font-semibold text-slate-800 text-sm leading-tight">${item.name}</h4>
+                        <p class="text-xs text-slate-400 mt-0.5">${subtext}</p>
+                        <div class="flex items-center gap-1 mt-2 bg-slate-50 w-max rounded-lg border border-slate-100 p-0.5">
+                            <button onclick="window.updateCartQty(${index}, -1)" class="w-7 h-7 flex items-center justify-center rounded text-slate-500 hover:bg-slate-200 transition-colors"><i data-lucide="minus" class="w-3 h-3"></i></button>
+                            <span class="text-xs font-bold w-6 text-center text-slate-700">${item.qty}</span>
+                            <button onclick="window.updateCartQty(${index}, 1)" class="w-7 h-7 flex items-center justify-center rounded text-slate-500 hover:bg-slate-200 transition-colors"><i data-lucide="plus" class="w-3 h-3"></i></button>
+                        </div>
+                    </div>
+                    <div class="text-right flex flex-col items-end justify-between h-full py-1 gap-4">
+                        <button onclick="window.removeFromCart(${index})" class="text-slate-300 hover:text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors" title="Remover Item"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        <span class="font-bold text-slate-800">${formatMoney(lineTotal)}</span>
+                    </div>
+                </div>
+                `;
+            }).join('');
+            
+            totalEl.textContent = formatMoney(total);
+            btnCheckout.disabled = false;
+            btnSaveOrder.disabled = false;
+            lucide.createIcons({root: container});
+            container.scrollTop = container.scrollHeight;
+        };
+
+        window.addFixedProductToCart = (productId) => {
+            const product = state.products.find(p => p.id === productId);
+            if (!product) return;
+
+            const existingIndex = state.cart.findIndex(i => i.id === productId && i.type !== 'buffet');
+            if (existingIndex >= 0) {
+                state.cart[existingIndex].qty += 1;
+            } else {
+                state.cart.push({ id: product.id, name: product.name, price: parseFloat(product.price), qty: 1, type: 'fixed' });
+            }
+            renderCart();
+        };
+
+        window.updateCartQty = (index, delta) => {
+            const newQty = state.cart[index].qty + delta;
+            if (newQty <= 0) window.removeFromCart(index);
+            else { state.cart[index].qty = newQty; renderCart(); }
+        };
+
+        window.removeFromCart = (index) => { state.cart.splice(index, 1); renderCart(); };
+        
+        window.clearCart = () => { 
+            if(state.cart.length > 0 && confirm("Limpar o pedido atual?")) { 
+                state.cart = []; 
+                state.currentOpenOrderId = null;
+                document.getElementById('order-customer-name').value = '';
+                renderCart(); 
+            } 
+        };
+
+        window.checkout = async () => {
+            if(!state.user || state.cart.length === 0) return;
+            
+            const btn = document.getElementById('btn-checkout');
+            btn.disabled = true;
+            btn.innerHTML = '<i data-lucide="loader-2" class="w-6 h-6 animate-spin"></i> Registrando...';
+            lucide.createIcons({root: btn});
+
+            const total = state.cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
+            const cartSnapshot = [...state.cart]; 
+            const dateOfSale = new Date();
+            const receiptId = Math.floor(100000 + Math.random() * 900000); 
+            const customerName = document.getElementById('order-customer-name').value.trim();
+            
+            try {
+                // 1. Registrar a Venda
+                const salesRef = collection(db, 'artifacts', appId, 'users', state.user.uid, 'sales');
+                await addDoc(salesRef, { items: state.cart, total: total, customerName: customerName, createdAt: serverTimestamp(), receiptId: receiptId });
+                
+                // 2. Deduzir do Estoque
+                const updatePromises = [];
+                state.cart.forEach(item => {
+                    if (item.type === 'fixed') {
+                        const productRef = doc(db, 'artifacts', appId, 'users', state.user.uid, 'products', item.id);
+                        updatePromises.push(updateDoc(productRef, { stock: increment(-item.qty) }));
+                    }
+                });
+                
+                // 3. Se era uma comanda em aberto, remove ela do banco (pois foi finalizada e paga)
+                if (state.currentOpenOrderId) {
+                    const openOrderRef = doc(db, 'artifacts', appId, 'users', state.user.uid, 'openOrders', state.currentOpenOrderId);
+                    updatePromises.push(deleteDoc(openOrderRef));
+                }
+
+                await Promise.all(updatePromises);
+
+                showToast("Venda finalizada com sucesso!");
+                state.cart = [];
+                state.currentOpenOrderId = null;
+                document.getElementById('order-customer-name').value = '';
+                renderCart();
+
+                // 4. Imprimir Recibo
+                window.printReceipt(cartSnapshot, total, dateOfSale, receiptId, customerName);
+                
+            } catch (error) {
+                console.error("Checkout Error:", error);
+                showToast("Erro ao finalizar venda.", "error");
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i data-lucide="check-circle" class="w-6 h-6"></i> <span>Finalizar Venda (Enter)</span>';
+                lucide.createIcons({root: btn});
+            }
+        };
+
+        // --- IMPRESSÃO DE RECIBO ---
+        window.printReceipt = (cart, total, dateObj, receiptId, customerName) => {
+            const s = state.settings;
+            const pSection = document.getElementById('print-section');
+
+            const itemsHtml = cart.map(item => {
+                const subtext = item.type === 'buffet' ? formatWeight(item.weight) : `${item.qty} un x ${formatMoney(item.price)}`;
+                const lineTotal = item.price * item.qty;
+                return `
+                    <div style="margin-bottom: 8px; font-size: 14px; font-weight: 900; line-height: 1.2;">
+                        <div style="text-align: left;">${item.name}</div>
+                        <div style="display: flex; justify-content: space-between; font-size: 12px; margin-top: 2px;">
+                            <span>${subtext}</span>
+                            <span>${formatMoney(lineTotal)}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            const dateStr = s.receiptShowDate !== false 
+                ? `<div style="font-size: 12px; font-weight: bold; margin-bottom: 5px;">Pedido: #${receiptId}<br>Data: ${dateObj.toLocaleString('pt-BR')}</div><div style="border-bottom: 2px dashed #000; margin-bottom: 8px;"></div>` 
+                : '';
+                
+            const customerStr = customerName 
+                ? `<div style="font-size: 14px; font-weight: 900; margin-bottom: 5px; text-transform: uppercase;">Cliente: ${customerName}</div><div style="border-bottom: 2px dashed #000; margin-bottom: 8px;"></div>` 
+                : '';
+
+            pSection.innerHTML = `
+                <div style="text-align: center; margin-bottom: 10px;">
+                    <h2 style="margin: 0; font-size: 18px; font-weight: 900; text-transform: uppercase;">${s.receiptStoreName || 'SORVETERIA'}</h2>
+                    ${s.receiptHeader ? `<div style="font-size: 12px; font-weight: bold; margin-top: 2px;">${s.receiptHeader}</div>` : ''}
+                </div>
+                
+                <div style="border-bottom: 2px dashed #000; margin-bottom: 8px;"></div>
+                ${dateStr}
+                ${customerStr}
+                
+                <div style="margin-bottom: 15px;">
+                    ${itemsHtml}
+                </div>
+                
+                <div style="border-bottom: 2px dashed #000; margin-bottom: 8px;"></div>
+                <div style="display: flex; justify-content: space-between; font-weight: 900; font-size: 16px; margin-bottom: 15px;">
+                    <span>${s.receiptTotalWord || 'TOTAL'}</span>
+                    <span>${formatMoney(total)}</span>
+                </div>
+                
+                <div style="text-align: center; font-size: 12px; font-weight: bold; margin-top: 10px;">
+                    ${s.receiptFooter || 'Obrigado pela preferencia!'}
+                </div>
+
+                <div style="height: 8mm;"></div>
+				<div style="text-align: center; font-size: 8px;">.</div>
+            `;
+
+            window.print();
+        };
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const tagName = document.activeElement.tagName;
+                if (['INPUT', 'TEXTAREA', 'BUTTON'].includes(tagName)) {
+                    // Se o usuário apertar Enter enquanto digita o nome, apenas tira o foco do input
+                    if(document.activeElement.id === 'order-customer-name') {
+                        document.activeElement.blur();
+                    }
+                    return; 
+                }
+                
+                const buffetModal = document.getElementById('modal-buffet');
+                const productModal = document.getElementById('modal-product');
+                const openOrdersModal = document.getElementById('modal-open-orders');
+                
+                if (!buffetModal.classList.contains('hidden') || !productModal.classList.contains('hidden') || !openOrdersModal.classList.contains('hidden')) return; 
+
+                if (state.cart.length > 0 && !document.getElementById('btn-checkout').disabled) {
+                    e.preventDefault(); 
+                    window.checkout();
+                }
+            }
+        });
+
+        const toggleModal = (modalId, show) => {
+            const el = document.getElementById(modalId);
+            const content = document.getElementById(`${modalId}-content`);
+            if (show) {
+                el.classList.remove('hidden');
+                void el.offsetWidth;
+                el.classList.remove('opacity-0');
+                content.classList.remove('scale-95');
+            } else {
+                el.classList.add('opacity-0');
+                content.classList.add('scale-95');
+                setTimeout(() => el.classList.add('hidden'), 200);
+            }
+        };
+
+        window.closeModals = () => { 
+            toggleModal('modal-buffet', false); 
+            toggleModal('modal-product', false); 
+            toggleModal('modal-open-orders', false); 
+            state.editingProductId = null; 
+        };
+
+        window.openBuffetModal = () => {
+            document.getElementById('weight-input').value = '';
+            document.getElementById('calculated-buffet-price').textContent = 'R$ 0,00';
+            toggleModal('modal-buffet', true);
+            setTimeout(() => document.getElementById('weight-input').focus(), 100);
+        };
+
+        const updateCalculatedPrice = () => {
+            const val = parseFloat(document.getElementById('weight-input').value);
+            if (isNaN(val) || val <= 0) { document.getElementById('calculated-buffet-price').textContent = 'R$ 0,00'; return; }
+            let weightInKg = val / 1000;
+            const price = weightInKg * parseFloat(state.settings.pricePerKg);
+            document.getElementById('calculated-buffet-price').textContent = formatMoney(price);
+        };
+        document.getElementById('weight-input').addEventListener('input', updateCalculatedPrice);
+
+        window.confirmBuffet = (e) => {
+            e.preventDefault();
+            const val = parseFloat(document.getElementById('weight-input').value);
+            if(isNaN(val) || val <= 0) return;
+            let weightInKg = val / 1000;
+            const price = weightInKg * parseFloat(state.settings.pricePerKg);
+            state.cart.push({ id: 'buffet_' + Date.now(), name: 'Buffet Sorvete', price: price, weight: weightInKg, qty: 1, type: 'buffet' });
+            renderCart();
+            window.closeModals();
+        };
+
+        window.openAddProductModal = (id = null) => {
+            state.editingProductId = id;
+            const titleEl = document.getElementById('modal-product-title');
+            if (id) {
+                const p = state.products.find(x => x.id === id);
+                document.getElementById('prod-name-input').value = p.name;
+                document.getElementById('prod-category-input').value = p.category || '';
+                document.getElementById('prod-price-input').value = p.price;
+                document.getElementById('prod-stock-input').value = p.stock || 0;
+                document.getElementById('prod-image-input').value = p.imageUrl || '';
+                titleEl.innerHTML = '<i data-lucide="edit"></i> Editar Produto';
+            } else {
+                document.getElementById('prod-name-input').value = '';
+                document.getElementById('prod-category-input').value = '';
+                document.getElementById('prod-price-input').value = '';
+                document.getElementById('prod-stock-input').value = '';
+                document.getElementById('prod-image-input').value = '';
+                titleEl.innerHTML = '<i data-lucide="package-plus"></i> Novo Produto';
+            }
+            toggleModal('modal-product', true);
+            lucide.createIcons();
+            setTimeout(() => document.getElementById('prod-name-input').focus(), 100);
+        };
+
+        window.saveProduct = async (e) => {
+            e.preventDefault();
+            if(!state.user) return;
+
+            const name = document.getElementById('prod-name-input').value.trim();
+            const category = document.getElementById('prod-category-input').value.trim();
+            const price = parseFloat(document.getElementById('prod-price-input').value);
+            const stock = parseInt(document.getElementById('prod-stock-input').value) || 0;
+            const imageUrl = document.getElementById('prod-image-input').value.trim();
+
+            if(!name || isNaN(price) || price < 0 || !category) return;
+            const data = { name, category, price, stock, imageUrl };
+
+            try {
+                if (state.editingProductId) {
+                    const docRef = doc(db, 'artifacts', appId, 'users', state.user.uid, 'products', state.editingProductId);
+                    await updateDoc(docRef, data);
+                    showToast("Produto atualizado com sucesso!");
+                } else {
+                    data.createdAt = serverTimestamp();
+                    const prodRef = collection(db, 'artifacts', appId, 'users', state.user.uid, 'products');
+                    await addDoc(prodRef, data);
+                    showToast("Produto adicionado com sucesso!");
+                }
+                window.closeModals();
+            } catch (error) { showToast("Erro ao salvar produto.", "error"); }
+        };
+
+        window.deleteProduct = async (id) => {
+            if(!state.user || !confirm("Tem certeza que deseja excluir este produto?")) return;
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'users', state.user.uid, 'products', id);
+                await deleteDoc(docRef);
+                showToast("Produto excluído.");
+            } catch (error) { showToast("Erro ao excluir produto.", "error"); }
+        };
+
+        window.saveSettings = async (e) => {
+            e.preventDefault();
+            if(!state.user) return;
+            const price = parseFloat(document.getElementById('price-kg-input').value);
+            if(isNaN(price) || price < 0) return;
+
+            const settingsToSave = {
+                pricePerKg: price,
+                receiptStoreName: document.getElementById('receipt-store-name').value.trim(),
+                receiptHeader: document.getElementById('receipt-header').value.trim(),
+                receiptTotalWord: document.getElementById('receipt-total-word').value.trim(),
+                receiptFooter: document.getElementById('receipt-footer').value.trim(),
+                receiptShowDate: document.getElementById('receipt-show-date').checked
+            };
+
+            const btn = e.target.querySelector('button[type="submit"]');
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<i data-lucide="loader-2" class="w-6 h-6 animate-spin"></i> Salvando...';
+            lucide.createIcons({root: btn});
+
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'users', state.user.uid, 'settings', 'config');
+                await setDoc(docRef, settingsToSave, { merge: true });
+                showToast("Configurações salvas com sucesso!");
+            } catch (error) { showToast("Erro ao salvar configurações.", "error"); } 
+            finally { btn.innerHTML = originalHtml; lucide.createIcons({root: btn}); }
+        };
+
+        lucide.createIcons();
+        initFirebase();
+    </script>
+</body>
+</html>
