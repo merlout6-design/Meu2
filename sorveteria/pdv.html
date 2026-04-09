@@ -618,11 +618,20 @@
                 onAuthStateChanged(auth, (user) => {
                     const loginOverlay = document.getElementById('login-overlay');
                     if (user) {
+                        // Se o navegador lembrar do usuário anônimo antigo, força ele a sair
+                        if (user.isAnonymous) {
+                            signOut(auth);
+                            return; // Para o código aqui e espera ele deslogar
+                        }
+
                         // Usuário Logado: Esconde a tela de login e puxa os dados
                         loginOverlay.style.display = 'none';
                         state.user = user;
-                        // Mostra o e-mail no menu lateral em vez do ID anônimo
-                        document.getElementById('user-id-display').textContent = user.email.split('@')[0];
+                        
+                        // Mostra o e-mail no menu lateral (com uma segurança extra caso dê erro)
+                        const displayEmail = user.email ? user.email.split('@')[0] : 'Admin';
+                        document.getElementById('user-id-display').textContent = displayEmail;
+                        
                         setupRealtimeListeners();
                         hideLoading();
                     } else {
