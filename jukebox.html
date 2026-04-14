@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Jukebox Gedasko Premium</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        /* TEMA ESCURO ESTILO SPOTIFY COM ROSA GEDASKO */
+        :root {
+            --bg-color: #121212;
+            --bg-card: #181818;
+            --bg-hover: #282828;
+            --primary: #D81B60; /* Rosa Gedasko */
+            --text-main: #FFFFFF;
+            --text-muted: #B3B3B3;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            padding-bottom: 80px; /* Espaço pro player falso embaixo */
+        }
+
+        /* HEADER */
+        header {
+            background: linear-gradient(180deg, rgba(216,27,96,0.3) 0%, rgba(18,18,18,1) 100%);
+            padding: 40px 20px 20px;
+            text-align: center;
+        }
+        header h1 { font-size: 28px; font-weight: 700; margin-bottom: 5px; }
+        header p { color: var(--text-muted); font-size: 14px; }
+
+        /* BARRA DE PESQUISA */
+        .search-container {
+            padding: 0 20px;
+            margin-top: 10px;
+            position: sticky;
+            top: 10px;
+            z-index: 100;
+        }
+        .search-box {
+            background-color: #242424;
+            border-radius: 50px;
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
+            border: 2px solid transparent;
+            transition: 0.3s;
+        }
+        .search-box:focus-within { border-color: var(--primary); }
+        .search-box input {
+            background: transparent;
+            border: none;
+            color: white;
+            font-size: 16px;
+            width: 100%;
+            outline: none;
+            margin-left: 10px;
+        }
+
+        /* SESSÕES */
+        .section-title {
+            padding: 25px 20px 15px;
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        /* RESULTADOS DA PESQUISA */
+        .resultados-grid {
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .track-card {
+            display: flex;
+            align-items: center;
+            background-color: var(--bg-card);
+            border-radius: 8px;
+            padding: 10px;
+            transition: 0.2s;
+            cursor: pointer;
+        }
+        .track-card:hover { background-color: var(--bg-hover); }
+        .track-card img {
+            width: 50px;
+            height: 50px;
+            border-radius: 4px;
+            margin-right: 15px;
+        }
+        .track-info { flex: 1; overflow: hidden; }
+        .track-title { font-size: 15px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .track-artist { font-size: 13px; color: var(--text-muted); }
+        .add-btn {
+            background: transparent;
+            border: 1px solid var(--text-muted);
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .track-card:hover .add-btn { border-color: white; }
+
+        /* FILA DE REPRODUÇÃO (HISTÓRICO) */
+        .fila-container {
+            padding: 0 20px;
+        }
+        .fila-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+            opacity: 0.8;
+        }
+        .fila-item img {
+            width: 40px; height: 40px; border-radius: 50%; margin-right: 15px;
+        }
+        .fila-item .track-title { font-size: 14px; color: var(--primary); }
+
+        /* LOADER E MENSAGENS */
+        .loader { text-align: center; color: var(--text-muted); padding: 20px; display: none; }
+        
+        /* TOAST NOTIFICATION */
+        #toast {
+            position: fixed; bottom: -60px; left: 50%; transform: translateX(-50%);
+            background: var(--primary); color: white; padding: 12px 24px;
+            border-radius: 50px; font-weight: 500; transition: 0.4s; z-index: 1000;
+        }
+        #toast.show { bottom: 30px; }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🎵 Jukebox Gedasko</h1>
+        <p>A trilha sonora da sorveteria é você quem faz!</p>
+    </header>
+
+    <div class="search-container">
+        <div class="search-box">
+            <span>🔍</span>
+            <input type="text" id="searchInput" placeholder="Qual música quer ouvir?" autocomplete="off">
+        </div>
+    </div>
+
+    <div id="resultadosSection" style="display: none;">
+        <h2 class="section-title">Resultados da Pesquisa</h2>
+        <div id="loader" class="loader">Buscando músicas... ⏳</div>
+        <div class="resultados-grid" id="resultadosGrid"></div>
+    </div>
+
+    <div>
+        <h2 class="section-title">Últimos Pedidos da Galera 🎧</h2>
+        <div class="fila-container" id="filaContainer">
+            <p style="color: gray; font-size: 13px;">Nenhum pedido recente.</p>
+        </div>
+    </div>
+
+    <div id="toast">✅ Música adicionada à fila!</div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getDatabase, ref, push, onValue, query, limitToLast } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+
+        // ⚠️ ATENÇÃO: COLOQUE A URL DO SEU FIREBASE AQUI ⚠️
+        const firebaseConfig = {
+            databaseURL: "https://frizza2-79ec2-default-rtdb.firebaseio.com/"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // Elementos da UI
+        const searchInput = document.getElementById('searchInput');
+        const resultadosGrid = document.getElementById('resultadosGrid');
+        const resultadosSection = document.getElementById('resultadosSection');
+        const loader = document.getElementById('loader');
+        const toast = document.getElementById('toast');
+        const filaContainer = document.getElementById('filaContainer');
+
+        let debounceTimer;
+
+        // Função de Pesquisa usando API pública do iTunes (Gera as capinhas)
+        searchInput.addEventListener('input', (e) => {
+            const termo = e.target.value.trim();
+            clearTimeout(debounceTimer);
+            
+            if(termo === '') {
+                resultadosSection.style.display = 'none';
+                return;
+            }
+
+            resultadosSection.style.display = 'block';
+            loader.style.display = 'block';
+            resultadosGrid.innerHTML = '';
+
+            debounceTimer = setTimeout(async () => {
+                try {
+                    const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(termo)}&entity=song&limit=6`);
+                    const data = await res.json();
+                    renderizarResultados(data.results);
+                } catch (error) {
+                    loader.innerText = "Erro ao buscar música.";
+                }
+            }, 600); // Espera o usuário parar de digitar por meio segundo
+        });
+
+        // Monta a tela de resultados
+        function renderizarResultados(musicas) {
+            loader.style.display = 'none';
+            resultadosGrid.innerHTML = '';
+
+            if(musicas.length === 0) {
+                resultadosGrid.innerHTML = '<p style="color:gray; text-align:center;">Nenhuma música encontrada.</p>';
+                return;
+            }
+
+            musicas.forEach(musica => {
+                const imagem = musica.artworkUrl100.replace('100x100', '150x150'); // Pega imagem maior
+                const titulo = musica.trackName;
+                const artista = musica.artistName;
+
+                const card = document.createElement('div');
+                card.className = 'track-card';
+                card.innerHTML = `
+                    <img src="${imagem}" alt="${titulo}">
+                    <div class="track-info">
+                        <div class="track-title">${titulo}</div>
+                        <div class="track-artist">${artista}</div>
+                    </div>
+                    <div class="add-btn">+</div>
+                `;
+
+                // Evento de Clique para pedir a música
+                card.onclick = () => enviarPedido(titulo, artista, imagem);
+                resultadosGrid.appendChild(card);
+            });
+        }
+
+        // Função que envia o pedido para o Firebase
+        function enviarPedido(titulo, artista, imagemUrl) {
+            const termoParaO_Python = `${titulo} ${artista}`; // Como o Python vai pesquisar no Spotify
+
+            // 1. Envia para a fila que o Python lê (pedidos_jukebox)
+            push(ref(db, 'pedidos_jukebox'), { busca: termoParaO_Python });
+
+            // 2. Envia para a fila visual de histórico do HTML (historico_jukebox)
+            push(ref(db, 'historico_jukebox'), {
+                titulo: titulo,
+                artista: artista,
+                imagem: imagemUrl,
+                timestamp: Date.now()
+            });
+
+            // Mostra notificação, limpa a tela de pesquisa e volta a tela ao normal
+            mostrarToast();
+            searchInput.value = '';
+            resultadosSection.style.display = 'none';
+        }
+
+        function mostrarToast() {
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        // Sincronizar Fila de Reprodução (Lê os últimos 5 pedidos do Firebase)
+        const historicoRef = query(ref(db, 'historico_jukebox'), limitToLast(5));
+        
+        onValue(historicoRef, (snapshot) => {
+            if (snapshot.exists()) {
+                filaContainer.innerHTML = '';
+                // O Firebase retorna em ordem de ID, precisamos inverter para mostrar o mais novo primeiro
+                const historicoArray = [];
+                snapshot.forEach(child => { historicoArray.push(child.val()); });
+                
+                historicoArray.reverse().forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'fila-item';
+                    div.innerHTML = `
+                        <img src="${item.imagem}" alt="Capa">
+                        <div class="track-info">
+                            <div class="track-title">${item.titulo}</div>
+                            <div class="track-artist">${item.artista}</div>
+                        </div>
+                    `;
+                    filaContainer.appendChild(div);
+                });
+            }
+        });
+    </script>
+</body>
+</html>
