@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel do Gerente - Gedasko</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #f4f4f9;
+            --primary: #D81B60;
+            --danger: #d32f2f;
+            --warning: #f57c00;
+            --success: #4CAF50;
+            --info: #2196F3;
+            --text-main: #333;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-main); padding: 20px; padding-bottom: 50px; }
+
+        header { text-align: center; margin-bottom: 20px; }
+        header h1 { color: var(--primary); font-size: 24px; }
+
+        #statusConexao {
+            text-align: center; font-size: 12px; font-weight: bold;
+            padding: 8px; margin-bottom: 20px; border-radius: 20px;
+            background-color: #ffebee; color: #c62828; transition: 0.3s;
+        }
+        .conectado { background-color: #e8f5e9 !important; color: #2e7d32 !important; }
+
+        .btn-panico {
+            display: block; width: 100%; max-width: 450px; margin: 0 auto 10px;
+            color: white; border: none; padding: 15px; border-radius: 12px;
+            font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s;
+        }
+        .btn-pular { background-color: var(--danger); box-shadow: 0 4px 10px rgba(211, 47, 47, 0.2); }
+        .btn-propaganda { background-color: #9C27B0; box-shadow: 0 4px 10px rgba(156, 39, 176, 0.2); }
+        .btn-panico:active { transform: scale(0.98); }
+
+        .container { 
+            max-width: 600px; margin: 0 auto 20px; background: white; 
+            padding: 20px; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); 
+        }
+        .section-title { 
+            font-size: 18px; margin-bottom: 15px; border-bottom: 2px solid #eee; 
+            padding-bottom: 8px; font-weight: 700; display: flex; align-items: center; gap: 8px;
+        }
+        
+        .card-item { 
+            display: flex; justify-content: space-between; align-items: center; 
+            background: #fafafa; padding: 12px 15px; border-radius: 8px; 
+            margin-bottom: 8px; font-size: 14px; transition: 0.2s;
+        }
+        
+        .border-fila { border-left: 5px solid var(--warning); }
+        .border-ambiente { border-left: 5px solid var(--info); }
+        .border-banida { border-left: 5px solid var(--text-main); background: #fff5f5; }
+
+        .botoes-acao { display: flex; gap: 8px; }
+        .btn-acao { 
+            border: none; padding: 8px 12px; border-radius: 6px; 
+            cursor: pointer; font-weight: 600; color: white; font-size: 11px; 
+        }
+        .btn-excluir { background-color: #757575; }
+        .btn-banir { background-color: var(--text-main); }
+        .btn-desbanir { background-color: var(--primary); }
+        .btn-play { background-color: var(--success); }
+
+        /* Estilos Configuração Spotify */
+        .input-spotify { 
+            width: 100%; padding: 12px; margin: 8px 0; 
+            border-radius: 10px; border: 1px solid #ddd; font-size: 14px; 
+        }
+        .btn-save { background-color: var(--success); width: 100%; margin-top: 5px; font-size: 14px; }
+
+        #mensagem { text-align: center; font-weight: bold; margin-top: 15px; color: var(--primary); min-height: 24px; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🛡️ Painel do Gerente - Gedasko</h1>
+    </header>
+    
+    <div id="statusConexao">🔴 Desconectado do Servidor</div>
+
+    <button id="btnPular" class="btn-panico btn-pular">⏭️ CORTAR ÁUDIO ATUAL</button>
+    <button id="btnTesteProp" class="btn-panico btn-propaganda">📢 TESTAR PROPAGANDA AGORA</button>
+
+    <div class="container">
+        <h2 class="section-title">Fila de Pedidos 📥</h2>
+        <div id="filaEspera"><p style="text-align: center; color: gray;">Nenhum pedido na fila.</p></div>
+    </div>
+
+    <div class="container">
+        <h2 class="section-title">Músicas da Pasta Local 📂</h2>
+        <div id="listaAmbiente"><p style="text-align: center; color: gray;">Sincronizando ficheiros...</p></div>
+    </div>
+
+    <div class="container">
+        <h2 class="section-title">Fonte Ambiente: Spotify 🎧</h2>
+        <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Mude o modo de reprodução ou atualize a Playlist ID.</p>
+        <select id="selectModo" class="input-spotify">
+            <option value="LOCAL">Modo: Pasta Local (MP3)</option>
+            <option value="SPOTIFY">Modo: Playlist Spotify</option>
+        </select>
+        <input type="text" id="spotifyID" class="input-spotify" placeholder="Cole o ID da Playlist Spotify aqui">
+        <button id="btnSalvarConfig" class="btn-panico btn-save">APLICAR CONFIGURAÇÃO</button>
+    </div>
+
+    <div class="container">
+        <h2 class="section-title">Músicas Banidas 🚫</h2>
+        <div id="listaNegra"><p style="text-align: center; color: gray;">Nenhuma música banida.</p></div>
+        <p id="mensagem"></p>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getDatabase, ref, onValue, remove, set } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+
+        // Configuração do teu Firebase
+        const firebaseConfig = {
+            databaseURL: "https://frizza2-79ec2-default-rtdb.firebaseio.com/"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        
+        const statusEl = document.getElementById('statusConexao');
+        const msgEl = document.getElementById('mensagem');
+
+        // Monitor de Conexão em Tempo Real
+        onValue(ref(db, '.info/connected'), (snap) => {
+            if (snap.val() === true) {
+                statusEl.innerText = "🟢 Conectado em Tempo Real";
+                statusEl.classList.add("conectado");
+            } else {
+                statusEl.innerText = "🔴 Tentando reconectar...";
+                statusEl.classList.remove("conectado");
+            }
+        });
+
+        function mostrarAviso(texto) {
+            msgEl.innerText = texto;
+            setTimeout(() => msgEl.innerText = "", 3000);
+        }
+
+        // --- COMANDOS GERAIS ---
+        
+        document.getElementById('btnPular').onclick = () => {
+            if(confirm("Deseja cortar a música/áudio atual?")) {
+                set(ref(db, 'comandos/pular'), true);
+                mostrarAviso("Sinal de corte enviado!");
+            }
+        };
+
+        document.getElementById('btnTesteProp').onclick = () => {
+            set(ref(db, 'comandos/teste_propaganda'), true);
+            mostrarAviso("Iniciando teste de propaganda...");
+        };
+
+        document.getElementById('btnSalvarConfig').onclick = () => {
+            const modo = document.getElementById('selectModo').value;
+            const id = document.getElementById('spotifyID').value;
+            
+            if(modo === 'SPOTIFY' && !id) {
+                alert("Por favor, insira o ID da playlist do Spotify.");
+                return;
+            }
+            
+            set(ref(db, 'comandos/config_ambiente'), {
+                modo: modo,
+                playlist_id: id
+            });
+            mostrarAviso("Configuração de ambiente atualizada!");
+        };
+
+        // --- MONITORES DE DADOS ---
+
+        // 1. Fila de Pedidos
+        onValue(ref(db, 'pedidos_jukebox'), (snapshot) => {
+            const container = document.getElementById('filaEspera');
+            container.innerHTML = '';
+            if (!snapshot.exists()) {
+                container.innerHTML = '<p style="text-align: center; color: gray;">Nenhum pedido na fila.</p>';
+                return;
+            }
+            snapshot.forEach((child) => {
+                const id = child.key;
+                const musica = child.val().busca;
+                const card = document.createElement('div');
+                card.className = 'card-item border-fila';
+                card.innerHTML = `
+                    <div style="font-weight:600">${musica}</div>
+                    <div class="botoes-acao">
+                        <button class="btn-acao btn-excluir" onclick="window.excluir('${id}')">Excluir</button>
+                        <button class="btn-acao btn-banir" onclick="window.banir('${id}', '${musica}')">Banir</button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        });
+
+        // 2. Músicas da Pasta Local
+        onValue(ref(db, 'lista_ambiente'), (snapshot) => {
+            const container = document.getElementById('listaAmbiente');
+            container.innerHTML = '';
+            if (!snapshot.exists()) {
+                container.innerHTML = '<p style="text-align: center; color: gray;">Nenhuma música sincronizada.</p>';
+                return;
+            }
+            snapshot.val().forEach((nome) => {
+                const card = document.createElement('div');
+                card.className = 'card-item border-ambiente';
+                card.innerHTML = `
+                    <div style="font-weight:500">${nome}</div>
+                    <div class="botoes-acao">
+                        <button class="btn-acao btn-play" onclick="window.tocarLocal('${nome}')">Play Now</button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        });
+
+        // 3. Lista Negra
+        onValue(ref(db, 'blacklist'), (snapshot) => {
+            const container = document.getElementById('listaNegra');
+            container.innerHTML = '';
+            if (!snapshot.exists()) {
+                container.innerHTML = '<p style="text-align: center; color: gray;">Nenhuma música banida.</p>';
+                return;
+            }
+            snapshot.forEach((child) => {
+                const id = child.key;
+                const termo = child.val().termo;
+                const card = document.createElement('div');
+                card.className = 'card-item border-banida';
+                card.innerHTML = `
+                    <div style="text-transform: capitalize; font-weight:600">🚫 ${termo}</div>
+                    <div class="botoes-acao">
+                        <button class="btn-acao btn-desbanir" onclick="window.desbanir('${id}')">Desbanir</button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        });
+
+        // --- FUNÇÕES GLOBAIS DE AÇÃO ---
+
+        window.excluir = (id) => {
+            remove(ref(db, `pedidos_jukebox/${id}`));
+            mostrarAviso("Pedido removido.");
+        };
+
+        window.banir = (id, nomeMusica) => {
+            if(confirm(`Deseja banir permanentemente "${nomeMusica}"?`)) {
+                remove(ref(db, `pedidos_jukebox/${id}`));
+                set(ref(db, `blacklist/${Date.now()}`), { termo: nomeMusica.toLowerCase() });
+                mostrarAviso("Música adicionada à lista negra!");
+            }
+        };
+
+        window.desbanir = (id) => {
+            remove(ref(db, `blacklist/${id}`));
+            mostrarAviso("Música permitida novamente.");
+        };
+
+        window.tocarLocal = (nomeArquivo) => {
+            set(ref(db, 'comandos/tocar_especifica'), { nome: nomeArquivo });
+            mostrarAviso(`Forçando reprodução de: ${nomeArquivo}`);
+        };
+
+    </script>
+</body>
+</html>
