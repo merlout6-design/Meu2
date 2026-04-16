@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Roteirizador Cloud PRO Mobile</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <style>
+        /* Previne o zoom indesejado em inputs no iOS/Android */
+        input, select, textarea { font-size: 16px !important; }
+        .tab-active { color: #2563eb !important; }
+        .tab-active .icon-bg { background-color: #eff6ff; border-radius: 9999px; }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen font-sans pb-20"> <div id="loginOverlay" class="fixed inset-0 bg-slate-900 flex flex-col items-center justify-center z-[100] px-6">
+        <h1 class="text-3xl font-black text-white mb-2 text-center">Roteirizador PRO</h1>
+        <p class="text-slate-400 mb-8 font-medium text-center" id="loginSubtitulo">Selecione o modo de operação</p>
+        
+        <div id="etapaModo" class="flex flex-col gap-4 w-full max-w-sm">
+            <button onclick="selecionarModo('uma')" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-6 rounded-2xl text-xl shadow-lg border-b-4 border-emerald-800 transition active:scale-95">1 Rota</button>
+            <button onclick="selecionarModo('duas')" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-6 rounded-2xl text-xl shadow-lg border-b-4 border-blue-800 transition active:scale-95">2 Rotas</button>
+        </div>
+
+        <div id="etapaOperador" class="hidden flex flex-col gap-4 w-full max-w-sm">
+            <button onclick="selecionarOperador('A')" class="w-full bg-blue-600 text-white font-bold py-6 rounded-2xl text-xl shadow-lg border-b-4 border-blue-800 active:scale-95">Operador A</button>
+            <button onclick="selecionarOperador('B')" class="w-full bg-indigo-600 text-white font-bold py-6 rounded-2xl text-xl shadow-lg border-b-4 border-indigo-800 active:scale-95">Operador B</button>
+        </div>
+
+        <div id="etapaSessao" class="hidden flex flex-col items-center gap-4 w-full max-w-sm">
+            <input type="text" id="inputNomeSessao" class="p-4 rounded-xl text-lg w-full outline-none border-2 border-emerald-500 uppercase font-bold text-center" placeholder="NOME DA ROTA / MOTO">
+            <button onclick="finalizarLogin()" class="bg-emerald-600 text-white font-bold py-4 w-full rounded-xl text-lg shadow-lg border-b-4 border-emerald-800 active:scale-95">INICIAR OPERAÇÃO</button>
+            
+            <div class="w-full mt-4 bg-slate-800 p-4 rounded-xl text-left border border-slate-700">
+                <h3 class="text-emerald-400 font-bold mb-3 text-xs uppercase tracking-widest flex justify-between">
+                    <span>Rotas de Hoje</span>
+                    <span class="text-slate-500" id="dataHojeDisplay"></span>
+                </h3>
+                <div id="listaSessoesAtivas" class="space-y-2 max-h-40 overflow-y-auto pr-1"></div>
+            </div>
+        </div>
+        
+        <button onclick="resetLogin()" id="btnVoltarLogin" class="hidden mt-8 text-slate-400 font-bold active:text-white py-2 px-4">← Voltar</button>
+    </div>
+
+    <div class="bg-white sticky top-0 z-40 border-b shadow-sm px-4 py-3 flex justify-between items-center">
+        <div>
+            <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span>
+                <h1 class="text-base font-black text-slate-800 uppercase leading-none">Painel</h1>
+            </div>
+            <p class="text-[10px] text-slate-500 font-bold mt-1 uppercase">
+                <span id="tagOperador" class="text-blue-600"></span> • <span id="tagModo"></span> • <span id="tagSessao" class="text-slate-800"></span>
+            </p>
+        </div>
+        <div class="flex gap-2">
+            <button onclick="document.getElementById('modalConfig').classList.remove('hidden')" class="w-10 h-10 flex justify-center items-center bg-slate-100 text-slate-600 rounded-full active:bg-slate-200">⚙️</button>
+            <button onclick="reiniciarDia()" class="w-10 h-10 flex justify-center items-center bg-rose-50 text-rose-600 border border-rose-200 rounded-full active:bg-rose-100">🔄</button>
+        </div>
+    </div>
+
+    <div class="p-4 max-w-lg mx-auto">
+        
+        <div id="aba-triagem" class="space-y-4">
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="font-bold text-slate-500 text-xs uppercase">Entrada de Pacote</h2>
+                    <span id="nextIdDisplay" class="text-xl font-black text-blue-600 bg-blue-50 px-3 py-1 rounded-lg"></span>
+                </div>
+                <div class="flex flex-col gap-3 relative">
+                    <div class="flex gap-2">
+                        <div class="relative flex-grow flex items-center">
+    <input type="text" id="enderecoInput" class="w-full p-3.5 pr-12 bg-slate-50 border border-slate-300 rounded-xl text-base outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition" autocomplete="off" placeholder="Rua e número...">
+    
+    <button onclick="iniciarReconhecimentoVoz()" id="btnMic" class="absolute right-2 text-slate-400 hover:text-blue-500 p-2 rounded-full active:bg-slate-200 transition">
+        🎤
+    </button>
+
+    <div id="sugestoesDropdown" class="hidden absolute left-0 right-0 top-[105%] bg-white border rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto"></div>
+</div>
+                        <button onclick="processarUmPacote()" class="bg-slate-900 text-white px-5 rounded-xl font-bold active:bg-slate-700 active:scale-95 transition">OK</button>
+                    </div>
+                    <input type="text" id="notaInput" class="w-full p-3 bg-yellow-50/50 border border-yellow-200 rounded-xl text-sm outline-none focus:border-yellow-400 text-slate-700 placeholder-yellow-600/50" autocomplete="off" placeholder="Nota avulsa (opcional)...">
+                </div>
+            </div>
+
+            <div id="map" class="w-full h-48 rounded-2xl shadow-sm border border-slate-200 z-0"></div>
+
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-bold text-slate-600 uppercase text-xs" id="tituloLateral">Pendentes</h3>
+                    <span id="countPendentes" class="bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full text-xs font-bold">0</span>
+                </div>
+                <div id="listaPendentes" class="space-y-3"></div> 
+            </div>
+        </div>
+
+        <div id="aba-listagem" class="hidden space-y-4">
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-bold text-green-700 uppercase text-sm" id="labelR1">Rota 1</h3>
+                    <button onclick="baixarPlanilha(rota1, 'Rota_1.xlsx')" class="bg-green-100 text-green-700 px-3 py-1.5 rounded-lg text-xs font-bold active:bg-green-200 flex items-center gap-1">⬇️ Excel</button>
+                </div>
+                <div id="fullRota1" class="space-y-2 text-xs"></div>
+            </div>
+            
+            <div id="colunaRota2" class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-bold text-orange-700 uppercase text-sm">Rota 2</h3>
+                    <button onclick="baixarPlanilha(rota2, 'Rota_2.xlsx')" class="bg-orange-100 text-orange-700 px-3 py-1.5 rounded-lg text-xs font-bold active:bg-orange-200 flex items-center gap-1">⬇️ Excel</button>
+                </div>
+                <div id="fullRota2" class="space-y-2 text-xs"></div>
+            </div>
+        </div>
+
+        <div id="aba-ajustes" class="hidden space-y-4">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-purple-100 relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-1 h-full bg-purple-500"></div>
+                <h3 class="font-black text-slate-800 mb-4 uppercase text-xs tracking-wider flex items-center gap-2">📍 Salvar Plus Code / Exato</h3>
+                
+                <input type="text" id="memEndOriginal" class="w-full p-3.5 bg-slate-50 border rounded-xl mb-3 text-sm outline-none focus:border-purple-400" placeholder="Endereço digitado (ex: Rua Brasil 10)">
+                
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <input type="text" id="memPlusCode" class="w-full p-3.5 bg-slate-50 border rounded-xl text-sm outline-none focus:border-purple-400" placeholder="Cole o Plus Code">
+                    <input type="text" id="memNotas" class="w-full p-3.5 bg-slate-50 border rounded-xl text-sm outline-none focus:border-purple-400" placeholder="Nota Fixa">
+                </div>
+                
+                <div class="flex items-center mb-4 bg-purple-50 p-3 rounded-xl border border-purple-100">
+                    <input type="checkbox" id="memAproximado" class="w-6 h-6 text-purple-600 bg-white border-slate-300 rounded cursor-pointer accent-purple-600">
+                    <label for="memAproximado" class="ml-3 text-xs font-bold text-purple-800 cursor-pointer leading-tight">
+                        Aplicar para 100 números próximos (+/-)
+                    </label>
+                </div>
+                
+                <button onclick="salvarCorrecaoExata()" class="w-full bg-purple-600 text-white py-3.5 rounded-xl font-bold shadow-md active:bg-purple-700 active:scale-95 transition">Salvar na Memória</button>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <h3 class="font-black text-slate-800 mb-4 uppercase text-xs tracking-wider flex items-center gap-2">🛣️ Forçar Rua para Rota</h3>
+                <input type="text" id="ajusteRuaInput" class="w-full p-3.5 bg-slate-50 border rounded-xl mb-3 text-sm outline-none focus:border-blue-500" placeholder="Apenas nome (Ex: Caetano)">
+                <div class="flex gap-2">
+                    <button onclick="trocarRotaManual(1)" class="flex-1 bg-green-500 text-white py-3 rounded-xl font-bold active:bg-green-600 active:scale-95 shadow-sm text-sm">ROTA 1</button>
+                    <button onclick="trocarRotaManual(2)" class="flex-1 bg-orange-500 text-white py-3 rounded-xl font-bold active:bg-orange-600 active:scale-95 shadow-sm text-sm">ROTA 2</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-50 px-2 pb-safe shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.1)]">
+        <div class="flex justify-around items-center h-16">
+            <button onclick="mudarAba('triagem')" id="tab-triagem" class="flex-1 flex flex-col items-center justify-center gap-1 text-slate-400 tab-active w-full h-full">
+                <div class="icon-bg p-1.5 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg></div>
+                <span class="text-[10px] font-bold tracking-wide">Triagem</span>
+            </button>
+            <button onclick="mudarAba('listagem')" id="tab-listagem" class="flex-1 flex flex-col items-center justify-center gap-1 text-slate-400 w-full h-full">
+                <div class="icon-bg p-1.5 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg></div>
+                <span class="text-[10px] font-bold tracking-wide">Listas</span>
+            </button>
+            <button onclick="mudarAba('ajustes')" id="tab-ajustes" class="flex-1 flex flex-col items-center justify-center gap-1 text-slate-400 w-full h-full">
+                <div class="icon-bg p-1.5 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg></div>
+                <span class="text-[10px] font-bold tracking-wide">Ajustes</span>
+            </button>
+        </div>
+        <div class="h-[env(safe-area-inset-bottom)]"></div>
+    </div>
+
+    <div id="modalConfig" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-[110] p-4 backdrop-blur-sm">
+        <div class="bg-white w-full max-w-sm p-6 rounded-3xl shadow-2xl relative">
+            <button onclick="document.getElementById('modalConfig').classList.add('hidden')" class="absolute top-4 right-4 bg-slate-100 w-8 h-8 rounded-full flex items-center justify-center text-slate-500 font-bold active:bg-slate-200">×</button>
+            <h3 class="font-black text-lg text-slate-800 mb-6 border-b pb-2">Configurações</h3>
+            <button onclick="excluirMemoriaTotal()" class="w-full bg-rose-50 text-rose-600 border border-rose-200 py-3.5 rounded-xl font-bold active:bg-rose-100">🗑️ Apagar Toda Memória (GLOBAL)</button>
+        </div>
+    </div>
+
+    <script>
+        const mbt = "pk.eyJ1IjoibWVybG91dCIsImEiOiJjbW8xeGV1YWwwcDQwMnBva242ZTJ0cmI5In0.SpwaxXYyWY25zIwVKdtT2w"; 
+        const fbc = {
+            apiKey: "AIzaSyDkVx0C_d9iAKdq6Ip22p4qQ6RYDhZvk-s",
+            authDomain: "rodao-f93c2.firebaseapp.com",
+            projectId: "rodao-f93c2",
+            storageBucket: "rodao-f93c2.firebasestorage.app",
+            messagingSenderId: "867137990526",
+            appId: "1:867137990526:web:833eed12a9c2e50c9a0d2f",
+            databaseURL: "https://rodao-f93c2-default-rtdb.firebaseio.com/"
+        };
+        firebase.initializeApp(fbc);
+        const db = firebase.database();
+        const dbRuas = db.ref('ruas_cafelandia_memoria');
+        const dbEnderecosExatos = db.ref('enderecos_exatos_memoria');
+        const dbAproximados = db.ref('enderecos_aproximados_memoria');
+        
+        let modoTrabalho = ''; 
+        let operadorAtual = '';
+        let nomeSessao = 'GERAL';
+        let meuContador = 1;
+        let dicionarioRuas = {}, dicionarioEnderecosExatos = {}, dicionarioAproximados = {};
+        let rota1 = [], rota2 = [], pendentes = [];
+        let map, marker, timeoutBusca;
+        
+        const dataHoje = new Date().toISOString().split('T')[0].replace(/-/g, '');
+
+        function getPathSessao() {
+            return modoTrabalho === 'duas' 
+                ? `sessoes_diarias/${dataHoje}/sessao_duas_rotas/pacotes` 
+                : `sessoes_diarias/${dataHoje}/sessao_uma_rota/${nomeSessao}/pacotes`;
+        }
+        function getPathContador() {
+            return modoTrabalho === 'duas' 
+                ? `sessoes_diarias/${dataHoje}/sessao_duas_rotas/contadores/${operadorAtual}` 
+                : `sessoes_diarias/${dataHoje}/sessao_uma_rota/${nomeSessao}/contadores/${operadorAtual}`;
+        }
+
+        function entrarSessaoExistente(nome) {
+            document.getElementById('inputNomeSessao').value = nome;
+            finalizarLogin();
+        }
+
+        window.onload = () => {
+            map = L.map('map', { zoomControl: false }).setView([-24.6191, -53.3256], 14); 
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+            marker = L.marker([-24.6191, -53.3256]).addTo(map);
+            marker.setOpacity(0);
+
+            dbRuas.on('value', snap => { dicionarioRuas = snap.val() || {}; });
+            dbEnderecosExatos.on('value', snap => { dicionarioEnderecosExatos = snap.val() || {}; });
+            dbAproximados.on('value', snap => { dicionarioAproximados = snap.val() || {}; });
+            
+            document.getElementById('dataHojeDisplay').innerText = new Date().toLocaleDateString('pt-BR');
+
+            db.ref(`sessoes_diarias/${dataHoje}/sessao_uma_rota`).on('value', snap => {
+                const sessoes = snap.val();
+                const container = document.getElementById('listaSessoesAtivas');
+                if(!container) return;
+                if(!sessoes) {
+                    container.innerHTML = '<p class="text-slate-500 text-sm italic">Nenhuma rota hoje.</p>';
+                    return;
+                }
+                let html = '';
+                for(let key in sessoes) {
+                    const pacotes = sessoes[key].pacotes ? Object.keys(sessoes[key].pacotes).length : 0;
+                    html += `<button onclick="entrarSessaoExistente('${key}')" class="w-full text-left p-3 mt-2 bg-slate-700 active:bg-slate-600 rounded-xl text-white text-sm font-medium border border-slate-600 flex justify-between items-center shadow-md">
+                                <span>📍 ${key}</span> 
+                                <span class="bg-slate-900 text-emerald-400 text-xs px-2.5 py-1 rounded-md font-bold">${pacotes} pct</span>
+                             </button>`;
+                }
+                container.innerHTML = html;
+            });
+
+            document.getElementById('enderecoInput').addEventListener('input', function() {
+                clearTimeout(timeoutBusca);
+                const termo = this.value.trim();
+                const dropdown = document.getElementById('sugestoesDropdown');
+                if(termo.length < 3) { dropdown.classList.add('hidden'); return; }
+                timeoutBusca = setTimeout(async () => {
+                    // proximity=-53.45,-24.95 força resultados ao redor de Cascavel
+// bbox delimita o mapa (Aprox 100km pra cada lado)
+const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(termo)}.json?access_token=${mbt}&country=br&bbox=-54.5,-26.0,-52.4,-24.0&proximity=-53.45,-24.95&types=address,poi&autocomplete=true&limit=5`;
+                    try {
+                        const res = await fetch(url);
+                        const data = await res.json();
+                        if(data.features && data.features.length > 0) {
+                            dropdown.innerHTML = data.features.map(f => `
+                                <div onclick="selecionarSugestaoMapbox('${f.place_name.replace(/'/g, "\\'")}', ${f.center[0]}, ${f.center[1]})" 
+                                     class="p-4 active:bg-blue-50 cursor-pointer border-b text-sm font-medium text-slate-700">
+                                    📍 ${f.place_name}
+                                </div>`).join('');
+                            dropdown.classList.remove('hidden');
+                        } else { dropdown.classList.add('hidden'); }
+                    } catch(e) { console.error(e); }
+                }, 400);
+            });
+        };
+
+        function selecionarModo(m) {
+            modoTrabalho = m;
+            document.getElementById('etapaModo').classList.add('hidden');
+            document.getElementById('etapaOperador').classList.remove('hidden');
+            document.getElementById('btnVoltarLogin').classList.remove('hidden');
+            document.getElementById('loginSubtitulo').innerText = "Quem está operando?";
+        }
+
+        function selecionarOperador(op) {
+            operadorAtual = op;
+            if (modoTrabalho === 'uma') {
+                document.getElementById('etapaOperador').classList.add('hidden');
+                document.getElementById('etapaSessao').classList.remove('hidden');
+                document.getElementById('loginSubtitulo').innerText = "Qual o nome da rota?";
+            } else {
+                finalizarLogin();
+            }
+        }
+
+        function resetLogin() {
+            document.getElementById('etapaModo').classList.remove('hidden');
+            document.getElementById('etapaOperador').classList.add('hidden');
+            document.getElementById('etapaSessao').classList.add('hidden');
+            document.getElementById('btnVoltarLogin').classList.add('hidden');
+            document.getElementById('loginSubtitulo').innerText = "Selecione o modo de operação";
+        }
+
+        function finalizarLogin() {
+            if (modoTrabalho === 'uma') {
+                nomeSessao = document.getElementById('inputNomeSessao').value.trim().toUpperCase() || 'SEM_NOME';
+            } else {
+                nomeSessao = 'TRIAGEM_GERAL';
+            }
+
+            document.getElementById('loginOverlay').classList.add('hidden');
+            document.getElementById('tagModo').innerText = modoTrabalho === 'uma' ? "1 ROTA" : "2 ROTAS";
+            document.getElementById('tagOperador').innerText = "OP " + operadorAtual;
+            document.getElementById('tagSessao').innerText = nomeSessao;
+            
+            if (modoTrabalho === 'uma') {
+                document.getElementById('colunaRota2').classList.add('hidden');
+                document.getElementById('tituloLateral').innerText = "Últimos Bipados";
+                document.getElementById('labelR1').innerText = "Sua Rota";
+            }
+
+            iniciarEscutaFirebase();
+            
+            // Corrige o mapa ao sair do display hidden do login
+            setTimeout(() => map.invalidateSize(), 300);
+        }
+
+        function iniciarEscutaFirebase() {
+            db.ref(getPathSessao()).on('value', snap => {
+                rota1 = []; rota2 = []; pendentes = [];
+                snap.forEach(child => {
+                    let p = child.val(); p._firebaseKey = child.key;
+                    if(p._status === '1') rota1.push(p); 
+                    else if(p._status === '2') rota2.push(p); 
+                    else pendentes.push(p);
+                });
+                atualizarUI();
+            });
+
+            db.ref(getPathContador()).on('value', snap => {
+                meuContador = snap.val() || 1;
+                document.getElementById('nextIdDisplay').innerText = `${operadorAtual}${meuContador}`;
+            });
+        }
+
+        async function processarUmPacote() {
+            const input = document.getElementById('enderecoInput');
+            const notaInp = document.getElementById('notaInput');
+            const val = input.value.trim();
+            if(!val) return;
+            
+            input.disabled = true;
+            notaInp.disabled = true;
+
+            const ruaBase = extrairNomeRua(val);
+            const rConhecida = dicionarioRuas[ruaBase];
+            const cExata = dicionarioEnderecosExatos[padronizarTexto(val)];
+
+            let endFinal = val; 
+            let nota = "-";
+            
+            if (cExata) {
+                if (cExata.plusCode) endFinal = cExata.plusCode;
+                if (cExata.notas) nota = cExata.notas;
+            } else {
+                let achouAproximado = false;
+                const matchNum = val.match(/\d+/);
+                
+                if (matchNum && dicionarioAproximados[ruaBase]) {
+                    const numDigitado = parseInt(matchNum[0]);
+                    const numerosMapeados = Object.keys(dicionarioAproximados[ruaBase]);
+                    
+                    for (let numMapeado of numerosMapeados) {
+                        if (Math.abs(numDigitado - parseInt(numMapeado)) <= 100) {
+                            endFinal = dicionarioAproximados[ruaBase][numMapeado].plusCode;
+                            nota = `Loc. APROX. (${val})`; 
+                            achouAproximado = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (!achouAproximado) {
+                    const temPlusCodeNaRua = dicionarioAproximados[ruaBase] || 
+                                            Object.keys(dicionarioEnderecosExatos).some(key => extrairNomeRua(key) === ruaBase);
+                    
+                    if (temPlusCodeNaRua) {
+                        nota = "Alerta. PlusCode Possivel";
+                    }
+                }
+            }
+
+            const notaAvulsa = notaInp.value.trim();
+            if (notaAvulsa) {
+                nota = nota !== "-" ? `${nota} | ${notaAvulsa}` : notaAvulsa;
+            }
+
+            const item = {
+                "Display ID": `${operadorAtual}${meuContador}`,
+                "Destination Address": endFinal,
+                "City": "-",
+                "Notas": nota,
+                "_ruaBase": ruaBase,
+                "_status": modoTrabalho === 'uma' ? '1' : (rConhecida || 'pendente')
+            };
+
+            db.ref(getPathSessao()).push(item);
+            db.ref(getPathContador()).set(meuContador + 1);
+
+            input.value = ""; input.disabled = false; input.focus();
+            notaInp.value = ""; notaInp.disabled = false;
+            document.getElementById('sugestoesDropdown').classList.add('hidden');
+        }
+
+        function reiniciarDia() {
+            if(confirm("Apagar os pacotes desta rota gerados hoje?")) {
+                db.ref(getPathSessao()).remove();
+                if(modoTrabalho === 'duas') {
+                    db.ref(`sessoes_diarias/${dataHoje}/sessao_duas_rotas/contadores`).set({A:1, B:1});
+                } else {
+                    db.ref(`sessoes_diarias/${dataHoje}/sessao_uma_rota/${nomeSessao}/contadores`).set({A:1, B:1});
+                }
+            }
+        }
+
+        function atualizarUI() {
+            const formatNota = (n) => n !== "-" ? `<div class="mt-1"><span class="text-[10px] text-purple-700 font-bold bg-purple-100 px-1.5 py-0.5 rounded leading-none inline-block">📝 ${n}</span></div>` : "";
+            
+            const renderItem = (i) => `
+                <div class="p-3 border-b flex justify-between bg-slate-50 rounded-lg mb-2 shadow-sm">
+                    <div class="pr-2"><span class="text-sm font-medium text-slate-800 leading-tight block">${i["Destination Address"]}</span>${formatNota(i.Notas)}</div>
+                    <b class="text-slate-400 text-sm">#${i["Display ID"]}</b>
+                </div>`;
+            
+            document.getElementById('fullRota1').innerHTML = [...rota1].reverse().map(renderItem).join('');
+            document.getElementById('fullRota2').innerHTML = [...rota2].reverse().map(renderItem).join('');
+
+            if (modoTrabalho === 'duas') {
+                document.getElementById('countPendentes').innerText = pendentes.length;
+                document.getElementById('listaPendentes').innerHTML = [...pendentes].reverse().map(i => `
+                    <div class="bg-white p-3.5 rounded-xl border-l-4 border-l-blue-500 shadow-sm active:bg-blue-50 transition relative" 
+                         onclick="verNoMapa('${i["Destination Address"].replace(/'/g, "\\'")}')">
+                        
+                        <div class="flex justify-between mb-1 pointer-events-none">
+                            <b class="text-red-600 text-sm">#${i["Display ID"]}</b>
+                            <span class="text-slate-400 text-[10px] font-bold bg-slate-100 px-1.5 rounded">${i._ruaBase}</span>
+                        </div>
+                        <p class="text-slate-700 text-sm font-medium leading-tight pointer-events-none mb-1">
+                            ${i["Destination Address"]}
+                        </p>
+                        ${formatNota(i.Notas)}
+                        
+                        <div class="flex gap-2 mt-3 relative z-10" onclick="event.stopPropagation()">
+                            <button onclick="ensinarEResolver('${i._firebaseKey}', 1, '${i._ruaBase}')" 
+                                    class="flex-1 bg-green-600 text-white py-2.5 rounded-lg text-xs font-bold shadow-sm active:scale-95 transition">
+                                ROTA 1
+                            </button>
+                            <button onclick="ensinarEResolver('${i._firebaseKey}', 2, '${i._ruaBase}')" 
+                                    class="flex-1 bg-orange-600 text-white py-2.5 rounded-lg text-xs font-bold shadow-sm active:scale-95 transition">
+                                ROTA 2
+                            </button>
+                        </div>
+                    </div>`).join('');
+            } else {
+                document.getElementById('countPendentes').innerText = rota1.length;
+                document.getElementById('listaPendentes').innerHTML = [...rota1].reverse().slice(0,15).map(renderItem).join('');
+            }
+        }
+
+        function extrairNomeRua(e) {
+            const b = padronizarTexto(e);
+            const m = b.match(/^([^0-9]+)/);
+            return m ? m[1].trim() : b;
+        }
+
+        function padronizarTexto(texto) {
+            let l = texto.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[,.-]/g, ' ');
+            const d = {'\\b(rua|r)\\b':'','\\b(avenida|av|ave)\\b':'','\\b(travessa|tv|trav)\\b':''};
+            for (let r in d) l = l.replace(new RegExp(r, 'g'), d[r]);
+            return l.replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+        }
+
+        function selecionarSugestaoMapbox(nome, lng, lat) {
+            const input = document.getElementById('enderecoInput');
+            const numDigitado = input.value.match(/\d+/);
+            if (numDigitado && !nome.match(/\d+/)) {
+                let partes = nome.split(',');
+                partes[0] = partes[0] + " " + numDigitado[0];
+                nome = partes.join(',');
+            }
+            input.value = nome;
+            document.getElementById('sugestoesDropdown').classList.add('hidden');
+            map.setView([lat, lng], 17);
+            marker.setLatLng([lat, lng]).setOpacity(1);
+        }
+
+        async function verNoMapa(endereco) {
+            try {
+                const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(endereco)}.json?access_token=${mbt}&country=br&limit=1`;
+                const res = await fetch(url);
+                const data = await res.json();
+                if (data.features && data.features.length > 0) {
+                    const [lng, lat] = data.features[0].center;
+                    map.setView([lat, lng], 16);
+                    marker.setLatLng([lat, lng]).setOpacity(1);
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        function ensinarEResolver(k, r, b) {
+            dbRuas.child(b).set(r.toString());
+            db.ref(getPathSessao()).child(k).update({ _status: r.toString() });
+        }
+
+        async function baixarPlanilha(dados, nome) {
+            if (dados.length === 0) { alert("Rota vazia!"); return; }
+
+            const dl = dados.map(item => ({
+                "ID Pacote": item["Display ID"],
+                "Notes": item.Notas || "-",
+                "City": item["City"] || "Cafelândia",
+                "Destination Address": item["Destination Address"]
+            }));
+            
+            const ws = XLSX.utils.json_to_sheet(dl);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Entregas");
+
+            try {
+                if (navigator.canShare) {
+                    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+                    const file = new File([wbout], nome, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                    if (navigator.canShare({ files: [file] })) {
+                        await navigator.share({ title: 'Rota ' + nome, text: 'Planilha pronta', files: [file] });
+                        return; 
+                    }
+                }
+            } catch (e) { console.log("Compartilhamento cancelado:", e); }
+            XLSX.writeFile(wb, nome);
+        }
+
+        function excluirMemoriaTotal() {
+            if (confirm("Apagar TODA a memória de ruas e Plus Codes?")) {
+                dbRuas.remove();
+                dbEnderecosExatos.remove();
+                dbAproximados.remove();
+                alert("Memória limpa!");
+                document.getElementById('modalConfig').classList.add('hidden');
+            }
+        }
+
+        function mudarAba(nome) {
+            ['triagem', 'listagem', 'ajustes'].forEach(a => {
+                document.getElementById('aba-' + a).classList.add('hidden');
+                document.getElementById('tab-' + a).classList.remove('tab-active');
+                document.getElementById('tab-' + a).classList.replace('text-blue-600', 'text-slate-400');
+            });
+            document.getElementById('aba-' + nome).classList.remove('hidden');
+            const activeTab = document.getElementById('tab-' + nome);
+            activeTab.classList.add('tab-active');
+            activeTab.classList.replace('text-slate-400', 'text-blue-600');
+            
+            if(nome === 'triagem') setTimeout(() => map.invalidateSize(), 100);
+        }
+
+        function trocarRotaManual(r) {
+            const rua = document.getElementById('ajusteRuaInput').value.trim();
+            if(!rua) return;
+            dbRuas.child(extrairNomeRua(rua)).set(r.toString());
+            alert("Rua atualizada!");
+            document.getElementById('ajusteRuaInput').value = '';
+        }
+
+        function salvarCorrecaoExata() {
+            const o = document.getElementById('memEndOriginal').value;
+            const p = document.getElementById('memPlusCode').value;
+            const n = document.getElementById('memNotas').value;
+            const isAproximado = document.getElementById('memAproximado').checked;
+
+            if(!o) return;
+
+            dbEnderecosExatos.child(padronizarTexto(o)).set({ plusCode: p, notas: n });
+
+            if (isAproximado) {
+                const ruaBase = extrairNomeRua(o);
+                const matchNum = o.match(/\d+/);
+                
+                if (matchNum) {
+                    const numero = matchNum[0];
+                    dbAproximados.child(ruaBase).child(numero).set({
+                        plusCode: p,
+                        enderecoBase: o 
+                    });
+                } else {
+                    alert("⚠️ O endereço precisa de um número para aproximação.");
+                    return;
+                }
+            }
+
+            alert("Salvo com sucesso!");
+            document.getElementById('memEndOriginal').value = '';
+            document.getElementById('memPlusCode').value = '';
+            document.getElementById('memNotas').value = '';
+            document.getElementById('memAproximado').checked = false;
+        }
+		function iniciarReconhecimentoVoz() {
+    // Verifica se o navegador suporta a API de voz (Chrome e Safari Mobile suportam bem)
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        alert("Microfone não suportado neste navegador. Tente pelo Google Chrome.");
+        return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'pt-BR';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    const btnMic = document.getElementById('btnMic');
+    const inputEnd = document.getElementById('enderecoInput');
+    
+    // Efeito visual para avisar que está gravando
+    btnMic.classList.add('bg-red-100', 'animate-pulse');
+    inputEnd.placeholder = "Ouvindo...";
+
+    recognition.start();
+
+    // Quando termina de escutar a voz
+    recognition.onresult = async (event) => {
+        const termoFalado = event.results[0][0].transcript;
+        inputEnd.value = termoFalado;
+        
+        btnMic.classList.remove('bg-red-100', 'animate-pulse');
+        inputEnd.placeholder = "Buscando localização...";
+
+        // Fazer a busca direto na API com o termo falado (Já com a restrição de Cascavel)
+        try {
+            const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(termoFalado)}.json?access_token=${mbt}&country=br&bbox=-54.5,-26.0,-52.4,-24.0&proximity=-53.45,-24.95&types=address,poi&limit=1`;
+            const res = await fetch(url);
+            const data = await res.json();
+            
+            if(data.features && data.features.length > 0) {
+                const f = data.features[0];
+                // Simula como se você tivesse clicado na melhor sugestão
+                selecionarSugestaoMapbox(f.place_name.replace(/'/g, "\\'"), f.center[0], f.center[1]);
+            } else {
+                alert("Endereço falado não foi encontrado no mapa.");
+            }
+        } catch(e) { console.error("Erro na busca por voz:", e); }
+        
+        inputEnd.placeholder = "Rua e número...";
+    };
+
+    // Em caso de erro ou ao parar de falar
+    recognition.onerror = (event) => {
+        btnMic.classList.remove('bg-red-100', 'animate-pulse');
+        inputEnd.placeholder = "Rua e número...";
+    };
+    recognition.onend = () => {
+        btnMic.classList.remove('bg-red-100', 'animate-pulse');
+        inputEnd.placeholder = "Rua e número...";
+    };
+}
+        document.getElementById('enderecoInput').addEventListener("keypress", e => { if(e.key === "Enter") processarUmPacote(); });
+        document.getElementById('notaInput').addEventListener("keypress", e => { if(e.key === "Enter") processarUmPacote(); });
+    </script>
+</body>
+</html>
