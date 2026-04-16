@@ -11,7 +11,6 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <style>
-        /* Previne o zoom indesejado em inputs no iOS/Android */
         input, select, textarea { font-size: 16px !important; }
         .tab-active { color: #2563eb !important; }
         .tab-active .icon-bg { background-color: #eff6ff; border-radius: 9999px; }
@@ -19,152 +18,159 @@
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
     </style>
 </head>
-<body class="bg-slate-50 min-h-screen font-sans pb-20"> <div id="loginOverlay" class="fixed inset-0 bg-slate-900 flex flex-col items-center justify-center z-[100] px-6">
-        <h1 class="text-3xl font-black text-white mb-2 text-center">Roteirizador PRO</h1>
-        <p class="text-slate-400 mb-8 font-medium text-center" id="loginSubtitulo">Selecione o modo de operação</p>
+<body class="bg-slate-50 min-h-screen font-sans pb-24 text-base"> 
+
+    <div id="loginOverlay" class="fixed inset-0 bg-slate-900 flex flex-col items-center justify-center z-[100] px-6">
+        <h1 class="text-4xl font-black text-white mb-2 text-center tracking-tight">Roteirizador PRO</h1>
+        <p class="text-slate-400 mb-10 font-medium text-lg text-center" id="loginSubtitulo">Selecione o modo de operação</p>
         
-        <div id="etapaModo" class="flex flex-col gap-4 w-full max-w-sm">
-            <button onclick="selecionarModo('uma')" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-6 rounded-2xl text-xl shadow-lg border-b-4 border-emerald-800 transition active:scale-95">1 Rota</button>
-            <button onclick="selecionarModo('duas')" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-6 rounded-2xl text-xl shadow-lg border-b-4 border-blue-800 transition active:scale-95">2 Rotas</button>
+        <div id="etapaModo" class="flex flex-col gap-5 w-full max-w-sm">
+            <button onclick="selecionarModo('uma')" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-6 rounded-2xl text-2xl shadow-lg border-b-4 border-emerald-800 transition active:scale-95">1 Rota</button>
+            <button onclick="selecionarModo('duas')" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-6 rounded-2xl text-2xl shadow-lg border-b-4 border-blue-800 transition active:scale-95">2 Rotas</button>
         </div>
 
-        <div id="etapaOperador" class="hidden flex flex-col gap-4 w-full max-w-sm">
-            <button onclick="selecionarOperador('A')" class="w-full bg-blue-600 text-white font-bold py-6 rounded-2xl text-xl shadow-lg border-b-4 border-blue-800 active:scale-95">Operador A</button>
-            <button onclick="selecionarOperador('B')" class="w-full bg-indigo-600 text-white font-bold py-6 rounded-2xl text-xl shadow-lg border-b-4 border-indigo-800 active:scale-95">Operador B</button>
+        <div id="etapaOperador" class="hidden flex flex-col gap-5 w-full max-w-sm">
+            <button onclick="selecionarOperador('A')" class="w-full bg-blue-600 text-white font-bold py-6 rounded-2xl text-2xl shadow-lg border-b-4 border-blue-800 active:scale-95">Operador A</button>
+            <button onclick="selecionarOperador('B')" class="w-full bg-indigo-600 text-white font-bold py-6 rounded-2xl text-2xl shadow-lg border-b-4 border-indigo-800 active:scale-95">Operador B</button>
         </div>
 
-        <div id="etapaSessao" class="hidden flex flex-col items-center gap-4 w-full max-w-sm">
-            <input type="text" id="inputNomeSessao" class="p-4 rounded-xl text-lg w-full outline-none border-2 border-emerald-500 uppercase font-bold text-center" placeholder="NOME DA ROTA / MOTO">
-            <button onclick="finalizarLogin()" class="bg-emerald-600 text-white font-bold py-4 w-full rounded-xl text-lg shadow-lg border-b-4 border-emerald-800 active:scale-95">INICIAR OPERAÇÃO</button>
+        <div id="etapaSessao" class="hidden flex flex-col items-center gap-5 w-full max-w-sm">
+            <input type="text" id="inputNomeSessao" class="p-5 rounded-2xl text-xl w-full outline-none border-4 border-emerald-500 uppercase font-bold text-center" placeholder="NOME DA MOTO/ROTA">
+            <button onclick="finalizarLogin()" class="bg-emerald-600 text-white font-bold py-5 w-full rounded-2xl text-xl shadow-lg border-b-4 border-emerald-800 active:scale-95">INICIAR OPERAÇÃO</button>
             
-            <div class="w-full mt-4 bg-slate-800 p-4 rounded-xl text-left border border-slate-700">
-                <h3 class="text-emerald-400 font-bold mb-3 text-xs uppercase tracking-widest flex justify-between">
+            <div class="w-full mt-4 bg-slate-800 p-5 rounded-2xl text-left border border-slate-700">
+                <h3 class="text-emerald-400 font-bold mb-4 text-sm uppercase tracking-widest flex justify-between">
                     <span>Rotas de Hoje</span>
                     <span class="text-slate-500" id="dataHojeDisplay"></span>
                 </h3>
-                <div id="listaSessoesAtivas" class="space-y-2 max-h-40 overflow-y-auto pr-1"></div>
+                <div id="listaSessoesAtivas" class="space-y-3 max-h-48 overflow-y-auto pr-1"></div>
             </div>
         </div>
         
-        <button onclick="resetLogin()" id="btnVoltarLogin" class="hidden mt-8 text-slate-400 font-bold active:text-white py-2 px-4">← Voltar</button>
+        <button onclick="resetLogin()" id="btnVoltarLogin" class="hidden mt-8 text-slate-400 font-bold text-lg active:text-white py-3 px-6">← Voltar</button>
     </div>
 
-    <div class="bg-white sticky top-0 z-40 border-b shadow-sm px-4 py-3 flex justify-between items-center">
+    <div class="bg-white sticky top-0 z-40 border-b shadow-sm px-4 py-4 flex justify-between items-center">
         <div>
             <div class="flex items-center gap-2">
-                <span class="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span>
-                <h1 class="text-base font-black text-slate-800 uppercase leading-none">Painel</h1>
+                <span class="w-3 h-3 rounded-full bg-green-500 animate-pulse"></span>
+                <h1 class="text-xl font-black text-slate-800 uppercase leading-none">Painel</h1>
             </div>
-            <p class="text-[10px] text-slate-500 font-bold mt-1 uppercase">
-                <span id="tagOperador" class="text-blue-600"></span> • <span id="tagModo"></span> • <span id="tagSessao" class="text-slate-800"></span>
+            <p class="text-xs text-slate-500 font-bold mt-1.5 uppercase">
+                <span id="tagOperador" class="text-blue-600 text-sm"></span> • <span id="tagModo"></span> • <span id="tagSessao" class="text-slate-800"></span>
             </p>
         </div>
-        <div class="flex gap-2">
-            <button onclick="document.getElementById('modalConfig').classList.remove('hidden')" class="w-10 h-10 flex justify-center items-center bg-slate-100 text-slate-600 rounded-full active:bg-slate-200">⚙️</button>
-            <button onclick="reiniciarDia()" class="w-10 h-10 flex justify-center items-center bg-rose-50 text-rose-600 border border-rose-200 rounded-full active:bg-rose-100">🔄</button>
+        <div class="flex gap-3">
+            <button onclick="document.getElementById('modalConfig').classList.remove('hidden')" class="w-12 h-12 flex justify-center items-center bg-slate-100 text-slate-600 text-xl rounded-full active:bg-slate-200">⚙️</button>
+            <button onclick="reiniciarDia()" class="w-12 h-12 flex justify-center items-center bg-rose-50 text-rose-600 border border-rose-200 text-xl rounded-full active:bg-rose-100">🔄</button>
         </div>
     </div>
 
     <div class="p-4 max-w-lg mx-auto">
         
-        <div id="aba-triagem" class="space-y-4">
-            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
-                <div class="flex justify-between items-center mb-3">
-                    <h2 class="font-bold text-slate-500 text-xs uppercase">Entrada de Pacote</h2>
-                    <span id="nextIdDisplay" class="text-xl font-black text-blue-600 bg-blue-50 px-3 py-1 rounded-lg"></span>
+        <div id="aba-triagem" class="space-y-5">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="font-bold text-slate-500 text-sm uppercase">Entrada de Pacote</h2>
+                    <span id="nextIdDisplay" class="text-2xl font-black text-blue-600 bg-blue-50 px-4 py-1.5 rounded-lg"></span>
                 </div>
-                <div class="flex flex-col gap-3 relative">
+                <div class="flex flex-col gap-4 relative">
                     <div class="flex gap-2">
                         <div class="relative flex-grow flex items-center">
-    <input type="text" id="enderecoInput" class="w-full p-3.5 pr-12 bg-slate-50 border border-slate-300 rounded-xl text-base outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition" autocomplete="off" placeholder="Rua e número...">
-    
-    <button onclick="iniciarReconhecimentoVoz()" id="btnMic" class="absolute right-2 text-slate-400 hover:text-blue-500 p-2 rounded-full active:bg-slate-200 transition">
-        🎤
-    </button>
-
-    <div id="sugestoesDropdown" class="hidden absolute left-0 right-0 top-[105%] bg-white border rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto"></div>
-</div>
-                        <button onclick="processarUmPacote()" class="bg-slate-900 text-white px-5 rounded-xl font-bold active:bg-slate-700 active:scale-95 transition">OK</button>
+                            <input type="text" id="enderecoInput" class="w-full p-4 pr-14 bg-slate-50 border border-slate-300 rounded-xl text-lg font-medium outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition" autocomplete="off" placeholder="Rua e número...">
+                            <button onclick="iniciarReconhecimentoVoz()" id="btnMic" class="absolute right-2 text-slate-400 hover:text-blue-500 p-3 rounded-full text-xl active:bg-slate-200 transition">🎤</button>
+                            <div id="sugestoesDropdown" class="hidden absolute left-0 right-0 top-[105%] bg-white border rounded-xl shadow-xl z-50 max-h-60 overflow-y-auto"></div>
+                        </div>
+                        <button onclick="processarUmPacote()" class="bg-slate-900 text-white px-6 rounded-xl text-lg font-bold active:bg-slate-700 active:scale-95 transition">OK</button>
                     </div>
-                    <input type="text" id="notaInput" class="w-full p-3 bg-yellow-50/50 border border-yellow-200 rounded-xl text-sm outline-none focus:border-yellow-400 text-slate-700 placeholder-yellow-600/50" autocomplete="off" placeholder="Nota avulsa (opcional)...">
+                    <input type="text" id="notaInput" class="w-full p-4 bg-yellow-50/50 border border-yellow-200 rounded-xl text-base font-medium outline-none focus:border-yellow-400 text-slate-700 placeholder-yellow-600/50" autocomplete="off" placeholder="Nota avulsa (opcional)...">
                 </div>
             </div>
 
-            <div id="map" class="w-full h-48 rounded-2xl shadow-sm border border-slate-200 z-0"></div>
+            <div id="map" class="w-full h-56 rounded-2xl shadow-sm border border-slate-200 z-0"></div>
 
-            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
-                <div class="flex justify-between items-center mb-3">
-                    <h3 class="font-bold text-slate-600 uppercase text-xs" id="tituloLateral">Pendentes</h3>
-                    <span id="countPendentes" class="bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full text-xs font-bold">0</span>
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-bold text-slate-600 uppercase text-sm" id="tituloLateral">Pendentes</h3>
+                    <span id="countPendentes" class="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-sm font-bold">0</span>
                 </div>
                 <div id="listaPendentes" class="space-y-3"></div> 
             </div>
         </div>
 
-        <div id="aba-listagem" class="hidden space-y-4">
-            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
-                <div class="flex justify-between items-center mb-3">
-                    <h3 class="font-bold text-green-700 uppercase text-sm" id="labelR1">Rota 1</h3>
-                    <button onclick="baixarPlanilha(rota1, 'Rota_1.xlsx')" class="bg-green-100 text-green-700 px-3 py-1.5 rounded-lg text-xs font-bold active:bg-green-200 flex items-center gap-1">⬇️ Excel</button>
+        <div id="aba-listagem" class="hidden space-y-5">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex justify-between items-center mb-4 border-b pb-3">
+                    <h3 class="font-bold text-green-700 uppercase text-base" id="labelR1">Rota 1</h3>
+                    <button onclick="baixarPlanilha(rota1, 'Rota_1.xlsx')" class="bg-green-100 text-green-700 px-4 py-2 rounded-lg text-sm font-bold active:bg-green-200 flex items-center gap-2">⬇️ Excel</button>
                 </div>
-                <div id="fullRota1" class="space-y-2 text-xs"></div>
+                <div id="fullRota1" class="space-y-3 text-base"></div>
             </div>
             
-            <div id="colunaRota2" class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
-                <div class="flex justify-between items-center mb-3">
-                    <h3 class="font-bold text-orange-700 uppercase text-sm">Rota 2</h3>
-                    <button onclick="baixarPlanilha(rota2, 'Rota_2.xlsx')" class="bg-orange-100 text-orange-700 px-3 py-1.5 rounded-lg text-xs font-bold active:bg-orange-200 flex items-center gap-1">⬇️ Excel</button>
+            <div id="colunaRota2" class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex justify-between items-center mb-4 border-b pb-3">
+                    <h3 class="font-bold text-orange-700 uppercase text-base">Rota 2</h3>
+                    <button onclick="baixarPlanilha(rota2, 'Rota_2.xlsx')" class="bg-orange-100 text-orange-700 px-4 py-2 rounded-lg text-sm font-bold active:bg-orange-200 flex items-center gap-2">⬇️ Excel</button>
                 </div>
-                <div id="fullRota2" class="space-y-2 text-xs"></div>
+                <div id="fullRota2" class="space-y-3 text-base"></div>
             </div>
         </div>
 
-        <div id="aba-ajustes" class="hidden space-y-4">
-            <div class="bg-white p-5 rounded-2xl shadow-sm border border-purple-100 relative overflow-hidden">
-                <div class="absolute top-0 left-0 w-1 h-full bg-purple-500"></div>
-                <h3 class="font-black text-slate-800 mb-4 uppercase text-xs tracking-wider flex items-center gap-2">📍 Salvar Plus Code / Exato</h3>
+        <div id="aba-ajustes" class="hidden space-y-5">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-purple-100 relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-1.5 h-full bg-purple-500"></div>
+                <h3 class="font-black text-slate-800 mb-5 uppercase text-sm tracking-wider flex items-center gap-2">📍 Salvar Plus Code / Exato</h3>
                 
-                <input type="text" id="memEndOriginal" class="w-full p-3.5 bg-slate-50 border rounded-xl mb-3 text-sm outline-none focus:border-purple-400" placeholder="Endereço digitado (ex: Rua Brasil 10)">
+                <input type="text" id="memEndOriginal" class="w-full p-4 bg-slate-50 border rounded-xl mb-4 text-base font-medium outline-none focus:border-purple-400" placeholder="Endereço digitado (ex: Rua Brasil 10)">
                 
-                <div class="grid grid-cols-2 gap-3 mb-3">
-                    <input type="text" id="memPlusCode" class="w-full p-3.5 bg-slate-50 border rounded-xl text-sm outline-none focus:border-purple-400" placeholder="Cole o Plus Code">
-                    <input type="text" id="memNotas" class="w-full p-3.5 bg-slate-50 border rounded-xl text-sm outline-none focus:border-purple-400" placeholder="Nota Fixa">
+                <div class="grid grid-cols-1 gap-4 mb-4">
+                    <input type="text" id="memPlusCode" class="w-full p-4 bg-slate-50 border rounded-xl text-base outline-none focus:border-purple-400" placeholder="Cole o Plus Code">
+                    <input type="text" id="memNotas" class="w-full p-4 bg-slate-50 border rounded-xl text-base outline-none focus:border-purple-400" placeholder="Nota Fixa">
                 </div>
                 
-                <div class="flex items-center mb-4 bg-purple-50 p-3 rounded-xl border border-purple-100">
-                    <input type="checkbox" id="memAproximado" class="w-6 h-6 text-purple-600 bg-white border-slate-300 rounded cursor-pointer accent-purple-600">
-                    <label for="memAproximado" class="ml-3 text-xs font-bold text-purple-800 cursor-pointer leading-tight">
+                <div class="flex items-center mb-5 bg-purple-50 p-4 rounded-xl border border-purple-100">
+                    <input type="checkbox" id="memAproximado" class="w-7 h-7 text-purple-600 bg-white border-slate-300 rounded cursor-pointer accent-purple-600">
+                    <label for="memAproximado" class="ml-4 text-sm font-bold text-purple-800 cursor-pointer leading-snug">
                         Aplicar para 100 números próximos (+/-)
                     </label>
                 </div>
                 
-                <button onclick="salvarCorrecaoExata()" class="w-full bg-purple-600 text-white py-3.5 rounded-xl font-bold shadow-md active:bg-purple-700 active:scale-95 transition">Salvar na Memória</button>
+                <button onclick="salvarCorrecaoExata()" class="w-full bg-purple-600 text-white py-4 rounded-xl text-lg font-bold shadow-md active:bg-purple-700 active:scale-95 transition">Salvar na Memória</button>
             </div>
 
-            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-                <h3 class="font-black text-slate-800 mb-4 uppercase text-xs tracking-wider flex items-center gap-2">🛣️ Forçar Rua para Rota</h3>
-                <input type="text" id="ajusteRuaInput" class="w-full p-3.5 bg-slate-50 border rounded-xl mb-3 text-sm outline-none focus:border-blue-500" placeholder="Apenas nome (Ex: Caetano)">
-                <div class="flex gap-2">
-                    <button onclick="trocarRotaManual(1)" class="flex-1 bg-green-500 text-white py-3 rounded-xl font-bold active:bg-green-600 active:scale-95 shadow-sm text-sm">ROTA 1</button>
-                    <button onclick="trocarRotaManual(2)" class="flex-1 bg-orange-500 text-white py-3 rounded-xl font-bold active:bg-orange-600 active:scale-95 shadow-sm text-sm">ROTA 2</button>
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h3 class="font-black text-slate-800 mb-4 uppercase text-sm tracking-wider flex items-center gap-2">🛣️ Forçar Rua para Rota</h3>
+                <input type="text" id="ajusteRuaInput" class="w-full p-4 bg-slate-50 border rounded-xl mb-4 text-base outline-none focus:border-blue-500" placeholder="Apenas nome (Ex: Caetano)">
+                <div class="flex gap-3">
+                    <button onclick="trocarRotaManual(1)" class="flex-1 bg-green-500 text-white py-4 rounded-xl font-bold active:bg-green-600 active:scale-95 shadow-sm text-base">ROTA 1</button>
+                    <button onclick="trocarRotaManual(2)" class="flex-1 bg-orange-500 text-white py-4 rounded-xl font-bold active:bg-orange-600 active:scale-95 shadow-sm text-base">ROTA 2</button>
                 </div>
             </div>
         </div>
     </div>
 
+    <div id="fabContainer" class="fixed bottom-24 right-5 flex flex-col gap-4 z-50">
+        <button id="fabMic" onclick="iniciarReconhecimentoVoz()" class="bg-blue-600 text-white w-16 h-16 rounded-full shadow-2xl flex items-center justify-center text-3xl active:scale-90 transition-transform">
+            🎤
+        </button>
+        <button id="fabOk" onclick="processarUmPacote()" class="bg-slate-900 text-white w-16 h-16 rounded-full shadow-2xl flex items-center justify-center text-xl font-black active:scale-90 transition-transform">
+            OK
+        </button>
+    </div>
+
     <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-50 px-2 pb-safe shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.1)]">
-        <div class="flex justify-around items-center h-16">
+        <div class="flex justify-around items-center h-20">
             <button onclick="mudarAba('triagem')" id="tab-triagem" class="flex-1 flex flex-col items-center justify-center gap-1 text-slate-400 tab-active w-full h-full">
-                <div class="icon-bg p-1.5 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg></div>
-                <span class="text-[10px] font-bold tracking-wide">Triagem</span>
+                <div class="icon-bg p-2 transition-colors"><svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg></div>
+                <span class="text-xs font-bold tracking-wide">Triagem</span>
             </button>
             <button onclick="mudarAba('listagem')" id="tab-listagem" class="flex-1 flex flex-col items-center justify-center gap-1 text-slate-400 w-full h-full">
-                <div class="icon-bg p-1.5 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg></div>
-                <span class="text-[10px] font-bold tracking-wide">Listas</span>
+                <div class="icon-bg p-2 transition-colors"><svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg></div>
+                <span class="text-xs font-bold tracking-wide">Listas</span>
             </button>
             <button onclick="mudarAba('ajustes')" id="tab-ajustes" class="flex-1 flex flex-col items-center justify-center gap-1 text-slate-400 w-full h-full">
-                <div class="icon-bg p-1.5 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg></div>
-                <span class="text-[10px] font-bold tracking-wide">Ajustes</span>
+                <div class="icon-bg p-2 transition-colors"><svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg></div>
+                <span class="text-xs font-bold tracking-wide">Ajustes</span>
             </button>
         </div>
         <div class="h-[env(safe-area-inset-bottom)]"></div>
@@ -172,9 +178,9 @@
 
     <div id="modalConfig" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-[110] p-4 backdrop-blur-sm">
         <div class="bg-white w-full max-w-sm p-6 rounded-3xl shadow-2xl relative">
-            <button onclick="document.getElementById('modalConfig').classList.add('hidden')" class="absolute top-4 right-4 bg-slate-100 w-8 h-8 rounded-full flex items-center justify-center text-slate-500 font-bold active:bg-slate-200">×</button>
-            <h3 class="font-black text-lg text-slate-800 mb-6 border-b pb-2">Configurações</h3>
-            <button onclick="excluirMemoriaTotal()" class="w-full bg-rose-50 text-rose-600 border border-rose-200 py-3.5 rounded-xl font-bold active:bg-rose-100">🗑️ Apagar Toda Memória (GLOBAL)</button>
+            <button onclick="document.getElementById('modalConfig').classList.add('hidden')" class="absolute top-4 right-4 bg-slate-100 w-10 h-10 rounded-full flex items-center justify-center text-slate-500 font-bold text-xl active:bg-slate-200">×</button>
+            <h3 class="font-black text-xl text-slate-800 mb-6 border-b pb-3">Configurações</h3>
+            <button onclick="excluirMemoriaTotal()" class="w-full bg-rose-50 text-rose-600 border border-rose-200 py-4 rounded-xl font-bold text-lg active:bg-rose-100">🗑️ Apagar Memória</button>
         </div>
     </div>
 
@@ -238,15 +244,15 @@
                 const container = document.getElementById('listaSessoesAtivas');
                 if(!container) return;
                 if(!sessoes) {
-                    container.innerHTML = '<p class="text-slate-500 text-sm italic">Nenhuma rota hoje.</p>';
+                    container.innerHTML = '<p class="text-slate-500 text-base italic">Nenhuma rota hoje.</p>';
                     return;
                 }
                 let html = '';
                 for(let key in sessoes) {
                     const pacotes = sessoes[key].pacotes ? Object.keys(sessoes[key].pacotes).length : 0;
-                    html += `<button onclick="entrarSessaoExistente('${key}')" class="w-full text-left p-3 mt-2 bg-slate-700 active:bg-slate-600 rounded-xl text-white text-sm font-medium border border-slate-600 flex justify-between items-center shadow-md">
+                    html += `<button onclick="entrarSessaoExistente('${key}')" class="w-full text-left p-4 mt-2 bg-slate-700 active:bg-slate-600 rounded-xl text-white text-base font-medium border border-slate-600 flex justify-between items-center shadow-md">
                                 <span>📍 ${key}</span> 
-                                <span class="bg-slate-900 text-emerald-400 text-xs px-2.5 py-1 rounded-md font-bold">${pacotes} pct</span>
+                                <span class="bg-slate-900 text-emerald-400 text-sm px-3 py-1.5 rounded-lg font-bold">${pacotes} pct</span>
                              </button>`;
                 }
                 container.innerHTML = html;
@@ -258,16 +264,15 @@
                 const dropdown = document.getElementById('sugestoesDropdown');
                 if(termo.length < 3) { dropdown.classList.add('hidden'); return; }
                 timeoutBusca = setTimeout(async () => {
-                    // proximity=-53.45,-24.95 força resultados ao redor de Cascavel
-// bbox delimita o mapa (Aprox 100km pra cada lado)
-const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(termo)}.json?access_token=${mbt}&country=br&bbox=-54.5,-26.0,-52.4,-24.0&proximity=-53.45,-24.95&types=address,poi&autocomplete=true&limit=5`;
+                    // API ajustada para o raio de Cascavel (aproximadamente 100km)
+                    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(termo)}.json?access_token=${mbt}&country=br&bbox=-54.5,-26.0,-52.4,-24.0&proximity=-53.45,-24.95&types=address,poi&autocomplete=true&limit=5`;
                     try {
                         const res = await fetch(url);
                         const data = await res.json();
                         if(data.features && data.features.length > 0) {
                             dropdown.innerHTML = data.features.map(f => `
                                 <div onclick="selecionarSugestaoMapbox('${f.place_name.replace(/'/g, "\\'")}', ${f.center[0]}, ${f.center[1]})" 
-                                     class="p-4 active:bg-blue-50 cursor-pointer border-b text-sm font-medium text-slate-700">
+                                     class="p-4 active:bg-blue-50 cursor-pointer border-b text-base font-medium text-slate-700">
                                     📍 ${f.place_name}
                                 </div>`).join('');
                             dropdown.classList.remove('hidden');
@@ -323,8 +328,6 @@ const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURICompon
             }
 
             iniciarEscutaFirebase();
-            
-            // Corrige o mapa ao sair do display hidden do login
             setTimeout(() => map.invalidateSize(), 300);
         }
 
@@ -427,12 +430,12 @@ const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURICompon
         }
 
         function atualizarUI() {
-            const formatNota = (n) => n !== "-" ? `<div class="mt-1"><span class="text-[10px] text-purple-700 font-bold bg-purple-100 px-1.5 py-0.5 rounded leading-none inline-block">📝 ${n}</span></div>` : "";
+            const formatNota = (n) => n !== "-" ? `<div class="mt-1.5"><span class="text-xs text-purple-700 font-bold bg-purple-100 px-2 py-1 rounded leading-none inline-block">📝 ${n}</span></div>` : "";
             
             const renderItem = (i) => `
-                <div class="p-3 border-b flex justify-between bg-slate-50 rounded-lg mb-2 shadow-sm">
-                    <div class="pr-2"><span class="text-sm font-medium text-slate-800 leading-tight block">${i["Destination Address"]}</span>${formatNota(i.Notas)}</div>
-                    <b class="text-slate-400 text-sm">#${i["Display ID"]}</b>
+                <div class="p-4 border-b flex justify-between bg-slate-50 rounded-xl mb-3 shadow-sm">
+                    <div class="pr-3"><span class="text-base font-medium text-slate-800 leading-snug block">${i["Destination Address"]}</span>${formatNota(i.Notas)}</div>
+                    <b class="text-slate-400 text-base">#${i["Display ID"]}</b>
                 </div>`;
             
             document.getElementById('fullRota1').innerHTML = [...rota1].reverse().map(renderItem).join('');
@@ -441,25 +444,25 @@ const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURICompon
             if (modoTrabalho === 'duas') {
                 document.getElementById('countPendentes').innerText = pendentes.length;
                 document.getElementById('listaPendentes').innerHTML = [...pendentes].reverse().map(i => `
-                    <div class="bg-white p-3.5 rounded-xl border-l-4 border-l-blue-500 shadow-sm active:bg-blue-50 transition relative" 
+                    <div class="bg-white p-4 rounded-xl border-l-4 border-l-blue-500 shadow-sm active:bg-blue-50 transition relative" 
                          onclick="verNoMapa('${i["Destination Address"].replace(/'/g, "\\'")}')">
                         
-                        <div class="flex justify-between mb-1 pointer-events-none">
-                            <b class="text-red-600 text-sm">#${i["Display ID"]}</b>
-                            <span class="text-slate-400 text-[10px] font-bold bg-slate-100 px-1.5 rounded">${i._ruaBase}</span>
+                        <div class="flex justify-between mb-2 pointer-events-none">
+                            <b class="text-red-600 text-base">#${i["Display ID"]}</b>
+                            <span class="text-slate-500 text-xs font-bold bg-slate-100 px-2 py-0.5 rounded">${i._ruaBase}</span>
                         </div>
-                        <p class="text-slate-700 text-sm font-medium leading-tight pointer-events-none mb-1">
+                        <p class="text-slate-800 text-base font-medium leading-snug pointer-events-none mb-1">
                             ${i["Destination Address"]}
                         </p>
                         ${formatNota(i.Notas)}
                         
-                        <div class="flex gap-2 mt-3 relative z-10" onclick="event.stopPropagation()">
+                        <div class="flex gap-3 mt-4 relative z-10" onclick="event.stopPropagation()">
                             <button onclick="ensinarEResolver('${i._firebaseKey}', 1, '${i._ruaBase}')" 
-                                    class="flex-1 bg-green-600 text-white py-2.5 rounded-lg text-xs font-bold shadow-sm active:scale-95 transition">
+                                    class="flex-1 bg-green-600 text-white py-3 rounded-lg text-sm font-bold shadow-sm active:scale-95 transition">
                                 ROTA 1
                             </button>
                             <button onclick="ensinarEResolver('${i._firebaseKey}', 2, '${i._ruaBase}')" 
-                                    class="flex-1 bg-orange-600 text-white py-2.5 rounded-lg text-xs font-bold shadow-sm active:scale-95 transition">
+                                    class="flex-1 bg-orange-600 text-white py-3 rounded-lg text-sm font-bold shadow-sm active:scale-95 transition">
                                 ROTA 2
                             </button>
                         </div>
@@ -553,17 +556,26 @@ const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURICompon
         }
 
         function mudarAba(nome) {
+            // Oculta todas as abas
             ['triagem', 'listagem', 'ajustes'].forEach(a => {
                 document.getElementById('aba-' + a).classList.add('hidden');
                 document.getElementById('tab-' + a).classList.remove('tab-active');
                 document.getElementById('tab-' + a).classList.replace('text-blue-600', 'text-slate-400');
             });
+            // Mostra a aba clicada
             document.getElementById('aba-' + nome).classList.remove('hidden');
             const activeTab = document.getElementById('tab-' + nome);
             activeTab.classList.add('tab-active');
             activeTab.classList.replace('text-slate-400', 'text-blue-600');
             
-            if(nome === 'triagem') setTimeout(() => map.invalidateSize(), 100);
+            // <-- NOVA LÓGICA DO CONTAINER DOS BOTÕES FLUTUANTES -->
+            const fabContainer = document.getElementById('fabContainer');
+            if(nome === 'triagem') {
+                fabContainer.classList.remove('hidden');
+                setTimeout(() => map.invalidateSize(), 100);
+            } else {
+                fabContainer.classList.add('hidden');
+            }
         }
 
         function trocarRotaManual(r) {
@@ -606,64 +618,74 @@ const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURICompon
             document.getElementById('memNotas').value = '';
             document.getElementById('memAproximado').checked = false;
         }
-		function iniciarReconhecimentoVoz() {
-    // Verifica se o navegador suporta a API de voz (Chrome e Safari Mobile suportam bem)
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-        alert("Microfone não suportado neste navegador. Tente pelo Google Chrome.");
-        return;
-    }
 
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'pt-BR';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-
-    const btnMic = document.getElementById('btnMic');
-    const inputEnd = document.getElementById('enderecoInput');
-    
-    // Efeito visual para avisar que está gravando
-    btnMic.classList.add('bg-red-100', 'animate-pulse');
-    inputEnd.placeholder = "Ouvindo...";
-
-    recognition.start();
-
-    // Quando termina de escutar a voz
-    recognition.onresult = async (event) => {
-        const termoFalado = event.results[0][0].transcript;
-        inputEnd.value = termoFalado;
-        
-        btnMic.classList.remove('bg-red-100', 'animate-pulse');
-        inputEnd.placeholder = "Buscando localização...";
-
-        // Fazer a busca direto na API com o termo falado (Já com a restrição de Cascavel)
-        try {
-            const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(termoFalado)}.json?access_token=${mbt}&country=br&bbox=-54.5,-26.0,-52.4,-24.0&proximity=-53.45,-24.95&types=address,poi&limit=1`;
-            const res = await fetch(url);
-            const data = await res.json();
-            
-            if(data.features && data.features.length > 0) {
-                const f = data.features[0];
-                // Simula como se você tivesse clicado na melhor sugestão
-                selecionarSugestaoMapbox(f.place_name.replace(/'/g, "\\'"), f.center[0], f.center[1]);
-            } else {
-                alert("Endereço falado não foi encontrado no mapa.");
+        // FUNÇÃO DE RECONHECIMENTO DE VOZ INTEGRADA
+        function iniciarReconhecimentoVoz() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                alert("Microfone não suportado. Use o Google Chrome no celular.");
+                return;
             }
-        } catch(e) { console.error("Erro na busca por voz:", e); }
-        
-        inputEnd.placeholder = "Rua e número...";
-    };
 
-    // Em caso de erro ou ao parar de falar
-    recognition.onerror = (event) => {
-        btnMic.classList.remove('bg-red-100', 'animate-pulse');
-        inputEnd.placeholder = "Rua e número...";
-    };
-    recognition.onend = () => {
-        btnMic.classList.remove('bg-red-100', 'animate-pulse');
-        inputEnd.placeholder = "Rua e número...";
-    };
-}
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'pt-BR';
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+
+            const btnMic = document.getElementById('btnMic');
+            const fabMic = document.getElementById('fabMic');
+            const inputEnd = document.getElementById('enderecoInput');
+            
+            // UI visual de "Gravando"
+            btnMic.classList.add('bg-red-100', 'animate-pulse');
+            fabMic.classList.remove('bg-blue-600');
+            fabMic.classList.add('bg-red-500', 'animate-pulse');
+            inputEnd.placeholder = "Ouvindo...";
+
+            recognition.start();
+
+            recognition.onresult = async (event) => {
+                const termoFalado = event.results[0][0].transcript;
+                inputEnd.value = termoFalado;
+                
+                // Remove visual de gravando
+                btnMic.classList.remove('bg-red-100', 'animate-pulse');
+                fabMic.classList.remove('bg-red-500', 'animate-pulse');
+                fabMic.classList.add('bg-blue-600');
+                inputEnd.placeholder = "Buscando localização...";
+
+                try {
+                    // Busca direto com a restrição de Cascavel (-54.5,-26.0 a -52.4,-24.0)
+                    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(termoFalado)}.json?access_token=${mbt}&country=br&bbox=-54.5,-26.0,-52.4,-24.0&proximity=-53.45,-24.95&types=address,poi&limit=1`;
+                    const res = await fetch(url);
+                    const data = await res.json();
+                    
+                    if(data.features && data.features.length > 0) {
+                        const f = data.features[0];
+                        selecionarSugestaoMapbox(f.place_name.replace(/'/g, "\\'"), f.center[0], f.center[1]);
+                    } else {
+                        alert("Não achei nada próximo com esse áudio: " + termoFalado);
+                    }
+                } catch(e) { console.error("Erro voz:", e); }
+                
+                inputEnd.placeholder = "Rua e número...";
+            };
+
+            recognition.onerror = (event) => {
+                btnMic.classList.remove('bg-red-100', 'animate-pulse');
+                fabMic.classList.remove('bg-red-500', 'animate-pulse');
+                fabMic.classList.add('bg-blue-600');
+                inputEnd.placeholder = "Rua e número...";
+            };
+            
+            recognition.onend = () => {
+                btnMic.classList.remove('bg-red-100', 'animate-pulse');
+                fabMic.classList.remove('bg-red-500', 'animate-pulse');
+                fabMic.classList.add('bg-blue-600');
+                if(inputEnd.placeholder === "Ouvindo...") inputEnd.placeholder = "Rua e número...";
+            };
+        }
+
         document.getElementById('enderecoInput').addEventListener("keypress", e => { if(e.key === "Enter") processarUmPacote(); });
         document.getElementById('notaInput').addEventListener("keypress", e => { if(e.key === "Enter") processarUmPacote(); });
     </script>
