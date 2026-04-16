@@ -12,20 +12,20 @@
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     
     <style>
-        /* VARIÁVEIS DINÂMICAS PARA TUDO (Cores e Tamanhos) */
+        /* VARIÁVEIS DINÂMICAS: LIMITES AUMENTADOS DRASTICAMENTE */
         :root {
             --cor-tema: #2563eb; 
-            --fonte-base: 16px;
-            --fonte-titulos: 20px;
-            --fonte-botoes: 18px;
-            --barra-topo-p: 16px;
-            --barra-base-h: 80px;
-            --fab-tamanho: 64px;
-            --card-p: 20px;
-            --input-p: 16px;
+            --fonte-base: 20px;
+            --fonte-titulos: 26px;
+            --fonte-botoes: 24px;
+            --barra-topo-p: 20px;
+            --barra-base-h: 100px;
+            --fab-tamanho: 85px; /* FAB Gigante por padrão */
+            --card-p: 24px;
+            --input-p: 24px;
         }
 
-        /* BLINDAGEM DE APP NATIVO */
+        /* BLINDAGEM */
         html, body {
             touch-action: pan-y; 
             -webkit-user-select: none; 
@@ -36,27 +36,34 @@
         input, textarea {
             -webkit-user-select: auto;
             user-select: auto;
-            font-size: 16px !important; 
+            font-size: 20px !important; /* Previne auto-zoom e melhora leitura */
         }
 
-        /* CLASSES DE TAMANHO PERSONALIZÁVEIS (Sobrescrevem o Tailwind) */
-        .txt-base { font-size: var(--fonte-base) !important; }
-        .txt-titulo { font-size: var(--fonte-titulos) !important; }
-        .txt-botao { font-size: var(--fonte-botoes) !important; }
+        /* CLASSES DE TAMANHO */
+        .txt-base { font-size: var(--fonte-base) !important; line-height: 1.3 !important; }
+        .txt-titulo { font-size: var(--fonte-titulos) !important; line-height: 1.2 !important; }
+        .txt-botao { font-size: var(--fonte-botoes) !important; font-weight: 900 !important; }
         .pad-topo { padding: var(--barra-topo-p) !important; }
         .alt-barra-base { height: var(--barra-base-h) !important; }
         .pad-card { padding: var(--card-p) !important; }
         .pad-input { padding: var(--input-p) !important; }
         
+        /* BOTÃO FLUTUANTE NO MEIO DA TELA */
         .fab-btn { 
             width: var(--fab-tamanho) !important; 
             height: var(--fab-tamanho) !important; 
             font-size: calc(var(--fab-tamanho) * 0.4) !important; 
         }
-        /* Ajusta a altura flutuante com base na barra inferior */
-        #fabContainer { bottom: calc(var(--barra-base-h) + 16px) !important; }
+        #fabContainer { 
+            top: 50% !important; 
+            transform: translateY(-50%) !important; 
+            right: 15px !important; 
+        }
+        
+        /* O conteúdo principal ganha padding na direita para o FAB não tampar a leitura */
+        .area-principal { padding-right: calc(var(--fab-tamanho) + 25px) !important; }
 
-        /* CLASSES DO TEMA DE COR */
+        /* TEMA */
         .bg-tema { background-color: var(--cor-tema) !important; color: white !important; }
         .text-tema { color: var(--cor-tema) !important; }
         .border-tema { border-color: var(--cor-tema) !important; }
@@ -71,227 +78,221 @@
         .dark-mode .bg-slate-50 { background-color: #0f172a !important; }
         .dark-mode .bottom-bar, .dark-mode .top-bar { background-color: #1e293b; border-color: #334155; }
 
-        ::-webkit-scrollbar { width: 4px; height: 4px; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-        .dark-mode ::-webkit-scrollbar-thumb { background: #475569; }
-
-        /* Estilização dos Sliders (Para ficar bonito no app) */
-        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
-        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 24px; width: 24px; border-radius: 50%; background: var(--cor-tema); cursor: pointer; margin-top: -8px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
-        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 8px; cursor: pointer; background: #cbd5e1; border-radius: 4px; }
-        .dark-mode input[type=range]::-webkit-slider-runnable-track { background: #475569; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 10px; }
+        
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; margin: 10px 0; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 32px; width: 32px; border-radius: 50%; background: var(--cor-tema); cursor: pointer; margin-top: -12px; box-shadow: 0 4px 10px rgba(0,0,0,0.4); }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 10px; cursor: pointer; background: #cbd5e1; border-radius: 5px; }
     </style>
 </head>
-<body class="bg-slate-50 min-h-screen font-sans pb-24 txt-base transition-colors duration-300"> 
+<body class="bg-slate-50 min-h-screen font-sans pb-32 txt-base transition-colors duration-300"> 
 
-    <div id="loginOverlay" class="fixed inset-0 bg-slate-900 flex flex-col items-center justify-center z-[100] px-6">
-        <h1 class="font-black text-white mb-2 text-center tracking-tight" style="font-size: calc(var(--fonte-titulos) + 12px)">Roteirizador PRO</h1>
-        <p class="text-slate-400 mb-10 font-medium text-center txt-base" id="loginSubtitulo">Selecione o modo de operação</p>
+    <div id="loginOverlay" class="fixed inset-0 bg-slate-900 flex flex-col items-center justify-center z-[100] px-4">
+        <h1 class="font-black text-white mb-4 text-center tracking-tight" style="font-size: calc(var(--fonte-titulos) + 16px)">Roteirizador PRO</h1>
+        <p class="text-slate-400 mb-12 font-medium text-center txt-base" id="loginSubtitulo">Selecione o modo de operação</p>
         
-        <div id="etapaModo" class="flex flex-col gap-5 w-full max-w-sm">
-            <button onclick="selecionarModo('uma')" class="w-full bg-tema hover:opacity-90 font-bold py-6 rounded-2xl shadow-lg transition active:scale-95 txt-botao">1 Rota</button>
-            <button onclick="selecionarModo('duas')" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-6 rounded-2xl shadow-lg transition active:scale-95 txt-botao">2 Rotas</button>
+        <div id="etapaModo" class="flex flex-col gap-6 w-full max-w-md">
+            <button onclick="selecionarModo('uma')" class="w-full bg-tema hover:opacity-90 font-bold py-8 rounded-3xl shadow-xl transition active:scale-95 txt-botao">1 Rota</button>
+            <button onclick="selecionarModo('duas')" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-8 rounded-3xl shadow-xl transition active:scale-95 txt-botao">2 Rotas</button>
         </div>
 
-        <div id="etapaOperador" class="hidden flex flex-col gap-5 w-full max-w-sm">
-            <button onclick="selecionarOperador('A')" class="w-full bg-tema font-bold py-6 rounded-2xl shadow-lg active:scale-95 txt-botao">Operador A</button>
-            <button onclick="selecionarOperador('B')" class="w-full bg-slate-700 text-white font-bold py-6 rounded-2xl shadow-lg active:scale-95 txt-botao">Operador B</button>
+        <div id="etapaOperador" class="hidden flex flex-col gap-6 w-full max-w-md">
+            <button onclick="selecionarOperador('A')" class="w-full bg-tema font-bold py-8 rounded-3xl shadow-xl active:scale-95 txt-botao">Operador A</button>
+            <button onclick="selecionarOperador('B')" class="w-full bg-slate-700 text-white font-bold py-8 rounded-3xl shadow-xl active:scale-95 txt-botao">Operador B</button>
         </div>
 
-        <div id="etapaSessao" class="hidden flex flex-col items-center gap-5 w-full max-w-sm">
-            <input type="text" id="inputNomeSessao" class="rounded-2xl w-full outline-none border-4 border-tema uppercase font-bold text-center text-slate-800 pad-input txt-titulo" placeholder="NOME DA MOTO/ROTA">
-            <button onclick="finalizarLogin()" class="bg-tema font-bold py-5 w-full rounded-2xl shadow-lg active:scale-95 txt-botao">INICIAR OPERAÇÃO</button>
+        <div id="etapaSessao" class="hidden flex flex-col items-center gap-6 w-full max-w-md">
+            <input type="text" id="inputNomeSessao" class="rounded-3xl w-full outline-none border-4 border-tema uppercase font-black text-center text-slate-800 pad-input txt-titulo" placeholder="NOME DA ROTA/MOTO">
+            <button onclick="finalizarLogin()" class="bg-tema font-bold py-6 w-full rounded-3xl shadow-xl active:scale-95 txt-botao">INICIAR OPERAÇÃO</button>
             
-            <div class="w-full mt-4 bg-slate-800 rounded-2xl text-left border border-slate-700 pad-card">
-                <h3 class="text-tema font-bold mb-4 uppercase tracking-widest flex justify-between txt-base">
+            <div class="w-full mt-6 bg-slate-800 rounded-3xl text-left border border-slate-700 pad-card">
+                <h3 class="text-tema font-black mb-5 uppercase tracking-widest flex justify-between txt-base">
                     <span class="text-white">Rotas de Hoje</span>
                     <span class="text-slate-400" id="dataHojeDisplay"></span>
                 </h3>
-                <div id="listaSessoesAtivas" class="space-y-3 max-h-48 overflow-y-auto pr-1"></div>
+                <div id="listaSessoesAtivas" class="space-y-4 max-h-56 overflow-y-auto pr-2"></div>
             </div>
         </div>
         
-        <button onclick="resetLogin()" id="btnVoltarLogin" class="hidden mt-8 text-slate-400 font-bold active:text-white py-3 px-6 txt-botao">← Voltar</button>
+        <button onclick="resetLogin()" id="btnVoltarLogin" class="hidden mt-10 text-slate-400 font-black active:text-white py-4 px-8 txt-botao">← Voltar</button>
     </div>
 
-    <div class="top-bar bg-white sticky top-0 z-40 border-b shadow-sm pad-topo flex justify-between items-center transition-colors duration-300">
+    <div class="top-bar bg-white sticky top-0 z-40 border-b shadow-md pad-topo flex justify-between items-center transition-colors duration-300">
         <div>
-            <div class="flex items-center gap-2">
-                <span class="w-3 h-3 rounded-full bg-green-500 animate-pulse"></span>
+            <div class="flex items-center gap-3">
+                <span class="w-4 h-4 rounded-full bg-green-500 animate-pulse shadow-sm"></span>
                 <h1 class="font-black uppercase leading-none txt-titulo">Painel</h1>
             </div>
-            <p class="texto-secundario font-bold mt-1.5 uppercase txt-base" style="font-size: 0.8em !important">
+            <p class="texto-secundario font-black mt-2 uppercase txt-base" style="font-size: 0.85em !important">
                 <span id="tagOperador" class="text-tema"></span> • <span id="tagModo"></span> • <span id="tagSessao"></span>
             </p>
         </div>
-        <div class="flex gap-3">
-            <button onclick="abrirConfiguracoes()" class="w-12 h-12 flex justify-center items-center bg-slate-100 card-ui rounded-full active:scale-95 txt-titulo">⚙️</button>
-            <button onclick="reiniciarDia()" class="w-12 h-12 flex justify-center items-center bg-rose-50 text-rose-600 border border-rose-200 rounded-full active:scale-95 txt-titulo">🔄</button>
+        <div class="flex gap-4">
+            <button onclick="abrirConfiguracoes()" class="w-14 h-14 flex justify-center items-center bg-slate-100 card-ui rounded-2xl shadow-sm active:scale-95 txt-titulo">⚙️</button>
+            <button onclick="reiniciarDia()" class="w-14 h-14 flex justify-center items-center bg-rose-50 text-rose-600 border border-rose-200 rounded-2xl shadow-sm active:scale-95 txt-titulo">🔄</button>
         </div>
     </div>
 
-    <div class="p-4 max-w-lg mx-auto pb-6">
+    <div class="p-4 pl-4 area-principal max-w-2xl mx-auto pb-10">
         
-        <div id="aba-triagem" class="space-y-5">
-            <div class="card-ui bg-white rounded-2xl shadow-sm border border-slate-200 pad-card transition-colors duration-300">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="texto-secundario font-bold uppercase txt-base">Entrada de Pacote</h2>
-                    <span id="nextIdDisplay" class="font-black text-tema bg-slate-100 card-ui px-4 py-1.5 rounded-lg txt-titulo"></span>
+        <div id="aba-triagem" class="space-y-6">
+            <div class="card-ui bg-white rounded-3xl shadow-md border border-slate-200 pad-card transition-colors duration-300">
+                <div class="flex justify-between items-center mb-5">
+                    <h2 class="texto-secundario font-black uppercase txt-base">Entrada de Pacote</h2>
+                    <span id="nextIdDisplay" class="font-black text-tema bg-slate-100 card-ui px-5 py-2 rounded-xl txt-titulo shadow-inner"></span>
                 </div>
-                <div class="flex flex-col gap-4 relative">
-                    <div class="flex gap-2">
-                        <div class="relative flex-grow flex items-center">
-                            <input type="text" id="enderecoInput" class="w-full pr-14 bg-slate-50 border border-slate-300 rounded-xl font-medium outline-none focus:border-tema focus:ring-2 focus:ring-tema transition pad-input txt-base" autocomplete="off" placeholder="Rua e número...">
-                            <button onclick="iniciarReconhecimentoVoz()" id="btnMic" class="absolute right-2 texto-secundario p-3 rounded-full active:bg-slate-200 transition txt-titulo">🎤</button>
-                            <div id="sugestoesDropdown" class="card-ui hidden absolute left-0 right-0 top-[105%] bg-white border rounded-xl shadow-xl z-50 max-h-60 overflow-y-auto"></div>
-                        </div>
+                <div class="flex flex-col gap-5 relative">
+                    <div class="relative flex-grow flex items-center">
+                        <input type="text" id="enderecoInput" class="w-full bg-slate-50 border-2 border-slate-300 rounded-2xl font-bold outline-none focus:border-tema focus:ring-4 focus:ring-tema/20 transition pad-input txt-base" autocomplete="off" placeholder="Rua e número...">
+                        <div id="sugestoesDropdown" class="card-ui hidden absolute left-0 right-0 top-[105%] bg-white border-2 rounded-2xl shadow-2xl z-50 max-h-72 overflow-y-auto"></div>
                     </div>
-                    <input type="text" id="notaInput" class="w-full bg-yellow-50/50 border border-yellow-200 rounded-xl font-medium outline-none focus:border-yellow-400 placeholder-yellow-600/50 pad-input txt-base" autocomplete="off" placeholder="Nota avulsa (opcional)...">
+                    <input type="text" id="notaInput" class="w-full bg-yellow-50/50 border-2 border-yellow-200 rounded-2xl font-bold outline-none focus:border-yellow-400 placeholder-yellow-600/50 pad-input txt-base" autocomplete="off" placeholder="Nota (opcional)...">
                 </div>
             </div>
 
-            <div id="map" class="w-full h-56 rounded-2xl shadow-sm border border-slate-200 z-0"></div>
+            <div id="map" class="w-full h-72 rounded-3xl shadow-md border-2 border-slate-200 z-0"></div>
 
-            <div class="card-ui bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col pad-card transition-colors duration-300">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="texto-secundario font-bold uppercase txt-base" id="tituloLateral">Pendentes</h3>
-                    <span id="countPendentes" class="bg-slate-100 texto-secundario px-3 py-1 rounded-full font-bold txt-base">0</span>
+            <div class="card-ui bg-white rounded-3xl shadow-md border border-slate-200 flex flex-col pad-card transition-colors duration-300">
+                <div class="flex justify-between items-center mb-5">
+                    <h3 class="texto-secundario font-black uppercase txt-base" id="tituloLateral">Pendentes</h3>
+                    <span id="countPendentes" class="bg-slate-100 texto-secundario px-4 py-1.5 rounded-full font-black txt-base shadow-inner">0</span>
                 </div>
-                <div id="listaPendentes" class="space-y-3"></div> 
+                <div id="listaPendentes" class="space-y-4"></div> 
             </div>
         </div>
 
-        <div id="aba-listagem" class="hidden space-y-5">
-            <div class="card-ui bg-white rounded-2xl shadow-sm border border-slate-200 pad-card transition-colors duration-300">
-                <div class="flex justify-between items-center mb-4 border-b pb-3 border-slate-200">
-                    <h3 class="font-bold text-tema uppercase txt-titulo" id="labelR1">Rota 1</h3>
-                    <button onclick="baixarPlanilha(rota1, 'Rota_1.xlsx')" class="bg-tema text-white px-4 py-2 rounded-lg font-bold active:opacity-80 flex items-center gap-2 txt-base">⬇️ Excel</button>
+        <div id="aba-listagem" class="hidden space-y-6">
+            <div class="card-ui bg-white rounded-3xl shadow-md border border-slate-200 pad-card transition-colors duration-300">
+                <div class="flex justify-between items-center mb-5 border-b-2 pb-4 border-slate-200">
+                    <h3 class="font-black text-tema uppercase txt-titulo" id="labelR1">Rota 1</h3>
+                    <button onclick="baixarPlanilha(rota1, 'Rota_1.xlsx')" class="bg-tema text-white px-5 py-3 rounded-xl font-black active:opacity-80 flex items-center gap-2 txt-base shadow-md">⬇️ Excel</button>
                 </div>
-                <div id="fullRota1" class="space-y-3 txt-base"></div>
+                <div id="fullRota1" class="space-y-4 txt-base"></div>
             </div>
             
-            <div id="colunaRota2" class="card-ui bg-white rounded-2xl shadow-sm border border-slate-200 pad-card transition-colors duration-300">
-                <div class="flex justify-between items-center mb-4 border-b pb-3 border-slate-200">
-                    <h3 class="font-bold text-orange-600 uppercase txt-titulo">Rota 2</h3>
-                    <button onclick="baixarPlanilha(rota2, 'Rota_2.xlsx')" class="bg-orange-500 text-white px-4 py-2 rounded-lg font-bold active:opacity-80 flex items-center gap-2 txt-base">⬇️ Excel</button>
+            <div id="colunaRota2" class="card-ui bg-white rounded-3xl shadow-md border border-slate-200 pad-card transition-colors duration-300">
+                <div class="flex justify-between items-center mb-5 border-b-2 pb-4 border-slate-200">
+                    <h3 class="font-black text-orange-600 uppercase txt-titulo">Rota 2</h3>
+                    <button onclick="baixarPlanilha(rota2, 'Rota_2.xlsx')" class="bg-orange-500 text-white px-5 py-3 rounded-xl font-black active:opacity-80 flex items-center gap-2 txt-base shadow-md">⬇️ Excel</button>
                 </div>
-                <div id="fullRota2" class="space-y-3 txt-base"></div>
+                <div id="fullRota2" class="space-y-4 txt-base"></div>
             </div>
         </div>
 
-        <div id="aba-ajustes" class="hidden space-y-5">
-            <div class="card-ui bg-white rounded-2xl shadow-sm border border-tema relative overflow-hidden pad-card transition-colors duration-300">
-                <div class="absolute top-0 left-0 w-1.5 h-full bg-tema"></div>
-                <h3 class="font-black mb-5 uppercase tracking-wider flex items-center gap-2 txt-titulo">📍 Plus Code</h3>
+        <div id="aba-ajustes" class="hidden space-y-6">
+            <div class="card-ui bg-white rounded-3xl shadow-md border-2 border-tema relative overflow-hidden pad-card transition-colors duration-300">
+                <div class="absolute top-0 left-0 w-2 h-full bg-tema"></div>
+                <h3 class="font-black mb-6 uppercase tracking-wider flex items-center gap-3 txt-titulo">📍 Plus Code</h3>
                 
-                <input type="text" id="memEndOriginal" class="w-full bg-slate-50 border rounded-xl mb-4 font-medium outline-none focus:border-tema pad-input txt-base" placeholder="Endereço (ex: Rua Brasil 10)">
+                <input type="text" id="memEndOriginal" class="w-full bg-slate-50 border-2 rounded-2xl mb-5 font-bold outline-none focus:border-tema pad-input txt-base" placeholder="Endereço Original">
                 
-                <div class="grid grid-cols-1 gap-4 mb-4">
-                    <input type="text" id="memPlusCode" class="w-full bg-slate-50 border rounded-xl outline-none focus:border-tema pad-input txt-base" placeholder="Plus Code">
-                    <input type="text" id="memNotas" class="w-full bg-slate-50 border rounded-xl outline-none focus:border-tema pad-input txt-base" placeholder="Nota Fixa">
+                <div class="grid grid-cols-1 gap-5 mb-5">
+                    <input type="text" id="memPlusCode" class="w-full bg-slate-50 border-2 rounded-2xl font-bold outline-none focus:border-tema pad-input txt-base" placeholder="Plus Code">
+                    <input type="text" id="memNotas" class="w-full bg-slate-50 border-2 rounded-2xl font-bold outline-none focus:border-tema pad-input txt-base" placeholder="Nota Fixa">
                 </div>
                 
-                <div class="flex items-center mb-5 rounded-xl border border-slate-200 bg-slate-50 pad-input">
-                    <input type="checkbox" id="memAproximado" class="w-7 h-7 text-tema bg-white border-slate-300 rounded cursor-pointer">
-                    <label for="memAproximado" class="ml-4 font-bold cursor-pointer leading-snug txt-base">
+                <div class="flex items-center mb-6 rounded-2xl border-2 border-slate-200 bg-slate-50 pad-input">
+                    <input type="checkbox" id="memAproximado" class="w-8 h-8 text-tema bg-white border-slate-300 rounded cursor-pointer">
+                    <label for="memAproximado" class="ml-4 font-black cursor-pointer leading-snug txt-base">
                         Aplicar p/ 100 números próximos
                     </label>
                 </div>
                 
-                <button onclick="salvarCorrecaoExata()" class="w-full bg-tema text-white rounded-xl font-bold shadow-md active:opacity-90 active:scale-95 transition pad-input txt-botao">Salvar Memória</button>
+                <button onclick="salvarCorrecaoExata()" class="w-full bg-tema text-white rounded-2xl font-black shadow-xl active:opacity-90 active:scale-95 transition pad-input txt-botao">Salvar Memória</button>
             </div>
 
-            <div class="card-ui bg-white rounded-2xl shadow-sm border border-slate-200 pad-card transition-colors duration-300">
-                <h3 class="font-black mb-4 uppercase tracking-wider flex items-center gap-2 txt-titulo">🛣️ Forçar Rota</h3>
-                <input type="text" id="ajusteRuaInput" class="w-full bg-slate-50 border rounded-xl mb-4 outline-none focus:border-tema pad-input txt-base" placeholder="Apenas nome (Ex: Caetano)">
-                <div class="flex gap-3">
-                    <button onclick="trocarRotaManual(1)" class="flex-1 bg-tema text-white rounded-xl font-bold active:opacity-90 active:scale-95 shadow-sm pad-input txt-botao">ROTA 1</button>
-                    <button onclick="trocarRotaManual(2)" class="flex-1 bg-orange-600 text-white rounded-xl font-bold active:opacity-90 active:scale-95 shadow-sm pad-input txt-botao">ROTA 2</button>
+            <div class="card-ui bg-white rounded-3xl shadow-md border border-slate-200 pad-card transition-colors duration-300">
+                <h3 class="font-black mb-5 uppercase tracking-wider flex items-center gap-3 txt-titulo">🛣️ Forçar Rota</h3>
+                <input type="text" id="ajusteRuaInput" class="w-full bg-slate-50 border-2 rounded-2xl mb-5 font-bold outline-none focus:border-tema pad-input txt-base" placeholder="Apenas nome (Ex: Caetano)">
+                <div class="flex gap-4">
+                    <button onclick="trocarRotaManual(1)" class="flex-1 bg-tema text-white rounded-2xl font-black active:opacity-90 active:scale-95 shadow-md pad-input txt-botao">ROTA 1</button>
+                    <button onclick="trocarRotaManual(2)" class="flex-1 bg-orange-600 text-white rounded-2xl font-black active:opacity-90 active:scale-95 shadow-md pad-input txt-botao">ROTA 2</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <div id="fabContainer" class="fixed right-5 flex flex-col gap-4 z-50">
-        <button id="fabMic" onclick="iniciarReconhecimentoVoz()" class="bg-tema text-white rounded-full shadow-2xl flex items-center justify-center fab-btn active:scale-90 transition-transform">
+    <div id="fabContainer" class="fixed flex flex-col gap-6 z-50">
+        <button id="fabMic" onclick="iniciarReconhecimentoVoz()" class="bg-tema text-white rounded-full shadow-[0_10px_25px_rgba(0,0,0,0.5)] flex items-center justify-center fab-btn active:scale-90 transition-transform">
             🎤
         </button>
-        <button id="fabOk" onclick="processarUmPacote()" class="bg-slate-800 text-white rounded-full shadow-2xl flex items-center justify-center font-black fab-btn active:scale-90 transition-transform border-2 border-slate-600">
+        <button id="fabOk" onclick="processarUmPacote()" class="bg-slate-800 text-white rounded-full shadow-[0_10px_25px_rgba(0,0,0,0.5)] flex items-center justify-center font-black fab-btn active:scale-90 transition-transform border-4 border-slate-600">
             OK
         </button>
     </div>
 
-    <div class="bottom-bar alt-barra-base fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-50 px-2 pb-safe shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.1)] transition-colors duration-300">
+    <div class="bottom-bar alt-barra-base fixed bottom-0 left-0 right-0 bg-white border-t-2 border-slate-200 z-50 px-2 pb-safe shadow-[0_-10px_30px_rgba(0,0,0,0.1)] transition-colors duration-300">
         <div class="flex justify-around items-center h-full">
-            <button onclick="mudarAba('triagem')" id="tab-triagem" class="flex-1 flex flex-col items-center justify-center gap-1 texto-secundario tab-active w-full h-full">
-                <div class="icon-bg p-2 transition-colors"><svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg></div>
-                <span class="font-bold tracking-wide" style="font-size: calc(var(--fonte-base) * 0.7)">Triagem</span>
+            <button onclick="mudarAba('triagem')" id="tab-triagem" class="flex-1 flex flex-col items-center justify-center gap-2 texto-secundario tab-active w-full h-full">
+                <div class="icon-bg p-3 transition-colors"><svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg></div>
+                <span class="font-black tracking-wide" style="font-size: calc(var(--fonte-base) * 0.75)">Triagem</span>
             </button>
-            <button onclick="mudarAba('listagem')" id="tab-listagem" class="flex-1 flex flex-col items-center justify-center gap-1 texto-secundario w-full h-full">
-                <div class="icon-bg p-2 transition-colors"><svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg></div>
-                <span class="font-bold tracking-wide" style="font-size: calc(var(--fonte-base) * 0.7)">Listas</span>
+            <button onclick="mudarAba('listagem')" id="tab-listagem" class="flex-1 flex flex-col items-center justify-center gap-2 texto-secundario w-full h-full">
+                <div class="icon-bg p-3 transition-colors"><svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg></div>
+                <span class="font-black tracking-wide" style="font-size: calc(var(--fonte-base) * 0.75)">Listas</span>
             </button>
-            <button onclick="mudarAba('ajustes')" id="tab-ajustes" class="flex-1 flex flex-col items-center justify-center gap-1 texto-secundario w-full h-full">
-                <div class="icon-bg p-2 transition-colors"><svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg></div>
-                <span class="font-bold tracking-wide" style="font-size: calc(var(--fonte-base) * 0.7)">Ajustes</span>
+            <button onclick="mudarAba('ajustes')" id="tab-ajustes" class="flex-1 flex flex-col items-center justify-center gap-2 texto-secundario w-full h-full">
+                <div class="icon-bg p-3 transition-colors"><svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg></div>
+                <span class="font-black tracking-wide" style="font-size: calc(var(--fonte-base) * 0.75)">Ajustes</span>
             </button>
         </div>
     </div>
 
-    <div id="modalConfig" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center z-[110] p-4 backdrop-blur-sm">
-        <div class="card-ui bg-white w-full max-w-sm p-5 rounded-3xl shadow-2xl relative transition-colors duration-300">
-            <button onclick="fecharConfiguracoes()" class="absolute top-4 right-4 bg-slate-100 card-ui w-10 h-10 rounded-full flex items-center justify-center font-bold text-xl active:scale-95">×</button>
-            <h3 class="font-black text-xl mb-4 border-b pb-3 border-slate-200">Editor Visual</h3>
+    <div id="modalConfig" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center z-[110] p-4 backdrop-blur-md">
+        <div class="card-ui bg-white w-full max-w-md p-6 rounded-[2rem] shadow-2xl relative transition-colors duration-300">
+            <button onclick="fecharConfiguracoes()" class="absolute top-5 right-5 bg-slate-100 card-ui w-12 h-12 rounded-full flex items-center justify-center font-black text-2xl active:scale-95 shadow-sm">×</button>
+            <h3 class="font-black mb-6 border-b-2 pb-4 border-slate-200 txt-titulo">Editor Visual</h3>
             
-            <div class="space-y-5 mb-4 h-[55vh] overflow-y-auto pr-2 pb-6">
-                <div class="bg-slate-50 card-ui p-4 rounded-xl border border-slate-200">
-                    <label class="block text-xs font-bold mb-3 texto-secundario uppercase">Tema Visual</label>
-                    <div class="flex items-center justify-between mb-3">
-                        <span class="font-bold">Cor Principal</span>
-                        <input type="color" id="inputCorTema" class="w-10 h-10 rounded cursor-pointer border-0 p-0 bg-transparent" onchange="previewVar('--cor-tema', this.value, '')">
+            <div class="space-y-6 mb-6 h-[55vh] overflow-y-auto pr-3 pb-8">
+                <div class="bg-slate-50 card-ui p-5 rounded-2xl border-2 border-slate-200">
+                    <label class="block font-black mb-4 texto-secundario uppercase txt-base" style="font-size: 0.8em !important">Tema Visual</label>
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="font-black txt-base">Cor Principal</span>
+                        <input type="color" id="inputCorTema" class="w-12 h-12 rounded-lg cursor-pointer border-0 p-0 bg-transparent" onchange="previewVar('--cor-tema', this.value, '')">
                     </div>
-                    <div class="flex items-center justify-between border-t border-slate-200 pt-3">
-                        <span class="font-bold">Modo Noturno</span>
-                        <input type="checkbox" id="inputModoEscuro" class="w-6 h-6 accent-tema cursor-pointer" onchange="document.body.classList.toggle('dark-mode', this.checked)">
+                    <div class="flex items-center justify-between border-t-2 border-slate-200 pt-4">
+                        <span class="font-black txt-base">Modo Noturno</span>
+                        <input type="checkbox" id="inputModoEscuro" class="w-8 h-8 accent-tema cursor-pointer" onchange="document.body.classList.toggle('dark-mode', this.checked)">
                     </div>
                 </div>
 
                 <div>
-                    <label class="block text-xs font-bold mb-1 texto-secundario uppercase">Tamanho: Letras (Geral)</label>
-                    <input type="range" id="slFonteGeral" min="12" max="24" class="w-full" oninput="previewVar('--fonte-base', this.value, 'px')">
+                    <label class="block font-black mb-2 texto-secundario uppercase txt-base" style="font-size: 0.8em !important">Tamanho: Letras (Geral)</label>
+                    <input type="range" id="slFonteGeral" min="16" max="40" class="w-full" oninput="previewVar('--fonte-base', this.value, 'px')">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold mb-1 texto-secundario uppercase">Tamanho: Títulos</label>
-                    <input type="range" id="slFonteTitulos" min="14" max="32" class="w-full" oninput="previewVar('--fonte-titulos', this.value, 'px')">
+                    <label class="block font-black mb-2 texto-secundario uppercase txt-base" style="font-size: 0.8em !important">Tamanho: Títulos</label>
+                    <input type="range" id="slFonteTitulos" min="20" max="50" class="w-full" oninput="previewVar('--fonte-titulos', this.value, 'px')">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold mb-1 texto-secundario uppercase">Tamanho: Botões</label>
-                    <input type="range" id="slFonteBotoes" min="14" max="28" class="w-full" oninput="previewVar('--fonte-botoes', this.value, 'px')">
+                    <label class="block font-black mb-2 texto-secundario uppercase txt-base" style="font-size: 0.8em !important">Tamanho: Botões</label>
+                    <input type="range" id="slFonteBotoes" min="18" max="45" class="w-full" oninput="previewVar('--fonte-botoes', this.value, 'px')">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold mb-1 texto-secundario uppercase">Espessura: Barra de Topo</label>
-                    <input type="range" id="slBarraTopo" min="8" max="32" class="w-full" oninput="previewVar('--barra-topo-p', this.value, 'px')">
+                    <label class="block font-black mb-2 texto-secundario uppercase txt-base" style="font-size: 0.8em !important">Espessura: Barra de Topo</label>
+                    <input type="range" id="slBarraTopo" min="12" max="40" class="w-full" oninput="previewVar('--barra-topo-p', this.value, 'px')">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold mb-1 texto-secundario uppercase">Altura: Menu Inferior</label>
-                    <input type="range" id="slBarraBase" min="60" max="110" class="w-full" oninput="previewVar('--barra-base-h', this.value, 'px')">
+                    <label class="block font-black mb-2 texto-secundario uppercase txt-base" style="font-size: 0.8em !important">Altura: Menu Inferior</label>
+                    <input type="range" id="slBarraBase" min="80" max="150" class="w-full" oninput="previewVar('--barra-base-h', this.value, 'px')">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold mb-1 texto-secundario uppercase">Tamanho: Botão Flutuante (MIC/OK)</label>
-                    <input type="range" id="slFab" min="50" max="90" class="w-full" oninput="previewVar('--fab-tamanho', this.value, 'px')">
+                    <label class="block font-black mb-2 texto-secundario uppercase txt-base" style="font-size: 0.8em !important">Tamanho: Botão Flutuante (MIC/OK)</label>
+                    <input type="range" id="slFab" min="60" max="130" class="w-full" oninput="previewVar('--fab-tamanho', this.value, 'px')">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold mb-1 texto-secundario uppercase">Espaçamento: Margens dos Blocos</label>
-                    <input type="range" id="slCard" min="10" max="40" class="w-full" oninput="previewVar('--card-p', this.value, 'px')">
+                    <label class="block font-black mb-2 texto-secundario uppercase txt-base" style="font-size: 0.8em !important">Espaçamento: Blocos e Cards</label>
+                    <input type="range" id="slCard" min="16" max="50" class="w-full" oninput="previewVar('--card-p', this.value, 'px')">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold mb-1 texto-secundario uppercase">Altura: Campos de Digitação</label>
-                    <input type="range" id="slInput" min="10" max="32" class="w-full" oninput="previewVar('--input-p', this.value, 'px')">
+                    <label class="block font-black mb-2 texto-secundario uppercase txt-base" style="font-size: 0.8em !important">Altura: Campos de Digitação</label>
+                    <input type="range" id="slInput" min="16" max="40" class="w-full" oninput="previewVar('--input-p', this.value, 'px')">
                 </div>
             </div>
 
-            <button onclick="salvarConfiguracoes()" class="w-full bg-tema text-white pad-input rounded-xl font-bold txt-botao active:scale-95 mb-3 shadow-md">✅ Salvar Layout</button>
-            <button onclick="excluirMemoriaTotal()" class="w-full bg-rose-50 text-rose-600 border border-rose-200 py-3 rounded-xl font-bold txt-base active:bg-rose-100">🗑️ Limpar Ruas Memória</button>
+            <button onclick="salvarConfiguracoes()" class="w-full bg-tema text-white pad-input rounded-2xl font-black txt-botao active:scale-95 mb-4 shadow-xl border-b-4 border-black/20">✅ Salvar Layout</button>
+            <button onclick="excluirMemoriaTotal()" class="w-full bg-rose-50 text-rose-600 border-2 border-rose-200 py-4 rounded-2xl font-black txt-base active:bg-rose-100">🗑️ Limpar Ruas Memória</button>
         </div>
     </div>
 
@@ -321,19 +322,19 @@
         let rota1 = [], rota2 = [], pendentes = [];
         let map, marker, timeoutBusca;
         
-        // CONFIGURAÇÃO PADRÃO
+        // CONFIGURAÇÃO PADRÃO (VALORES MAIORES)
         let configApp = { 
             corTema: '#2563eb', 
             modoEscuro: false,
             vars: {
-                '--fonte-base': '16px',
-                '--fonte-titulos': '20px',
-                '--fonte-botoes': '18px',
-                '--barra-topo-p': '16px',
-                '--barra-base-h': '80px',
-                '--fab-tamanho': '64px',
-                '--card-p': '20px',
-                '--input-p': '16px'
+                '--fonte-base': '20px',
+                '--fonte-titulos': '26px',
+                '--fonte-botoes': '24px',
+                '--barra-topo-p': '20px',
+                '--barra-base-h': '100px',
+                '--fab-tamanho': '85px',
+                '--card-p': '24px',
+                '--input-p': '24px'
             }
         };
         
@@ -356,10 +357,8 @@
             marker = L.marker([-24.6191, -53.3256]).addTo(map);
             marker.setOpacity(0);
 
-            // Carrega Preferências da Nuvem
             dbConfig.on('value', snap => {
                 if(snap.val()) {
-                    // Mescla as configs para evitar quebrar caso seja um banco novo
                     configApp = { ...configApp, ...snap.val() };
                     if(!configApp.vars) configApp.vars = {};
                     aplicarTemaUI();
@@ -377,15 +376,15 @@
                 const container = document.getElementById('listaSessoesAtivas');
                 if(!container) return;
                 if(!sessoes) {
-                    container.innerHTML = '<p class="text-slate-400 txt-base italic">Nenhuma rota hoje.</p>';
+                    container.innerHTML = '<p class="text-slate-400 txt-base italic font-bold">Nenhuma rota hoje.</p>';
                     return;
                 }
                 let html = '';
                 for(let key in sessoes) {
                     const pacotes = sessoes[key].pacotes ? Object.keys(sessoes[key].pacotes).length : 0;
-                    html += `<button onclick="entrarSessaoExistente('${key}')" class="w-full text-left p-4 mt-2 bg-slate-700 active:bg-slate-600 rounded-xl text-white txt-base font-medium border border-slate-600 flex justify-between items-center shadow-md">
+                    html += `<button onclick="entrarSessaoExistente('${key}')" class="w-full text-left p-5 mt-3 bg-slate-700 active:bg-slate-600 rounded-2xl text-white txt-base font-black border border-slate-600 flex justify-between items-center shadow-md">
                                 <span>📍 ${key}</span> 
-                                <span class="bg-slate-900 text-tema px-3 py-1.5 rounded-lg font-bold">${pacotes} pct</span>
+                                <span class="bg-slate-900 text-tema px-4 py-2 rounded-xl font-black">${pacotes} pct</span>
                              </button>`;
                 }
                 container.innerHTML = html;
@@ -404,7 +403,7 @@
                         if(data.features && data.features.length > 0) {
                             dropdown.innerHTML = data.features.map(f => `
                                 <div onclick="selecionarSugestaoMapbox('${f.place_name.replace(/'/g, "\\'")}', ${f.center[0]}, ${f.center[1]})" 
-                                     class="p-4 active:bg-slate-100 cursor-pointer border-b border-slate-200 txt-base font-medium">
+                                     class="p-5 active:bg-slate-100 cursor-pointer border-b-2 border-slate-200 txt-base font-black text-slate-700">
                                     📍 ${f.place_name}
                                 </div>`).join('');
                             dropdown.classList.remove('hidden');
@@ -423,31 +422,29 @@
         function aplicarTemaUI() {
             document.documentElement.style.setProperty('--cor-tema', configApp.corTema);
             document.body.classList.toggle('dark-mode', configApp.modoEscuro);
-            
             for(let key in configApp.vars) {
                 document.documentElement.style.setProperty(key, configApp.vars[key]);
             }
         }
 
         function abrirConfiguracoes() {
-            // Sincroniza os inputs com os dados carregados
             document.getElementById('inputCorTema').value = configApp.corTema;
             document.getElementById('inputModoEscuro').checked = configApp.modoEscuro;
             
-            document.getElementById('slFonteGeral').value = parseInt(configApp.vars['--fonte-base'] || 16);
-            document.getElementById('slFonteTitulos').value = parseInt(configApp.vars['--fonte-titulos'] || 20);
-            document.getElementById('slFonteBotoes').value = parseInt(configApp.vars['--fonte-botoes'] || 18);
-            document.getElementById('slBarraTopo').value = parseInt(configApp.vars['--barra-topo-p'] || 16);
-            document.getElementById('slBarraBase').value = parseInt(configApp.vars['--barra-base-h'] || 80);
-            document.getElementById('slFab').value = parseInt(configApp.vars['--fab-tamanho'] || 64);
-            document.getElementById('slCard').value = parseInt(configApp.vars['--card-p'] || 20);
-            document.getElementById('slInput').value = parseInt(configApp.vars['--input-p'] || 16);
+            document.getElementById('slFonteGeral').value = parseInt(configApp.vars['--fonte-base'] || 20);
+            document.getElementById('slFonteTitulos').value = parseInt(configApp.vars['--fonte-titulos'] || 26);
+            document.getElementById('slFonteBotoes').value = parseInt(configApp.vars['--fonte-botoes'] || 24);
+            document.getElementById('slBarraTopo').value = parseInt(configApp.vars['--barra-topo-p'] || 20);
+            document.getElementById('slBarraBase').value = parseInt(configApp.vars['--barra-base-h'] || 100);
+            document.getElementById('slFab').value = parseInt(configApp.vars['--fab-tamanho'] || 85);
+            document.getElementById('slCard').value = parseInt(configApp.vars['--card-p'] || 24);
+            document.getElementById('slInput').value = parseInt(configApp.vars['--input-p'] || 24);
 
             document.getElementById('modalConfig').classList.remove('hidden');
         }
 
         function fecharConfiguracoes() {
-            aplicarTemaUI(); // Reverte caso ele tenha mexido nos sliders mas não salvou
+            aplicarTemaUI(); 
             document.getElementById('modalConfig').classList.add('hidden');
         }
 
@@ -466,11 +463,11 @@
                 '--input-p': document.getElementById('slInput').value + 'px'
             };
             
-            dbConfig.set(configApp); // Manda tudo pro Firebase
+            dbConfig.set(configApp); 
             document.getElementById('modalConfig').classList.add('hidden');
         }
 
-        // ====== RESTANTE DAS FUNÇÕES LOGÍSTICAS ======
+        // ====== RESTANTE DAS FUNÇÕES ======
 
         function selecionarModo(m) {
             modoTrabalho = m;
@@ -614,12 +611,12 @@
         }
 
         function atualizarUI() {
-            const formatNota = (n) => n !== "-" ? `<div class="mt-1.5"><span class="text-tema font-bold bg-slate-200 px-2 py-1 rounded inline-block" style="font-size: calc(var(--fonte-base) * 0.8)">📝 ${n}</span></div>` : "";
+            const formatNota = (n) => n !== "-" ? `<div class="mt-2"><span class="text-tema font-black bg-slate-200 px-3 py-1.5 rounded-lg inline-block" style="font-size: calc(var(--fonte-base) * 0.85)">📝 ${n}</span></div>` : "";
             
             const renderItem = (i) => `
-                <div class="pad-input border-b border-slate-200 flex justify-between card-ui bg-slate-50 rounded-xl mb-3 shadow-sm">
-                    <div class="pr-3"><span class="txt-base font-medium leading-snug block">${i["Destination Address"]}</span>${formatNota(i.Notas)}</div>
-                    <b class="texto-secundario txt-base">#${i["Display ID"]}</b>
+                <div class="pad-input border-b-2 border-slate-200 flex justify-between card-ui bg-slate-50 rounded-2xl mb-4 shadow-sm">
+                    <div class="pr-3"><span class="txt-base font-black leading-snug block">${i["Destination Address"]}</span>${formatNota(i.Notas)}</div>
+                    <b class="texto-secundario txt-base font-black">#${i["Display ID"]}</b>
                 </div>`;
             
             document.getElementById('fullRota1').innerHTML = [...rota1].reverse().map(renderItem).join('');
@@ -628,21 +625,21 @@
             if (modoTrabalho === 'duas') {
                 document.getElementById('countPendentes').innerText = pendentes.length;
                 document.getElementById('listaPendentes').innerHTML = [...pendentes].reverse().map(i => `
-                    <div class="card-ui bg-white pad-input rounded-xl border-l-4 border-tema shadow-sm active:opacity-80 transition relative" 
+                    <div class="card-ui bg-white pad-input rounded-2xl border-l-8 border-tema shadow-md active:opacity-80 transition relative mb-4" 
                          onclick="verNoMapa('${i["Destination Address"].replace(/'/g, "\\'")}')">
                         
-                        <div class="flex justify-between mb-2 pointer-events-none">
-                            <b class="text-rose-500 txt-base">#${i["Display ID"]}</b>
-                            <span class="texto-secundario font-bold bg-slate-100 card-ui px-2 py-0.5 rounded" style="font-size: calc(var(--fonte-base) * 0.8)">${i._ruaBase}</span>
+                        <div class="flex justify-between mb-3 pointer-events-none">
+                            <b class="text-rose-500 txt-base font-black">#${i["Display ID"]}</b>
+                            <span class="texto-secundario font-black bg-slate-100 card-ui px-3 py-1 rounded-lg" style="font-size: calc(var(--fonte-base) * 0.85)">${i._ruaBase}</span>
                         </div>
-                        <p class="txt-base font-medium leading-snug pointer-events-none mb-1">
+                        <p class="txt-base font-black leading-snug pointer-events-none mb-2">
                             ${i["Destination Address"]}
                         </p>
                         ${formatNota(i.Notas)}
                         
-                        <div class="flex gap-3 mt-4 relative z-10" onclick="event.stopPropagation()">
-                            <button onclick="ensinarEResolver('${i._firebaseKey}', 1, '${i._ruaBase}')" class="flex-1 bg-tema text-white pad-input rounded-lg font-bold shadow-sm active:scale-95 transition txt-base">ROTA 1</button>
-                            <button onclick="ensinarEResolver('${i._firebaseKey}', 2, '${i._ruaBase}')" class="flex-1 bg-orange-600 text-white pad-input rounded-lg font-bold shadow-sm active:scale-95 transition txt-base">ROTA 2</button>
+                        <div class="flex gap-4 mt-5 relative z-10" onclick="event.stopPropagation()">
+                            <button onclick="ensinarEResolver('${i._firebaseKey}', 1, '${i._ruaBase}')" class="flex-1 bg-tema text-white pad-input rounded-xl font-black shadow-md active:scale-95 transition txt-base">ROTA 1</button>
+                            <button onclick="ensinarEResolver('${i._firebaseKey}', 2, '${i._ruaBase}')" class="flex-1 bg-orange-600 text-white pad-input rounded-xl font-black shadow-md active:scale-95 transition txt-base">ROTA 2</button>
                         </div>
                     </div>`).join('');
             } else {
@@ -779,11 +776,9 @@
             recognition.interimResults = false;
             recognition.maxAlternatives = 1;
 
-            const btnMic = document.getElementById('btnMic');
             const fabMic = document.getElementById('fabMic');
             const inputEnd = document.getElementById('enderecoInput');
             
-            btnMic.classList.add('text-rose-500', 'animate-pulse');
             fabMic.classList.replace('bg-tema', 'bg-rose-500');
             fabMic.classList.add('animate-pulse');
             inputEnd.placeholder = "Ouvindo...";
@@ -793,10 +788,9 @@
             recognition.onresult = async (event) => {
                 const termoFalado = event.results[0][0].transcript;
                 inputEnd.value = termoFalado;
-                btnMic.classList.remove('text-rose-500', 'animate-pulse');
                 fabMic.classList.replace('bg-rose-500', 'bg-tema');
                 fabMic.classList.remove('animate-pulse');
-                inputEnd.placeholder = "Buscando localização...";
+                inputEnd.placeholder = "Buscando...";
 
                 try {
                     const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(termoFalado)}.json?access_token=${mbt}&country=br&bbox=-54.5,-26.0,-52.4,-24.0&proximity=-53.45,-24.95&types=address,poi&limit=1`;
@@ -811,14 +805,12 @@
             };
 
             recognition.onerror = () => {
-                btnMic.classList.remove('text-rose-500', 'animate-pulse');
                 fabMic.classList.replace('bg-rose-500', 'bg-tema');
                 fabMic.classList.remove('animate-pulse');
                 inputEnd.placeholder = "Rua e número...";
             };
             
             recognition.onend = () => {
-                btnMic.classList.remove('text-rose-500', 'animate-pulse');
                 fabMic.classList.replace('bg-rose-500', 'bg-tema');
                 fabMic.classList.remove('animate-pulse');
                 if(inputEnd.placeholder === "Ouvindo...") inputEnd.placeholder = "Rua e número...";
