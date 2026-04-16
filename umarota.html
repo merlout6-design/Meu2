@@ -138,9 +138,15 @@
                     <h3 class="font-bold text-slate-800 mb-2 uppercase text-center text-purple-800">Memória de Endereço Exato</h3>
                     <input type="text" id="memEndOriginal" class="w-full p-3 bg-slate-50 border rounded-lg mb-2 outline-none" placeholder="Endereço com Número">
                     <div class="grid grid-cols-2 gap-3 mb-2">
-                        <input type="text" id="memPlusCode" class="w-full p-3 bg-slate-50 border rounded-lg" placeholder="Plus Code">
-                        <input type="text" id="memNotas" class="w-full p-3 bg-slate-50 border rounded-lg" placeholder="Nota Fixa">
-                    </div>
+    <input type="text" id="memPlusCode" class="w-full p-3 bg-slate-50 border rounded-lg" placeholder="Plus Code">
+    <input type="text" id="memNotas" class="w-full p-3 bg-slate-50 border rounded-lg" placeholder="Nota Fixa">
+</div>
+<div class="flex items-center mb-4 bg-purple-50 p-3 rounded-lg border border-purple-100">
+    <input type="checkbox" id="memAproximado" class="w-5 h-5 text-purple-600 bg-white border-slate-300 rounded cursor-pointer">
+    <label for="memAproximado" class="ml-3 text-sm font-bold text-purple-800 cursor-pointer">
+        Aplicar este Plus Code para 100 números próximos (+/-)
+    </label>
+</div>
                     <button onclick="salvarCorrecaoExata()" class="w-full bg-purple-600 text-white py-4 rounded-xl font-bold shadow-md">Salvar Memória</button>
                 </div>
             </div>
@@ -170,13 +176,14 @@
         const db = firebase.database();
         const dbRuas = db.ref('ruas_cafelandia_memoria');
         const dbEnderecosExatos = db.ref('enderecos_exatos_memoria');
+		const dbAproximados = db.ref('enderecos_aproximados_memoria');
         
         // Variáveis de Estado
         let modoTrabalho = ''; // 'uma' ou 'duas'
         let operadorAtual = '';
         let nomeSessao = 'GERAL';
         let meuContador = 1;
-        let dicionarioRuas = {}, dicionarioEnderecosExatos = {};
+        let dicionarioRuas = {}, dicionarioEnderecosExatos = {}, dicionarioAproximados = {};
         let rota1 = [], rota2 = [], pendentes = [];
         let map, marker, timeoutBusca;
         // Pega a data atual para criar a pasta do dia no banco de dados
@@ -208,6 +215,7 @@ function entrarSessaoExistente(nome) {
 
             dbRuas.on('value', snap => { dicionarioRuas = snap.val() || {}; });
             dbEnderecosExatos.on('value', snap => { dicionarioEnderecosExatos = snap.val() || {}; });
+			dbAproximados.on('value', snap => { dicionarioAproximados = snap.val() || {}; });
 			document.getElementById('dataHojeDisplay').innerText = new Date().toLocaleDateString('pt-BR');
 
 			// Escuta as rotas ativas APENAS DE HOJE para exibir na tela de login
@@ -326,7 +334,7 @@ function entrarSessaoExistente(nome) {
 async function processarUmPacote() {
     const input = document.getElementById('enderecoInput');
     const notaInp = document.getElementById('notaInput');
-    const val = input.value.trim();
+    const val = input.value.trim(); // <-- Este é o endereço que você acabou de digitar
     if(!val) return;
     
     input.disabled = true;
@@ -340,8 +348,40 @@ async function processarUmPacote() {
     let nota = "-";
     
     if (cExata) {
+        // Regra 1: Achou o Endereço Exato
         if (cExata.plusCode) endFinal = cExata.plusCode;
         if (cExata.notas) nota = cExata.notas;
+    } else {
+        // Regra 2: Busca por Aproximação (+/- 100 números)
+        let achouAproximado = false;
+        const matchNum = val.match(/\d+/);
+        
+        if (matchNum && dicionarioAproximados[ruaBase]) {
+            const numDigitado = parseInt(matchNum[0]);
+            const numerosMapeados = Object.keys(dicionarioAproximados[ruaBase]);
+            
+            for (let numMapeado of numerosMapeados) {
+                if (Math.abs(numDigitado - parseInt(numMapeado)) <= 200) {
+                    endFinal = dicionarioAproximados[ruaBase][numMapeado].plusCode;
+                    
+                    // <-- MUDANÇA AQUI: Agora a nota usa o 'val' (endereço atual do pacote)
+                    nota = `Loc. Aproximada. (${val})`; 
+                    
+                    achouAproximado = true;
+                    break;
+                }
+            }
+        }
+
+        // Regra 3: Alerta de Plus Code Possível (Sinaliza que a rua já tem mapeamento)
+        if (!achouAproximado) {
+            const temPlusCodeNaRua = dicionarioAproximados[ruaBase] || 
+                                     Object.keys(dicionarioEnderecosExatos).some(key => extrairNomeRua(key) === ruaBase);
+            
+            if (temPlusCodeNaRua) {
+                nota = "Alerta. PlusCode Possivel";
+            }
+        }
     }
 
     const notaAvulsa = notaInp.value.trim();
@@ -350,7 +390,7 @@ async function processarUmPacote() {
     }
 
     const item = {
-        "Display ID": `${operadorAtual}${meuContador}`, // Sempre salva com A1, B1, etc.
+        "Display ID": `${operadorAtual}${meuContador}`,
         "Destination Address": endFinal,
         "City": "-",
         "Notas": nota,
@@ -358,7 +398,6 @@ async function processarUmPacote() {
         "_status": modoTrabalho === 'uma' ? '1' : (rConhecida || 'pendente')
     };
 
-    // Salva na pasta do dia
     db.ref(getPathSessao()).push(item);
     db.ref(getPathContador()).set(meuContador + 1);
 
@@ -521,12 +560,13 @@ function reiniciarDia() {
 }
 
         function excluirMemoriaTotal() {
-            if (confirm("Apagar TODA a memória global de ruas e endereços exatos?")) {
-                dbRuas.remove();
-                dbEnderecosExatos.remove();
-                alert("Memória apagada!");
-            }
-        }
+    if (confirm("Apagar TODA a memória global de ruas, endereços exatos e aproximações?")) {
+        dbRuas.remove();
+        dbEnderecosExatos.remove();
+        dbAproximados.remove(); // NOVO
+        alert("Memória totalmente apagada!");
+    }
+}
 
         function mudarAba(nome) {
             ['triagem', 'listagem', 'ajustes'].forEach(a => {
@@ -546,13 +586,41 @@ function reiniciarDia() {
         }
 
         function salvarCorrecaoExata() {
-            const o = document.getElementById('memEndOriginal').value;
-            const p = document.getElementById('memPlusCode').value;
-            const n = document.getElementById('memNotas').value;
-            if(!o) return;
-            dbEnderecosExatos.child(padronizarTexto(o)).set({ plusCode: p, notas: n });
-            alert("Memória salva!");
+    const o = document.getElementById('memEndOriginal').value;
+    const p = document.getElementById('memPlusCode').value;
+    const n = document.getElementById('memNotas').value;
+    const isAproximado = document.getElementById('memAproximado').checked;
+
+    if(!o) return;
+
+    // Salva na memória exata padrão
+    dbEnderecosExatos.child(padronizarTexto(o)).set({ plusCode: p, notas: n });
+
+    // Se marcou a caixa, extrai o número e salva a regra de aproximação
+    if (isAproximado) {
+        const ruaBase = extrairNomeRua(o);
+        const matchNum = o.match(/\d+/);
+        
+        if (matchNum) {
+            const numero = matchNum[0];
+            dbAproximados.child(ruaBase).child(numero).set({
+                plusCode: p,
+                enderecoBase: o // <-- AGORA ELE SALVA O ENDEREÇO ORIGINAL PARA USAR NA NOTA
+            });
+        } else {
+            alert("⚠️ Atenção: Para usar a aproximação, o endereço original precisa ter um número.");
+            return;
         }
+    }
+
+    alert("Memória salva com sucesso!");
+    
+    // Limpa os campos para a próxima
+    document.getElementById('memEndOriginal').value = '';
+    document.getElementById('memPlusCode').value = '';
+    document.getElementById('memNotas').value = '';
+    document.getElementById('memAproximado').checked = false;
+}
 		document.getElementById('enderecoInput').addEventListener("keypress", e => { if(e.key === "Enter") processarUmPacote(); });
 		document.getElementById('notaInput').addEventListener("keypress", e => { if(e.key === "Enter") processarUmPacote(); });
         document.getElementById('enderecoInput').addEventListener("keypress", e => { if(e.key === "Enter") processarUmPacote(); });
