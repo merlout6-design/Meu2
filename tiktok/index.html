@@ -106,18 +106,35 @@
             <button onclick="selecionarOperador('B')" class="w-full bg-slate-700 text-white font-bold py-6 rounded-2xl shadow-lg active:scale-95 txt-botao">Operador B</button>
         </div>
 
-        <div id="etapaSessao" class="hidden flex flex-col items-center gap-5 w-full max-w-sm">
-            <input type="text" id="inputNomeSessao" class="rounded-2xl w-full outline-none border-4 border-tema uppercase font-bold text-center text-slate-800 pad-input txt-titulo" placeholder="NOME DA MOTO/ROTA">
-            <button onclick="finalizarLogin()" class="bg-tema font-bold py-5 w-full rounded-2xl shadow-lg active:scale-95 txt-botao">INICIAR OPERAÇÃO</button>
-            
-            <div class="w-full mt-4 bg-slate-800 rounded-2xl text-left border border-slate-700 pad-card">
-                <h3 class="text-tema font-bold mb-4 uppercase tracking-widest flex justify-between txt-base">
-                    <span class="text-white">Rotas de Hoje</span>
-                    <span class="text-slate-400" id="dataHojeDisplay"></span>
-                </h3>
-                <div id="listaSessoesAtivas" class="space-y-3 max-h-48 overflow-y-auto pr-1"></div>
-            </div>
+       <div id="etapaSessao" class="hidden flex flex-col items-center gap-4 w-full max-w-sm">
+    <input type="text" id="inputNomeSessao" class="rounded-2xl w-full outline-none border-4 border-tema uppercase font-bold text-center text-slate-800 pad-input txt-titulo" placeholder="NOME DA MOTO/ROTA">
+    
+    <div class="w-full bg-slate-800 p-4 rounded-2xl border border-slate-700 text-left">
+        <label class="text-slate-400 font-bold text-sm mb-1 block uppercase">Área de Entrega</label>
+        <input type="text" id="inputCidade" value="Cascavel, PR" class="w-full bg-slate-900 border-none rounded-xl text-white outline-none focus:ring-2 focus:ring-tema pad-input txt-base mb-3" placeholder="Cidade (ex: Cascavel, PR)">
+        
+        <div class="flex items-center gap-3">
+            <span class="text-slate-400 font-bold text-sm uppercase">Raio:</span>
+            <input type="range" id="inputRaio" min="5" max="100" value="10" class="flex-1 accent-tema" oninput="document.getElementById('raioLabel').innerText = this.value + 'km'">
+            <span id="raioLabel" class="font-bold text-tema w-12 text-right txt-base">10km</span>
         </div>
+    </div>
+
+    <div class="w-full bg-slate-800 p-4 rounded-2xl border border-slate-700 text-left">
+        <label class="text-slate-400 font-bold text-sm mb-1 block uppercase">Filtro de CEP (Opcional)</label>
+        <input type="text" id="inputCepRestricao" class="w-full bg-slate-900 border-none rounded-xl text-white outline-none focus:ring-2 focus:ring-tema pad-input txt-base" placeholder="Ex: 85801 (Vazio = Sem filtro)">
+        <p class="text-xs text-slate-500 mt-2 font-medium">Avisa se o pacote for de outra região.</p>
+    </div>
+    <button onclick="configurarEFinalizarLogin()" class="bg-tema font-bold py-5 w-full rounded-2xl shadow-lg active:scale-95 txt-botao mt-2">INICIAR OPERAÇÃO</button>
+			
+			<div class="w-full mt-2 bg-slate-800 rounded-2xl text-left border border-slate-700 pad-card">
+				<h3 class="text-tema font-bold mb-4 uppercase tracking-widest flex justify-between txt-base">
+					<span class="text-white">Rotas de Hoje</span>
+					<span class="text-slate-400" id="dataHojeDisplay"></span>
+				</h3>
+				<div id="listaSessoesAtivas" class="space-y-3 max-h-48 overflow-y-auto pr-1"></div>
+			</div>
+		</div>
         
         <button onclick="resetLogin()" id="btnVoltarLogin" class="hidden mt-8 text-slate-400 font-bold active:text-white py-3 px-6 txt-botao">← Voltar</button>
     </div>
@@ -315,35 +332,42 @@
             databaseURL: "https://rodao-f93c2-default-rtdb.firebaseio.com/"
         };
         firebase.initializeApp(fbc);
-        const db = firebase.database();
+        
+        // 👉 ADICIONE ESTA LINHA ABAIXO:
+        const db = firebase.database(); 
+        
         const dbRuas = db.ref('ruas_cafelandia_memoria');
         const dbEnderecosExatos = db.ref('enderecos_exatos_memoria');
-        const dbAproximados = db.ref('enderecos_aproximados_memoria');
-        const dbConfig = db.ref('configuracoes_interface'); 
-        
-        let modoTrabalho = ''; 
-        let operadorAtual = '';
-        let nomeSessao = 'GERAL';
-        let meuContador = 1;
-        let dicionarioRuas = {}, dicionarioEnderecosExatos = {}, dicionarioAproximados = {};
-        let rota1 = [], rota2 = [], pendentes = [];
-        let map, marker, timeoutBusca;
-        
-        // CONFIGURAÇÃO PADRÃO
-        let configApp = { 
-            corTema: '#2563eb', 
-            modoEscuro: false,
-            vars: {
-                '--fonte-base': '16px',
-                '--fonte-titulos': '20px',
-                '--fonte-botoes': '18px',
-                '--barra-topo-p': '16px',
-                '--barra-base-h': '80px',
-                '--fab-tamanho': '64px',
-                '--card-p': '20px',
-                '--input-p': '16px'
-            }
-        };
+		const dbAproximados = db.ref('enderecos_aproximados_memoria');
+		const dbConfig = db.ref('configuracoes_interface'); 
+		const dbNotas = db.ref('notas_memoria'); // NOVO: Banco de notas globais
+
+		let modoTrabalho = ''; 
+		let operadorAtual = '';
+		let nomeSessao = 'GERAL';
+		let dicionarioRuas = {}, dicionarioEnderecosExatos = {}, dicionarioAproximados = {};
+		let dicionarioNotas = {};
+		let rota1 = [], rota2 = [], pendentes = [];
+		let map, marker, timeoutBusca;
+
+		// NOVA VARIÁVEL
+		let idReservadoAtual = null;
+		let cepRestricaoSessao = "";
+		let ultimoEnderecoPermitidoCep = "";
+
+		// 👉 ADICIONE ESTE BLOCO AQUI:
+		let configApp = {
+			corTema: '#2563eb',
+			modoEscuro: false,
+			vars: {}
+		};
+
+		// NOVA: Configuração da Sessão (Raio e Centro)
+		let configSessao = {
+			cidade: "Cascavel, PR",
+			centro: [-53.45, -24.95], // Lng, Lat padrão (Cascavel)
+			raioKm: 10
+		};
         
         const dataHoje = new Date().toISOString().split('T')[0].replace(/-/g, '');
 
@@ -359,6 +383,7 @@
         }
 
         window.onload = () => {
+			dbNotas.on('value', snap => { dicionarioNotas = snap.val() || {}; });
             map = L.map('map', { zoomControl: false }).setView([-24.6191, -53.3256], 14); 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
             marker = L.marker([-24.6191, -53.3256]).addTo(map);
@@ -528,6 +553,7 @@
 
             iniciarEscutaFirebase();
             setTimeout(() => map.invalidateSize(), 300);
+			reservarProximoId();
         }
 
         function iniciarEscutaFirebase() {
@@ -541,77 +567,119 @@
                 });
                 atualizarUI();
             });
-
-            db.ref(getPathContador()).on('value', snap => {
-                meuContador = snap.val() || 1;
-                document.getElementById('nextIdDisplay').innerText = `${operadorAtual}${meuContador}`;
-            });
         }
+		// NOVA FUNÇÃO: Garante um número único do servidor ANTES de preencher
+		function reservarProximoId() {
+			const refContadorGlobal = modoTrabalho === 'duas' 
+				? db.ref(`sessoes_diarias/${dataHoje}/sessao_duas_rotas/contador_global`)
+				: db.ref(`sessoes_diarias/${dataHoje}/sessao_uma_rota/${nomeSessao}/contador_global`);
+
+			// Trava a tela visualmente enquanto busca o ID
+			const display = document.getElementById('nextIdDisplay');
+			display.innerText = "⏳ Puxando ID...";
+			display.classList.add('animate-pulse');
+			document.getElementById('fabOk').style.pointerEvents = 'none'; // Trava o botão OK
+
+			refContadorGlobal.transaction((valorAtual) => {
+				return (valorAtual || 0) + 1;
+			}, (error, committed, snapshot) => {
+				if (error) {
+					console.error("Erro ao reservar ID, tentando de novo...", error);
+					setTimeout(reservarProximoId, 1000); // Tenta de novo em 1s se a internet oscilar
+				} else if (committed) {
+					idReservadoAtual = snapshot.val();
+					
+					// Libera a tela e mostra o número GIGANTE para o operador
+					display.innerText = `📦 #${idReservadoAtual}`;
+					display.classList.remove('animate-pulse');
+					document.getElementById('fabOk').style.pointerEvents = 'auto'; // Libera o botão OK
+				}
+			});
+		}
 
         async function processarUmPacote() {
-            const input = document.getElementById('enderecoInput');
-            const notaInp = document.getElementById('notaInput');
-            const val = input.value.trim();
-            if(!val) return;
-            
-            input.disabled = true;
-            notaInp.disabled = true;
+			const input = document.getElementById('enderecoInput');
+			const notaInp = document.getElementById('notaInput');
+			const val = input.value.trim();
+			
+			if(!val) return;
+			
+			// Trava de segurança: Se a internet estiver tão lenta que ainda não puxou o ID, bloqueia.
+			if(!idReservadoAtual) {
+				alert("Aguarde o sistema alocar o número do pacote!");
+				return;
+			}
+			const cepValido = await validarCepAvisoAsync(val);
+    if (!cepValido) return; 
 
-            const ruaBase = extrairNomeRua(val);
-            const rConhecida = dicionarioRuas[ruaBase];
-            const cExata = dicionarioEnderecosExatos[padronizarTexto(val)];
+    input.disabled = true;
+    notaInp.disabled = true;
+			notaInp.disabled = true;
 
-            let endFinal = val; 
-            let nota = "-";
-            
-            if (cExata) {
-                if (cExata.plusCode) endFinal = cExata.plusCode;
-                if (cExata.notas) nota = cExata.notas;
-            } else {
-                let achouAproximado = false;
-                const matchNum = val.match(/\d+/);
-                
-                if (matchNum && dicionarioAproximados[ruaBase]) {
-                    const numDigitado = parseInt(matchNum[0]);
-                    const numerosMapeados = Object.keys(dicionarioAproximados[ruaBase]);
-                    
-                    for (let numMapeado of numerosMapeados) {
-                        if (Math.abs(numDigitado - parseInt(numMapeado)) <= 100) {
-                            endFinal = dicionarioAproximados[ruaBase][numMapeado].plusCode;
-                            nota = `Loc. APROX. (${val})`; 
-                            achouAproximado = true;
-                            break;
-                        }
-                    }
-                }
+			const ruaBase = extrairNomeRua(val);
+			const rConhecida = dicionarioRuas[ruaBase];
+			const cExata = dicionarioEnderecosExatos[padronizarTexto(val)];
 
-                if (!achouAproximado) {
-                    const temPlusCodeNaRua = dicionarioAproximados[ruaBase] || 
-                                            Object.keys(dicionarioEnderecosExatos).some(key => extrairNomeRua(key) === ruaBase);
-                    
-                    if (temPlusCodeNaRua) { nota = "Alerta. PlusCode Possivel"; }
-                }
-            }
+			let endFinal = val; 
+			let nota = "-";
+			
+			// Lógica de Plus Codes e aproximação
+			if (cExata) {
+				if (cExata.plusCode) endFinal = cExata.plusCode;
+				if (cExata.notas) nota = cExata.notas;
+			} else {
+				let achouAproximado = false;
+				const matchNum = val.match(/\d+/);
+				
+				if (matchNum && dicionarioAproximados[ruaBase]) {
+					const numDigitado = parseInt(matchNum[0]);
+					const numerosMapeados = Object.keys(dicionarioAproximados[ruaBase]);
+					
+					for (let numMapeado of numerosMapeados) {
+						if (Math.abs(numDigitado - parseInt(numMapeado)) <= 100) {
+							endFinal = dicionarioAproximados[ruaBase][numMapeado].plusCode;
+							nota = `Loc. APROX. (${val})`; 
+							achouAproximado = true; break;
+						}
+					}
+				}
+				if (!achouAproximado) {
+					const temPlusCodeNaRua = dicionarioAproximados[ruaBase] || Object.keys(dicionarioEnderecosExatos).some(key => extrairNomeRua(key) === ruaBase);
+					if (temPlusCodeNaRua) { nota = "Alerta. PlusCode Possivel"; }
+				}
+			}
 
-            const notaAvulsa = notaInp.value.trim();
-            if (notaAvulsa) { nota = nota !== "-" ? `${nota} | ${notaAvulsa}` : notaAvulsa; }
+			const notaAvulsa = notaInp.value.trim();
+			if (notaAvulsa) { 
+				nota = nota !== "-" ? `${nota} | ${notaAvulsa}` : notaAvulsa; 
+				dbNotas.child(padronizarTexto(endFinal)).set(notaAvulsa);
+				dbNotas.child(padronizarTexto(ruaBase)).set(notaAvulsa); 
+			}
 
-            const item = {
-                "Display ID": `${operadorAtual}${meuContador}`,
-                "Destination Address": endFinal,
-                "City": "-",
-                "Notas": nota,
-                "_ruaBase": ruaBase,
-                "_status": modoTrabalho === 'uma' ? '1' : (rConhecida || 'pendente')
-            };
+			const itemBase = {
+				"Display ID": idReservadoAtual.toString(), // 👉 USA O NÚMERO PRÉ-ALOCADO EXCLUSIVO DELE
+				"Destination Address": endFinal,
+				"City": "-",
+				"Notas": nota,
+				"_ruaBase": ruaBase,
+				"_status": modoTrabalho === 'uma' ? '1' : (rConhecida || 'pendente')
+			};
 
-            db.ref(getPathSessao()).push(item);
-            db.ref(getPathContador()).set(meuContador + 1);
-
-            input.value = ""; input.disabled = false; input.focus();
-            notaInp.value = ""; notaInp.disabled = false;
-            document.getElementById('sugestoesDropdown').classList.add('hidden');
-        }
+			// Salva direto no banco e DEPOIS limpa a tela e pede um novo número
+			db.ref(getPathSessao()).push(itemBase).then(() => {
+				// Libera a tela
+				input.value = ""; input.disabled = false; input.focus();
+				notaInp.value = ""; notaInp.disabled = false;
+				document.getElementById('sugestoesDropdown').classList.add('hidden');
+				
+				// Puxa o próximo número para o próximo pacote
+				idReservadoAtual = null; 
+				reservarProximoId(); 
+			}).catch(e => {
+				alert("Erro de conexão ao salvar pacote. Tente novamente.");
+				input.disabled = false; notaInp.disabled = false;
+			});
+		}
 
         function reiniciarDia() {
             if(confirm("Apagar os pacotes desta rota gerados hoje?")) {
@@ -625,10 +693,18 @@
             const formatNota = (n) => n !== "-" ? `<div class="mt-1.5"><span class="text-tema font-bold bg-slate-200 px-2 py-1 rounded inline-block" style="font-size: calc(var(--fonte-base) * 0.8)">📝 ${n}</span></div>` : "";
             
             const renderItem = (i) => `
-                <div class="pad-input border-b border-slate-200 flex justify-between card-ui bg-slate-50 rounded-xl mb-3 shadow-sm">
-                    <div class="pr-3"><span class="txt-base font-medium leading-snug block">${i["Destination Address"]}</span>${formatNota(i.Notas)}</div>
-                    <b class="texto-secundario txt-base">#${i["Display ID"]}</b>
-                </div>`;
+    <div class="pad-input border-b border-slate-200 flex justify-between items-center card-ui bg-slate-50 rounded-xl mb-3 shadow-sm">
+        <div class="pr-3 flex-grow">
+            <span class="txt-base font-medium leading-snug block">${i["Destination Address"]}</span>
+            ${formatNota(i.Notas)}
+        </div>
+        <div class="flex items-center gap-3">
+            <b class="texto-secundario txt-base">#${i["Display ID"]}</b>
+            <button onclick="removerPacote('${i._firebaseKey}')" class="bg-rose-50 text-rose-500 p-3 rounded-lg active:scale-90 transition border border-rose-100">
+                🗑️
+            </button>
+        </div>
+    </div>`;
             
             document.getElementById('fullRota1').innerHTML = [...rota1].reverse().map(renderItem).join('');
             document.getElementById('fullRota2').innerHTML = [...rota2].reverse().map(renderItem).join('');
@@ -672,20 +748,6 @@
             return l.replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
         }
 
-        function selecionarSugestaoMapbox(nome, lng, lat) {
-            const input = document.getElementById('enderecoInput');
-            const numDigitado = input.value.match(/\d+/);
-            if (numDigitado && !nome.match(/\d+/)) {
-                let partes = nome.split(',');
-                partes[0] = partes[0] + " " + numDigitado[0];
-                nome = partes.join(',');
-            }
-            input.value = nome;
-            document.getElementById('sugestoesDropdown').classList.add('hidden');
-            map.setView([lat, lng], 17);
-            marker.setLatLng([lat, lng]).setOpacity(1);
-        }
-
         async function verNoMapa(endereco) {
             try {
                 const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(endereco)}.json?access_token=${mbt}&country=br&limit=1`;
@@ -706,7 +768,12 @@
 
         async function baixarPlanilha(dados, nome) {
             if (dados.length === 0) { alert("Rota vazia!"); return; }
-            const dl = dados.map(item => ({ "ID Pacote": item["Display ID"], "Notes": item.Notas || "-", "City": item["City"] || "Cafelândia", "Destination Address": item["Destination Address"] }));
+            const dl = dados.map(item => ({ 
+    "ID Pacote": item["Display ID"], 
+    "Notes": item.Notas || "-", 
+    "City": configSessao.cidade, // Usa a cidade selecionada no login
+    "Destination Address": item["Destination Address"] 
+}));
             const ws = XLSX.utils.json_to_sheet(dl);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Entregas");
@@ -832,6 +899,184 @@
                 if(inputEnd.placeholder === "Ouvindo...") inputEnd.placeholder = "Rua e número...";
             };
         }
+				// NOVA FUNÇÃO: Transforma cidade em coordenadas e finaliza login
+		async function configurarEFinalizarLogin() {
+			const cidade = document.getElementById('inputCidade').value.trim();
+			configSessao.raioKm = parseInt(document.getElementById('inputRaio').value);
+			cepRestricaoSessao = document.getElementById('inputCepRestricao').value.trim().replace('-', '');
+			
+			if(cidade !== configSessao.cidade) {
+				try {
+					const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(cidade)}.json?access_token=${mbt}&country=br&types=place&limit=1`;
+					const res = await fetch(url);
+					const data = await res.json();
+					if(data.features && data.features.length > 0) {
+						configSessao.centro = data.features[0].center; // [lng, lat]
+						configSessao.cidade = cidade;
+					}
+				} catch(e) { console.error("Erro ao buscar cidade", e); }
+			}
+			finalizarLogin();
+		}
+
+		// NOVA FUNÇÃO: Autopreenchimento
+		function checarNotaAutomatica(endereco) {
+			const enderecoBase = extrairNomeRua(endereco);
+			// Tenta buscar pelo endereço exato ou pela rua base
+			const notaSalva = dicionarioNotas[padronizarTexto(endereco)] || dicionarioNotas[padronizarTexto(enderecoBase)];
+			if(notaSalva) {
+				const inputNota = document.getElementById('notaInput');
+				if(!inputNota.value) inputNota.value = notaSalva; // Preenche se estiver vazio
+			}
+		}
+
+		// ATUALIZAÇÃO: Evento de digitação do endereço (substitua o evento existente no window.onload)
+		document.getElementById('enderecoInput').addEventListener('input', function() {
+			clearTimeout(timeoutBusca);
+			const termo = this.value.trim();
+			const dropdown = document.getElementById('sugestoesDropdown');
+			
+			if(termo.length < 3) { dropdown.classList.add('hidden'); return; }
+			
+			// Autopreenchimento enquanto digita
+			checarNotaAutomatica(termo);
+
+			timeoutBusca = setTimeout(async () => {
+				// Cálculo do Bounding Box baseado no centro e raio (1 grau ≈ 111km)
+				const offsetGraus = configSessao.raioKm / 111; 
+				const minLng = configSessao.centro[0] - offsetGraus;
+				const minLat = configSessao.centro[1] - offsetGraus;
+				const maxLng = configSessao.centro[0] + offsetGraus;
+				const maxLat = configSessao.centro[1] + offsetGraus;
+				const bboxStr = `${minLng},${minLat},${maxLng},${maxLat}`;
+				const proxStr = `${configSessao.centro[0]},${configSessao.centro[1]}`;
+
+				const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(termo)}.json?access_token=${mbt}&country=br&bbox=${bboxStr}&proximity=${proxStr}&types=address,poi&autocomplete=true&limit=5`;
+				
+				try {
+					const res = await fetch(url);
+					const data = await res.json();
+					if(data.features && data.features.length > 0) {
+						dropdown.innerHTML = data.features.map(f => `
+							<div onclick="selecionarSugestaoMapbox('${f.place_name.replace(/'/g, "\\'")}', ${f.center[0]}, ${f.center[1]})" 
+								 class="p-4 active:bg-slate-100 cursor-pointer border-b border-slate-200 txt-base font-medium">
+								📍 ${f.place_name}
+							</div>`).join('');
+						dropdown.classList.remove('hidden');
+					} else { dropdown.classList.add('hidden'); }
+				} catch(e) { console.error(e); }
+			}, 400);
+		});
+		
+		// Função que desenha o Modal na tela e aguarda a resposta do usuário
+function solicitarConfirmacaoCepUI(cepEncontrado, cepEsperado) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('modalCep');
+        const content = document.getElementById('modalCepContent');
+        const texto = document.getElementById('modalCepTexto');
+        const btnDescartar = document.getElementById('btnDescartarCep');
+        const btnManter = document.getElementById('btnIgnorarCep');
+
+        texto.innerHTML = `Endereço fora da região padrão.<br><br>CEP identificado: <b class="text-slate-800">${cepEncontrado}</b><br>Filtro da rota: <b class="text-rose-500">${cepEsperado}</b>`;
+
+        // Mostra e anima a entrada
+        modal.classList.remove('hidden');
+        setTimeout(() => content.classList.replace('scale-95', 'scale-100'), 10);
+
+        const fecharModal = (resultado) => {
+            content.classList.replace('scale-100', 'scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                resolve(resultado);
+            }, 200);
+            
+            btnDescartar.onclick = null;
+            btnManter.onclick = null;
+        };
+
+        btnDescartar.onclick = () => fecharModal(false);
+        btnManter.onclick = () => fecharModal(true);
+    });
+}
+
+// Lógica inteligente que busca o CEP em milissegundos
+async function validarCepAvisoAsync(enderecoStr) {
+    if (!cepRestricaoSessao) return true; // Se não tem regra, passa direto
+    if (enderecoStr === ultimoEnderecoPermitidoCep) return true; // Se já aprovou este endereço antes, não avisa de novo
+    
+    let cepEncontrado = "";
+    const matchCep = enderecoStr.match(/\b\d{5}-?\d{3}\b/);
+    
+    if (matchCep) {
+        cepEncontrado = matchCep[0];
+    } else {
+        try {
+            const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(enderecoStr)}.json?access_token=${mbt}&country=br&limit=1`;
+            const res = await fetch(url);
+            const data = await res.json();
+            if (data.features && data.features.length > 0) {
+                const pc = data.features[0].context?.find(c => c.id.includes('postcode'));
+                if (pc) {
+                    cepEncontrado = pc.text;
+                } else {
+                    const m = data.features[0].place_name.match(/\b\d{5}-?\d{3}\b/);
+                    if (m) cepEncontrado = m[0];
+                }
+            }
+        } catch(e) { console.error(e); }
+    }
+
+    if (cepEncontrado) {
+        const cepLimpo = cepEncontrado.replace('-', '');
+        const restricaoLimpa = cepRestricaoSessao.replace('-', '');
+        
+        if (!cepLimpo.startsWith(restricaoLimpa)) {
+            // Se for diferente, chama o Modal bonito e espera ele clicar
+            const querManter = await solicitarConfirmacaoCepUI(cepEncontrado, cepRestricaoSessao);
+            if (querManter) {
+                ultimoEnderecoPermitidoCep = enderecoStr; // Salva na memória
+                return true;
+            } else {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+		async function selecionarSugestaoMapbox(nome, lng, lat) {
+    const input = document.getElementById('enderecoInput');
+    
+    // O nome vem assim: "Rua Fidelis Batista de Aguiar, Santa Felicidade, Cascavel..."
+    // Vamos dividir na primeira vírgula para separar a rua do resto
+    let partes = nome.split(',');
+    let rua = partes[0].trim();
+    let resto = partes.slice(1).join(',').trim();
+    
+    // Monta o texto deixando o espaço central para o número: "Rua, , Bairro, Cidade"
+    // O espaço extra entre as vírgulas facilita a digitação no celular
+    input.value = `${rua} , ${resto}`;
+    
+    document.getElementById('sugestoesDropdown').classList.add('hidden');
+    map.setView([lat, lng], 17);
+    marker.setLatLng([lat, lng]).setOpacity(1);
+    
+    // FOCO E POSICIONAMENTO:
+    input.focus();
+    // Posiciona o cursor logo após a primeira vírgula e o espaço
+    const posicaoCursor = rua.length + 2; 
+    input.setSelectionRange(posicaoCursor, posicaoCursor);
+    
+    checarNotaAutomatica(rua);
+
+    const cepValido = await validarCepAvisoAsync(nome);
+    if (!cepValido) {
+        input.value = "";
+        input.focus();
+    }
+}
+
+
 
         document.getElementById('enderecoInput').addEventListener("keypress", e => { if(e.key === "Enter") processarUmPacote(); });
         document.getElementById('notaInput').addEventListener("keypress", e => { if(e.key === "Enter") processarUmPacote(); });
@@ -844,6 +1089,34 @@
                     .catch(err => console.log('Erro no Service Worker:', err));
             });
         }
+		
+	function removerPacote(key) {
+    if (confirm("Deseja apagar este pacote da lista?")) {
+        db.ref(getPathSessao()).child(key).remove()
+            .then(() => {
+                // O Firebase atualizará a interface automaticamente via 'on value'
+                console.log("Removido com sucesso");
+            })
+            .catch(e => alert("Erro ao remover: " + e.message));
+    }
+}
     </script>
+<div id="modalCep" class="fixed inset-0 bg-slate-900/80 hidden flex items-center justify-center z-[120] px-4 backdrop-blur-sm transition-opacity">
+    <div id="modalCepContent" class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl flex flex-col gap-4 transform scale-95 transition-transform duration-300">
+        <div class="flex items-center gap-3 text-rose-500">
+            <div class="bg-rose-100 p-3 rounded-full flex items-center justify-center">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+            </div>
+            <h3 class="font-black text-xl uppercase tracking-tight">Aviso de CEP</h3>
+        </div>
+        
+        <p class="text-slate-600 font-medium txt-base" id="modalCepTexto"></p>
+        
+        <div class="flex gap-3 mt-3">
+            <button id="btnDescartarCep" class="flex-1 bg-slate-100 text-slate-500 font-bold py-4 rounded-xl active:bg-slate-200 transition txt-botao">Apagar</button>
+            <button id="btnIgnorarCep" class="flex-1 bg-rose-500 text-white font-bold py-4 rounded-xl shadow-md active:scale-95 transition txt-botao">Manter</button>
+        </div>
+    </div>
+</div>
 </body>
 </html>
