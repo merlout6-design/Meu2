@@ -847,58 +847,129 @@
         }
 
         function iniciarReconhecimentoVoz() {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRecognition) { alert("Microfone não suportado. Use o Google Chrome no celular."); return; }
-            const recognition = new SpeechRecognition();
-            recognition.lang = 'pt-BR';
-            recognition.interimResults = false;
-            recognition.maxAlternatives = 1;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) { alert("Microfone não suportado. Use o Google Chrome no celular."); return; }
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'pt-BR';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
 
-            const btnMic = document.getElementById('btnMic');
-            const fabMic = document.getElementById('fabMic');
-            const inputEnd = document.getElementById('enderecoInput');
+    const btnMic = document.getElementById('btnMic');
+    const fabMic = document.getElementById('fabMic');
+    const inputEnd = document.getElementById('enderecoInput');
+    
+    btnMic.classList.add('text-rose-500', 'animate-pulse');
+    fabMic.classList.replace('bg-tema', 'bg-rose-500');
+    fabMic.classList.add('animate-pulse');
+    inputEnd.placeholder = "Ouvindo...";
+
+    recognition.start();
+
+    recognition.onresult = async (event) => {
+        const termoFalado = event.results[0][0].transcript; // Ex: "fidelis 1183"
+        inputEnd.value = termoFalado; 
+        
+        btnMic.classList.remove('text-rose-500', 'animate-pulse');
+        fabMic.classList.replace('bg-rose-500', 'bg-tema');
+        fabMic.classList.remove('animate-pulse');
+        inputEnd.placeholder = "Buscando localização...";
+
+        // 👇 1. LÓGICA DE EXTRAÇÃO DE NÚMERO
+        // Tira o número da fala. Se você falou "Fidelis 1183", ele guarda o "1183"
+        const matchNum = termoFalado.match(/\d+/);
+        const numeroFalado = matchNum ? matchNum[0] : null;
+
+        try {
+            // 👇 2. TRAVA GEOGRÁFICA (Para achar ruas só na sua cidade)
+            const offsetGraus = configSessao.raioKm / 111; 
+            const minLng = configSessao.centro[0] - offsetGraus;
+            const minLat = configSessao.centro[1] - offsetGraus;
+            const maxLng = configSessao.centro[0] + offsetGraus;
+            const maxLat = configSessao.centro[1] + offsetGraus;
+            const bboxStr = `${minLng},${minLat},${maxLng},${maxLat}`;
+            const proxStr = `${configSessao.centro[0]},${configSessao.centro[1]}`;
+
+            // Busca no mapbox usando a trava da cidade
+            const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(termoFalado)}.json?access_token=${mbt}&country=br&bbox=${bboxStr}&proximity=${proxStr}&types=address,poi&limit=1`;
             
-            btnMic.classList.add('text-rose-500', 'animate-pulse');
-            fabMic.classList.replace('bg-tema', 'bg-rose-500');
-            fabMic.classList.add('animate-pulse');
-            inputEnd.placeholder = "Ouvindo...";
-
-            recognition.start();
-
-            recognition.onresult = async (event) => {
-                const termoFalado = event.results[0][0].transcript;
-                inputEnd.value = termoFalado;
-                btnMic.classList.remove('text-rose-500', 'animate-pulse');
-                fabMic.classList.replace('bg-rose-500', 'bg-tema');
-                fabMic.classList.remove('animate-pulse');
-                inputEnd.placeholder = "Buscando localização...";
-
-                try {
-                    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(termoFalado)}.json?access_token=${mbt}&country=br&bbox=-54.5,-26.0,-52.4,-24.0&proximity=-53.45,-24.95&types=address,poi&limit=1`;
-                    const res = await fetch(url);
-                    const data = await res.json();
-                    if(data.features && data.features.length > 0) {
-                        const f = data.features[0];
-                        selecionarSugestaoMapbox(f.place_name.replace(/'/g, "\\'"), f.center[0], f.center[1]);
-                    } else { alert("Não achei nada próximo com esse áudio: " + termoFalado); }
-                } catch(e) { console.error("Erro voz:", e); }
-                inputEnd.placeholder = "Rua e número...";
-            };
-
-            recognition.onerror = () => {
-                btnMic.classList.remove('text-rose-500', 'animate-pulse');
-                fabMic.classList.replace('bg-rose-500', 'bg-tema');
-                fabMic.classList.remove('animate-pulse');
-                inputEnd.placeholder = "Rua e número...";
-            };
+            const res = await fetch(url);
+            const data = await res.json();
             
-            recognition.onend = () => {
-                btnMic.classList.remove('text-rose-500', 'animate-pulse');
-                fabMic.classList.replace('bg-rose-500', 'bg-tema');
-                fabMic.classList.remove('animate-pulse');
-                if(inputEnd.placeholder === "Ouvindo...") inputEnd.placeholder = "Rua e número...";
-            };
-        }
+            if(data.features && data.features.length > 0) {
+                const f = data.features[0];
+                let nomeRetornado = f.place_name.replace(/'/g, "\\'");
+                
+                // 👇 3. FORMATAÇÃO E MONTAGEM DO ENDEREÇO
+                let partes = nomeRetornado.split(',');
+                let rua = partes[0].trim();
+                rua = rua.replace(/\s+\d+$/, ''); // Limpa números no final do nome da rua, se houver
+                
+                let restoArray = partes.slice(1).map(p => p.trim());
+                
+                // Evita duplicar o número caso o mapbox também tenha devolvido ele
+                if (numeroFalado && restoArray[0] === numeroFalado) {
+                    restoArray.shift(); 
+                }
+                let resto = restoArray.join(', ');
+
+                if (numeroFalado) {
+                    // Se você falou número (Ex: Fidelis 1183), ele já monta 100% pronto!
+                    inputEnd.value = `${rua}, ${numeroFalado}, ${resto}`;
+                } else {
+                    // Se você falou só "Fidelis", ele monta com o espaço no meio igual no texto!
+                    inputEnd.value = `${rua}, , ${resto}`;
+                }
+
+                // Move o mapa
+                map.setView([f.center[1], f.center[0]], 17);
+                marker.setLatLng([f.center[1], f.center[0]]).setOpacity(1);
+
+                // Checa a nota da rua
+                checarNotaAutomatica(rua);
+
+                // Dispara o alerta de CEP (se houver regra na sessão)
+                const cepValido = await validarCepAvisoAsync(inputEnd.value);
+                if (!cepValido) {
+                    inputEnd.value = "";
+                    inputEnd.focus();
+                    return;
+                }
+
+                // 👇 4. CONTROLE INTELIGENTE DO TECLADO
+                inputEnd.focus();
+                if (!numeroFalado) {
+                    // Abre o teclado exatamente no meio das vírgulas para você digitar
+                    const pos = rua.length + 2;
+                    inputEnd.setSelectionRange(pos, pos);
+                } else {
+                    // Abre o teclado no final do texto (caso você queira adicionar ex: "Casa 2")
+                    const len = inputEnd.value.length;
+                    inputEnd.setSelectionRange(len, len);
+                }
+
+            } else { 
+                alert("Não encontrei endereço próximo com o áudio: " + termoFalado); 
+                inputEnd.value = "";
+            }
+        } catch(e) { console.error("Erro voz:", e); }
+        
+        inputEnd.placeholder = "Rua e número...";
+    };
+
+    recognition.onerror = () => {
+        btnMic.classList.remove('text-rose-500', 'animate-pulse');
+        fabMic.classList.replace('bg-rose-500', 'bg-tema');
+        fabMic.classList.remove('animate-pulse');
+        inputEnd.placeholder = "Rua e número...";
+    };
+    
+    recognition.onend = () => {
+        btnMic.classList.remove('text-rose-500', 'animate-pulse');
+        fabMic.classList.replace('bg-rose-500', 'bg-tema');
+        fabMic.classList.remove('animate-pulse');
+        if(inputEnd.placeholder === "Ouvindo...") inputEnd.placeholder = "Rua e número...";
+    };
+}
 				// NOVA FUNÇÃO: Transforma cidade em coordenadas e finaliza login
 		async function configurarEFinalizarLogin() {
 			const cidade = document.getElementById('inputCidade').value.trim();
