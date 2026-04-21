@@ -307,12 +307,17 @@
         // 2. LÓGICA DE PROCESSAMENTO E MAPBOX
         // -----------------------------------------------------
         window.processarFila = async function() {
-            const token = document.getElementById('mapboxToken').value.trim();
+            // Token integrado diretamente no código
+            const token = "pk.eyJ1IjoibWVybG91dCIsImEiOiJjbW8xeGV1YWwwcDQwMnBva242ZTJ0cmI5In0.SpwaxXYyWY25zIwVKdtT2w";
+            
             const jsonRaw = document.getElementById('jsonInput').value.trim();
-            const cepFiltro = document.getElementById('cepAlvo').value.trim().replace(/\D/g, ''); 
+            // NOVA LÓGICA: Pega apenas os 5 primeiros números do CEP Alvo digitado
+            const cepFiltroOriginal = document.getElementById('cepAlvo').value.trim().replace(/\D/g, ''); 
+            const cepFiltro = cepFiltroOriginal.substring(0, 5); 
+
             const btn = document.getElementById('btnProcessar');
             
-            if (!token || !jsonRaw) {
+            if (!jsonRaw) {
                 alert("Por favor, cole o JSON gerado.");
                 return;
             }
@@ -320,7 +325,6 @@
             try {
                 const dados = JSON.parse(jsonRaw);
                 
-                // UI: Reset e Loading
                 btn.disabled = true;
                 btn.classList.add('opacity-50');
                 document.getElementById('statusArea').classList.remove('hidden');
@@ -336,14 +340,10 @@
                 for (let i = 0; i < dados.length; i++) {
                     const item = dados[i];
                     
-                    // Progresso
                     const progresso = ((i + 1) / dados.length) * 100;
                     document.getElementById('progressBar').style.width = `${progresso}%`;
                     document.getElementById('progressText').innerText = `Validando: ${item.rua}, ${item.numero}`;
 
-                    // ==========================================
-                    // NOVO: VERIFICAÇÃO DE LISTA DE BLOQUEIO
-                    // ==========================================
                     const ruaLimpaItem = removerAcentos(item.rua);
                     const numLimpoItem = removerAcentos(String(item.numero));
 
@@ -352,7 +352,6 @@
                     });
 
                     if (pacoteBloqueado) {
-                        // Se estiver banido, ignora Mapbox e joga na lista de retidos
                         const idBloqueado = `ban_${Date.now()}_${i}`;
                         window.enderecosBloqueadosEncontrados.push({
                             id: idBloqueado,
@@ -362,33 +361,46 @@
                             motivo: "Endereço cadastrado na Lista Negra"
                         });
                         renderizarItemBloqueado({id: idBloqueado, rua: item.rua, numero: item.numero, bairro: item.bairro});
-                        continue; // Pula para o próximo item (Economiza API Mapbox)
+                        continue; 
                     }
-                    // ==========================================
 
-
-                    // Consulta Mapbox normal
                     const geoResult = await consultarMapbox(item.query_mapbox, token, item.rua, item.bairro);
                     
-                    let enderecoValidado = geoResult || `${item.rua}, ${item.numero}, ${item.bairro}, ${item.cidade} - ${item.estado}`;
+                    // Ajustado para ler o novo objeto retornado pelo Mapbox
+                    let enderecoValidado = geoResult ? geoResult.endereco : `${item.rua}, ${item.numero}, ${item.bairro}, ${item.cidade} - ${item.estado}`;
                     let complementoFinal = item.complemento;
 
-                    let cepMatch = enderecoValidado.match(/\b\d{5}(?:-\d{3})?\b/);
-                    let cepMapbox = cepMatch ? cepMatch[0] : "";
+                    // 1. Tenta pegar o CEP do Mapbox, se não achar, procura na string do endereço
+                    let cepMapbox = geoResult && geoResult.cep ? geoResult.cep : "";
+                    if (!cepMapbox) {
+                        // Aceita formatos com 8 ou 5 digitos
+                        let cepMatch = enderecoValidado.match(/\b\d{5}-?\d{3}\b/) || enderecoValidado.match(/\b\d{5}\b/);
+                        if (cepMatch) cepMapbox = cepMatch[0];
+                    }
                     
+                    // 2. Fallback: Procura na linha original do Gemini se o Mapbox falhar
                     if (!cepMapbox && item.linha_original) {
-                        let cepOriginalMatch = item.linha_original.match(/\b\d{5}(?:-\d{3})?\b/);
+                        let cepOriginalMatch = item.linha_original.match(/\b\d{5}-?\d{3}\b/) || item.linha_original.match(/\b\d{5}\b/);
                         if (cepOriginalMatch) cepMapbox = cepOriginalMatch[0];
                     }
 
-                    let cepLimpo = cepMapbox.replace(/\D/g, '');
+                    // 3. Formatação Visual: Garante que se tiver 8 números, exiba com o traço (85700-000)
+                    let cepLimpoNumeros = cepMapbox.replace(/\D/g, '');
+                    let cepFormatadoExibicao = cepMapbox; // Mantém como estava (pode ser só 5 dígitos)
+                    if (cepLimpoNumeros.length === 8) {
+                        cepFormatadoExibicao = `${cepLimpoNumeros.substring(0, 5)}-${cepLimpoNumeros.substring(5, 8)}`;
+                    }
 
+                    // 4. Comparação Lógica: Pega APENAS os 5 primeiros dígitos reais para comparar com o CEP Alvo
                     let cepMismatched = false;
                     if (cepFiltro) {
-                        if (cepLimpo) {
-                            if (!cepLimpo.startsWith(cepFiltro)) cepMismatched = true;
+                        if (cepLimpoNumeros.length >= 5) {
+                            const cepLimpo5 = cepLimpoNumeros.substring(0, 5);
+                            if (cepLimpo5 !== cepFiltro) {
+                                cepMismatched = true;
+                            }
                         } else {
-                            cepMismatched = true;
+                            cepMismatched = true; // Se não tem CEP ou tem menos de 5 digitos, dá erro
                         }
                     }
 
@@ -408,17 +420,25 @@
                         address_line_2: complementoFinal,
                         city: item.cidade || "Cascavel",
                         state: item.estado || "PR",
-                        postal_code: cepMapbox, 
+                        postal_code: cepFormatadoExibicao, 
                         mismatched: cepMismatched
                     };
                     
                     window.enderecosFinais.push(enderecoObj);
-                    renderizarItemNaLista(enderecoObj);
                 }
+
+                // ORDENAÇÃO: Coloca os pacotes com problema de CEP no topo da lista
+                window.enderecosFinais.sort((a, b) => {
+                    return (b.mismatched === true) - (a.mismatched === true);
+                });
+
+                // Renderiza a lista inteira de uma vez, já na ordem correta
+                window.enderecosFinais.forEach(endereco => {
+                    renderizarItemNaLista(endereco);
+                });
 
                 atualizarContadores();
                 
-                // Finaliza carregamento e exibe painéis
                 document.getElementById('statusArea').classList.add('hidden');
                 document.getElementById('resultsContainer').classList.remove('hidden');
                 
@@ -521,7 +541,10 @@
 
         async function consultarMapbox(query, token, ruaEsperada, bairroEsperado) {
             const bbox = "-53.5350,-25.0250,-53.3750,-24.8950"; 
-            const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${token}&country=BR&bbox=${bbox}&language=pt&types=address`;
+            
+            // 1. REMOVIDO o "&types=address". Agora, se ele não achar a casa exata, 
+            // ele puxa a rua inteira (que sempre tem o CEP atrelado).
+            const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${token}&country=BR&bbox=${bbox}&language=pt`;
             
             try {
                 const response = await fetch(url);
@@ -529,15 +552,36 @@
                 
                 if (data.features && data.features.length > 0) {
                     const melhorResultado = data.features[0];
-                    if (melhorResultado.relevance < 0.85) return null; 
-
-                    const nomeRetornado = melhorResultado.place_name.toLowerCase();
-                    const primeiraPalavraRua = ruaEsperada.split(' ')[1]?.toLowerCase(); 
                     
-                    if (primeiraPalavraRua && !nomeRetornado.includes(primeiraPalavraRua)) {
-                        return null; 
+                    // Relaxamos levemente a exigência de relevância (de 0.85 para 0.60) 
+                    // para ruas novas ou com nomes complexos.
+                    if (melhorResultado.relevance < 0.60) return null; 
+
+                    let cepExtraido = "";
+
+                    // 2. BUSCA PROFUNDA DE CEP (Varredura inteligente)
+                    // Em vez de olhar só pro primeiro resultado, varremos todos os retornos do Mapbox
+                    // até encontrar o abençoado CEP.
+                    for (let feature of data.features) {
+                        // Tenta achar nos metadados (context)
+                        const pc = feature.context?.find(c => c.id.includes('postcode'));
+                        if (pc) {
+                            cepExtraido = pc.text;
+                            break;
+                        } else {
+                            // Tenta achar direto no texto do endereço
+                            const m = feature.place_name.match(/\b\d{5}-?\d{3}\b/) || feature.place_name.match(/\b\d{5}\b/);
+                            if (m) {
+                                cepExtraido = m[0];
+                                break;
+                            }
+                        }
                     }
-                    return melhorResultado.place_name;
+
+                    return {
+                        endereco: melhorResultado.place_name,
+                        cep: cepExtraido
+                    };
                 }
                 return null;
             } catch (err) {
