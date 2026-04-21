@@ -24,10 +24,37 @@
                     <span id="cloudStatus" class="flex items-center gap-1 text-xs bg-indigo-800/50 px-2 py-1 rounded-full text-indigo-200">
                         <i class="fas fa-circle-notch fa-spin"></i> Conectando...
                     </span>
-                    <span class="bg-indigo-900 px-3 py-1 rounded-full text-xs font-mono border border-indigo-500/30">v6.7</span>
+                    <span class="bg-indigo-900 px-3 py-1 rounded-full text-xs font-mono border border-indigo-500/30">v6.5</span>
                 </div>
             </div>
-            <p class="text-indigo-200 text-sm mt-2">Validação Inteligente de CEP (Regex Avançada)</p>
+            <p class="text-indigo-200 text-sm mt-2">Validação de CEP Avançada e Sincronização em Nuvem</p>
+        </div>
+
+        <div class="bg-slate-50 border-b border-slate-200 px-6 py-3 flex justify-end">
+            <button onclick="document.getElementById('blacklistArea').classList.toggle('hidden')" class="text-sm font-bold text-red-600 hover:text-red-800 flex items-center gap-1 transition-colors">
+                <i class="fas fa-ban"></i> Gerenciar Endereços Bloqueados
+            </button>
+        </div>
+
+        <div id="blacklistArea" class="hidden bg-red-50 p-6 border-b border-red-200">
+            <h3 class="font-bold text-red-800 mb-3 flex items-center gap-2">
+                <i class="fas fa-shield-alt"></i> Lista Negra de Endereços
+            </h3>
+            <p class="text-xs text-red-600 mb-4">Pacotes com estes endereços serão automaticamente separados da rota.</p>
+            
+            <div class="flex flex-col sm:flex-row gap-3 mb-4">
+                <input type="text" id="banRua" placeholder="Rua (Ex: Rio Grande do Sul)" class="flex-1 border border-red-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-red-500 outline-none" />
+                <input type="text" id="banNum" placeholder="Número" class="w-full sm:w-32 border border-red-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-red-500 outline-none" />
+                <button onclick="window.adicionarBanido()" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-4 rounded-lg transition-all shadow-sm flex items-center justify-center gap-2">
+                    <i class="fas fa-plus"></i> Bloquear
+                </button>
+            </div>
+            
+            <div class="bg-white rounded-lg border border-red-100 p-2">
+                <ul id="listaBanidosUI" class="space-y-1 max-h-40 overflow-y-auto text-sm">
+                    <li class="text-slate-400 italic text-center p-2 text-xs">Carregando lista de bloqueio...</li>
+                </ul>
+            </div>
         </div>
 
         <div class="p-6 space-y-6">
@@ -56,136 +83,461 @@
             </div>
             
             <div id="resultsContainer" class="hidden space-y-6 pt-4 border-t border-slate-200">
-                <div class="flex items-center justify-between pb-2 border-b border-slate-200 mb-3">
-                    <h3 class="font-bold text-slate-800 flex items-center gap-2">
-                        <i class="fas fa-list-check text-indigo-500"></i> Endereços Ordenados (Prioridade ⬆)
-                    </h3>
-                    <span id="countLabel" class="text-xs bg-slate-200 px-3 py-1 rounded-full font-bold text-slate-700">0 itens</span>
-                </div>
-                <ul id="resultsList" class="space-y-3 max-h-[500px] overflow-y-auto pr-2 pb-2"></ul>
                 
-                <button onclick="window.exportarCSV()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 px-6 rounded-xl transition-all shadow-md active:scale-[0.98] flex items-center justify-center gap-2 mt-4">
-                    <i class="fas fa-file-csv text-xl"></i> Baixar Planilha
-                </button>
+                <div id="bloqueadosContainer" class="hidden bg-red-50 border border-red-200 rounded-xl p-4">
+                    <div class="flex items-center justify-between pb-3 border-b border-red-200 mb-3">
+                        <h3 class="font-bold text-red-800 flex items-center gap-2">
+                            <i class="fas fa-hand-paper"></i> Pacotes Retidos (Endereços Banidos)
+                        </h3>
+                        <span id="countBloqueadosLabel" class="text-xs bg-red-200 px-3 py-1 rounded-full font-bold text-red-900">0 itens</span>
+                    </div>
+                    <ul id="resultsBloqueadosList" class="space-y-3 max-h-64 overflow-y-auto pr-2"></ul>
+                    <p class="text-xs text-red-600 mt-3 font-medium"><i class="fas fa-info-circle"></i> Separe estes pacotes manualmente. Eles não serão exportados para a rota.</p>
+                </div>
+
+                <div>
+                    <div class="flex items-center justify-between pb-2">
+                        <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                            <i class="fas fa-list-check text-indigo-500"></i> Endereços para Exportação
+                        </h3>
+                        <span id="countLabel" class="text-xs bg-slate-200 px-3 py-1 rounded-full font-bold text-slate-700">0 itens</span>
+                    </div>
+                    
+                    <ul id="resultsList" class="space-y-3 max-h-96 overflow-y-auto pr-2 pb-2"></ul>
+                    
+                    <button onclick="window.exportarCSV()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 px-6 rounded-xl transition-all shadow-md active:scale-[0.98] flex items-center justify-center gap-2 mt-4">
+                        <i class="fas fa-file-csv text-xl"></i> Baixar Planilha & Salvar na Nuvem
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, onSnapshot, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Firebase Setup
-        const firebaseConfig = { apiKey: "AIzaSyDkVx0C_d9iAKdq6Ip22p4qQ6RYDhZvk-s", projectId: "rodao-f93c2", appId: "1:867137990526:web:833eed12a9c2e50c9a0d2f" };
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        signInAnonymously(auth);
-
-        // Regex Flexível para CEP (Pega 5 dígitos ou 8 com traço)
-        const CEP_REGEX = /\b\d{5}(?:-\d{3})?\b/;
-
-        window.processarFila = async function() {
-            const token = "pk.eyJ1IjoibWVybG91dCIsImEiOiJjbW8xeGV1YWwwcDQwMnBva242ZTJ0cmI5In0.SpwaxXYyWY25zIwVKdtT2w";
-            const jsonRaw = document.getElementById('jsonInput').value.trim();
-            const cepAlvo = document.getElementById('cepAlvo').value.trim().replace(/\D/g, '');
-            
-            if (!jsonRaw) return alert("Cole o JSON.");
-            
-            const dados = JSON.parse(jsonRaw);
-            const btn = document.getElementById('btnProcessar');
-            window.enderecosFinais = [];
-
-            btn.disabled = true;
-            document.getElementById('statusArea').classList.remove('hidden');
-            document.getElementById('resultsList').innerHTML = '';
-
-            for (let i = 0; i < dados.length; i++) {
-                const item = dados[i];
-                
-                // Busca Mapbox
-                const geoResult = await consultarMapbox(item.query_mapbox, token);
-                let enderecoValidado = geoResult || `${item.rua}, ${item.numero}, ${item.bairro}`;
-                
-                // EXTRAÇÃO INTELIGENTE DE CEP
-                let cepEncontrado = "";
-                const match = enderecoValidado.match(CEP_REGEX);
-                if (match) {
-                    cepEncontrado = match[0].replace('-', '');
-                }
-
-                // DEFINIÇÃO DE PRIORIDADE PARA ORDENAÇÃO
-                // 2 = Erro (CEP incompatível)
-                // 1 = Alerta (Sem CEP)
-                // 0 = OK
-                let prioridade = 0;
-                let aviso = "";
-
-                if (cepAlvo && cepEncontrado && !cepEncontrado.startsWith(cepAlvo)) {
-                    prioridade = 2;
-                    aviso = "CEP Divergente";
-                } else if (!cepEncontrado) {
-                    prioridade = 1;
-                    aviso = "Sem CEP";
-                }
-
-                window.enderecosFinais.push({
-                    id: `item_${Date.now()}_${i}`,
-                    address: enderecoValidado,
-                    postal_code: cepEncontrado || "S/ CEP",
-                    prioridade: prioridade,
-                    aviso: aviso
-                });
-            }
-
-            // ORDENAÇÃO: Prioridade alta (2) primeiro, depois (1), depois (0)
-            window.enderecosFinais.sort((a, b) => b.prioridade - a.prioridade);
-            window.enderecosFinais.forEach(renderizar);
-
-            document.getElementById('statusArea').classList.add('hidden');
-            document.getElementById('resultsContainer').classList.remove('hidden');
-            document.getElementById('countLabel').innerText = `${window.enderecosFinais.length} itens`;
-            btn.disabled = false;
+        const firebaseConfig = {
+            apiKey: "AIzaSyDkVx0C_d9iAKdq6Ip22p4qQ6RYDhZvk-s",
+            authDomain: "rodao-f93c2.firebaseapp.com",
+            projectId: "rodao-f93c2",
+            storageBucket: "rodao-f93c2.firebasestorage.app",
+            messagingSenderId: "867137990526",
+            appId: "1:867137990526:web:833eed12a9c2e50c9a0d2f",
+            databaseURL: "https://rodao-f93c2-default-rtdb.firebaseio.com/"
         };
+        const appId = 'rodao-f93c2'; 
 
-        async function consultarMapbox(query, token) {
-            const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${token}&country=BR&language=pt&types=address`;
-            try {
-                const res = await fetch(url);
-                const data = await res.json();
-                return data.features?.[0] ? data.features[0].place_name : null;
-            } catch { return null; }
+        let app, auth, db;
+        let currentUser = null;
+        let memoriaComplementos = {}; 
+        let memoriaBanidos = []; 
+
+        try {
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+        } catch (e) {
+            console.warn("Falha ao inicializar Firebase.", e);
         }
 
-        function renderizar(row) {
+        window.enderecosFinais = [];
+        window.enderecosBloqueadosEncontrados = [];
+
+        const removerAcentos = (str) => {
+            return str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : "";
+        };
+
+        const initAuth = async () => {
+            if (!auth) return;
+            try {
+                await signInAnonymously(auth);
+            } catch (error) {
+                console.error("Erro na Autenticação Anônima:", error);
+                atualizarStatusNuvem(false);
+            }
+        };
+
+        if (auth) {
+            initAuth();
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    currentUser = user;
+                    atualizarStatusNuvem(true);
+                    carregarMemoriaDaNuvem();
+                    carregarBanidosDaNuvem(); 
+                } else {
+                    atualizarStatusNuvem(false);
+                }
+            });
+        }
+
+        function atualizarStatusNuvem(online) {
+            const el = document.getElementById('cloudStatus');
+            if (online) {
+                el.innerHTML = '<i class="fas fa-cloud-check text-emerald-400"></i> Banco Ativo';
+                el.className = 'flex items-center gap-1 text-xs bg-emerald-900/50 px-3 py-1 rounded-full text-emerald-100 border border-emerald-500/30';
+            } else {
+                el.innerHTML = '<i class="fas fa-cloud-xmark text-red-400"></i> Banco Offline';
+                el.className = 'flex items-center gap-1 text-xs bg-red-900/50 px-3 py-1 rounded-full text-red-100 border border-red-500/30';
+            }
+        }
+
+        function carregarMemoriaDaNuvem() {
+            if (!currentUser || !db) return;
+            const colRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'complementos');
+            onSnapshot(colRef, (snapshot) => {
+                snapshot.forEach(docSnap => {
+                    memoriaComplementos[docSnap.id] = docSnap.data().complemento;
+                });
+            }, (error) => console.error("Erro no onSnapshot do Firebase:", error));
+        }
+
+        function carregarBanidosDaNuvem() {
+            if (!currentUser || !db) return;
+            const colRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'banidos');
+            
+            onSnapshot(colRef, (snapshot) => {
+                memoriaBanidos = [];
+                const listaUI = document.getElementById('listaBanidosUI');
+                listaUI.innerHTML = '';
+                
+                if (snapshot.empty) {
+                    listaUI.innerHTML = '<li class="text-slate-400 italic text-center p-2 text-xs">Nenhum endereço bloqueado.</li>';
+                    return;
+                }
+
+                snapshot.forEach(docSnap => {
+                    const dados = docSnap.data();
+                    memoriaBanidos.push({
+                        id: docSnap.id,
+                        rua: dados.rua,
+                        numero: dados.numero
+                    });
+                    
+                    const li = document.createElement('li');
+                    li.className = "flex items-center justify-between p-2 hover:bg-slate-50 border-b border-slate-100 last:border-0 rounded";
+                    li.innerHTML = `
+                        <div>
+                            <span class="font-bold text-slate-700">${dados.rua}</span>, 
+                            <span class="text-slate-600">${dados.numero}</span>
+                        </div>
+                        <button onclick="window.removerBanido('${docSnap.id}')" class="text-red-400 hover:text-red-600 px-2">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    `;
+                    listaUI.appendChild(li);
+                });
+            }, (error) => console.error("Erro ao carregar banidos:", error));
+        }
+
+        window.adicionarBanido = async function() {
+            const rua = document.getElementById('banRua').value.trim();
+            const num = document.getElementById('banNum').value.trim();
+
+            if (!rua || !num) {
+                alert("Por favor, preencha a Rua e o Número para bloquear.");
+                return;
+            }
+
+            if (!currentUser || !db) return;
+
+            const docId = `${removerAcentos(rua).replace(/\s+/g, '_')}_${removerAcentos(num)}`.substring(0, 50);
+            const docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'banidos', docId);
+            
+            try {
+                await setDoc(docRef, { rua: rua, numero: num, criadoEm: new Date().toISOString() });
+                document.getElementById('banRua').value = '';
+                document.getElementById('banNum').value = '';
+            } catch (e) {
+                console.error("Erro ao adicionar banido", e);
+            }
+        };
+
+        window.removerBanido = async function(id) {
+            if (!currentUser || !db) return;
+            const docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'banidos', id);
+            try {
+                await deleteDoc(docRef);
+            } catch (e) {
+                console.error("Erro ao remover banido", e);
+            }
+        };
+
+        async function salvarComplementoNaNuvem(chaveRuaNum, complementoStr) {
+            if (!currentUser || !db || !complementoStr) return;
+            const docId = chaveRuaNum.replace(/[^a-zA-Z0-9_]/g, '_');
+            const docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'complementos', docId);
+            try {
+                await setDoc(docRef, { complemento: complementoStr, atualizadoEm: new Date().toISOString() });
+            } catch (e) {}
+        }
+
+        async function salvarHistoricoRotas(listaFinal) {
+            if (!currentUser || !db) return;
+            const docId = `export_${Date.now()}`;
+            const docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'rotas_exportadas', docId);
+            try {
+                await setDoc(docRef, { data: new Date().toISOString(), quantidade: listaFinal.length, enderecos: listaFinal });
+            } catch (e) {}
+        }
+
+        window.processarFila = async function() {
+            // Token integrado diretamente no código
+            const token = "pk.eyJ1IjoibWVybG91dCIsImEiOiJjbW8xeGV1YWwwcDQwMnBva242ZTJ0cmI5In0.SpwaxXYyWY25zIwVKdtT2w";
+            
+            const jsonRaw = document.getElementById('jsonInput').value.trim();
+            const cepFiltro = document.getElementById('cepAlvo').value.trim().replace(/\D/g, ''); 
+            const btn = document.getElementById('btnProcessar');
+            
+            if (!jsonRaw) {
+                alert("Por favor, cole o JSON gerado.");
+                return;
+            }
+
+            try {
+                const dados = JSON.parse(jsonRaw);
+                
+                btn.disabled = true;
+                btn.classList.add('opacity-50');
+                document.getElementById('statusArea').classList.remove('hidden');
+                document.getElementById('resultsContainer').classList.add('hidden');
+                document.getElementById('bloqueadosContainer').classList.add('hidden');
+                
+                document.getElementById('resultsList').innerHTML = '';
+                document.getElementById('resultsBloqueadosList').innerHTML = '';
+                
+                window.enderecosFinais = [];
+                window.enderecosBloqueadosEncontrados = [];
+
+                for (let i = 0; i < dados.length; i++) {
+                    const item = dados[i];
+                    
+                    const progresso = ((i + 1) / dados.length) * 100;
+                    document.getElementById('progressBar').style.width = `${progresso}%`;
+                    document.getElementById('progressText').innerText = `Validando: ${item.rua}, ${item.numero}`;
+
+                    const ruaLimpaItem = removerAcentos(item.rua);
+                    const numLimpoItem = removerAcentos(String(item.numero));
+
+                    const pacoteBloqueado = memoriaBanidos.find(banido => {
+                        return ruaLimpaItem.includes(removerAcentos(banido.rua)) && numLimpoItem === removerAcentos(banido.numero);
+                    });
+
+                    if (pacoteBloqueado) {
+                        const idBloqueado = `ban_${Date.now()}_${i}`;
+                        window.enderecosBloqueadosEncontrados.push({
+                            id: idBloqueado,
+                            rua: item.rua,
+                            numero: item.numero,
+                            bairro: item.bairro || '',
+                            motivo: "Endereço cadastrado na Lista Negra"
+                        });
+                        renderizarItemBloqueado({id: idBloqueado, rua: item.rua, numero: item.numero, bairro: item.bairro});
+                        continue; 
+                    }
+
+                    const geoResult = await consultarMapbox(item.query_mapbox, token, item.rua, item.bairro);
+                    
+                    let enderecoValidado = geoResult || `${item.rua}, ${item.numero}, ${item.bairro}, ${item.cidade} - ${item.estado}`;
+                    let complementoFinal = item.complemento;
+
+                    let cepMatch = enderecoValidado.match(/\b\d{5}(?:-\d{3})?\b/);
+                    let cepMapbox = cepMatch ? cepMatch[0] : "";
+                    
+                    if (!cepMapbox && item.linha_original) {
+                        let cepOriginalMatch = item.linha_original.match(/\b\d{5}(?:-\d{3})?\b/);
+                        if (cepOriginalMatch) cepMapbox = cepOriginalMatch[0];
+                    }
+
+                    let cepLimpo = cepMapbox.replace(/\D/g, '');
+
+                    let cepMismatched = false;
+                    if (cepFiltro) {
+                        if (cepLimpo) {
+                            if (!cepLimpo.startsWith(cepFiltro)) cepMismatched = true;
+                        } else {
+                            cepMismatched = true;
+                        }
+                    }
+
+                    const chaveMemoria = `${item.rua.replace(/\s+/g, '_')}_${item.numero}_${item.bairro.replace(/\s+/g, '_')}`.toLowerCase();
+                    
+                    if (!complementoFinal) {
+                        complementoFinal = memoriaComplementos[chaveMemoria] || "";
+                    } else if (complementoFinal) {
+                        salvarComplementoNaNuvem(chaveMemoria, complementoFinal);
+                        memoriaComplementos[chaveMemoria] = complementoFinal;
+                    }
+
+                    const uniqueId = `item_${Date.now()}_${i}`;
+                    const enderecoObj = {
+                        id: uniqueId,
+                        address_line_1: enderecoValidado,
+                        address_line_2: complementoFinal,
+                        city: item.cidade || "Cascavel",
+                        state: item.estado || "PR",
+                        postal_code: cepMapbox, 
+                        mismatched: cepMismatched
+                    };
+                    
+                    window.enderecosFinais.push(enderecoObj);
+                    renderizarItemNaLista(enderecoObj);
+                }
+
+                atualizarContadores();
+                
+                document.getElementById('statusArea').classList.add('hidden');
+                document.getElementById('resultsContainer').classList.remove('hidden');
+                
+                if (window.enderecosBloqueadosEncontrados.length > 0) {
+                    document.getElementById('bloqueadosContainer').classList.remove('hidden');
+                }
+
+                btn.disabled = false;
+                btn.classList.remove('opacity-50');
+
+            } catch (e) {
+                console.error(e);
+                alert("Erro ao processar JSON. Certifique-se de que copiou o código corretamente.");
+                btn.disabled = false;
+                btn.classList.remove('opacity-50');
+                document.getElementById('statusArea').classList.add('hidden');
+            }
+        };
+
+        function renderizarItemNaLista(row) {
             const list = document.getElementById('resultsList');
             const li = document.createElement('li');
+            li.id = row.id;
             
-            let color = "bg-slate-50 border-slate-200";
-            let textColor = "text-slate-800";
-            
-            if (row.prioridade === 2) { color = "bg-red-50 border-red-300"; textColor = "text-red-900"; }
-            else if (row.prioridade === 1) { color = "bg-orange-50 border-orange-300"; textColor = "text-orange-900"; }
+            const baseClasses = "p-3 border rounded-xl text-sm flex flex-col gap-2 shadow-sm transition-all";
+            const alertClasses = row.mismatched 
+                ? "bg-red-50 border-red-300 ring-1 ring-red-200" 
+                : "bg-slate-50 border-slate-200 hover:border-indigo-200";
 
-            li.className = `p-3 border rounded-xl shadow-sm ${color}`;
+            const iconMap = row.mismatched 
+                ? '<i class="fas fa-triangle-exclamation text-red-500 text-lg" title="CEP incompatível ou vazio!"></i>' 
+                : '<i class="fas fa-check-circle text-emerald-500 text-lg"></i>';
+
+            li.className = `${baseClasses} ${alertClasses}`;
             li.innerHTML = `
-                <div class="flex items-start justify-between">
-                    <div class="${textColor} font-bold text-sm leading-tight">${row.address}</div>
-                    <span class="text-[10px] font-bold px-2 py-0.5 rounded uppercase ${row.prioridade > 0 ? 'bg-white' : 'bg-slate-200'}">${row.postal_code}</span>
+                <div class="flex items-start justify-between gap-3">
+                    <div class="flex items-start gap-3 w-full">
+                        <div class="mt-0.5 shrink-0">${iconMap}</div>
+                        <div class="w-full">
+                            <div class="${row.mismatched ? 'text-red-900 font-bold' : 'text-slate-800 font-bold'} leading-tight">
+                                ${row.address_line_1}
+                            </div>
+                            <div class="flex items-center gap-2 mt-1.5">
+                                <span class="text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded text-xs font-medium flex items-center gap-1">
+                                    <i class="fas fa-tag"></i> ${row.address_line_2 || '<span class="opacity-60 italic">Sem complemento</span>'}
+                                </span>
+                                <span class="${row.mismatched ? 'bg-red-200 text-red-800' : 'bg-slate-200 text-slate-600'} border border-slate-300 px-2 py-0.5 rounded text-xs font-bold tracking-wider">
+                                    ${row.postal_code || 'S/ CEP'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    ${row.mismatched ? `
+                    <button onclick="window.removerItem('${row.id}')" class="shrink-0 bg-red-100 hover:bg-red-200 text-red-700 px-3 py-2 rounded-lg text-xs font-bold border border-red-200 transition-colors shadow-sm flex flex-col items-center gap-1">
+                        <i class="fas fa-trash-alt"></i> Remover
+                    </button>
+                    ` : ''}
                 </div>
-                ${row.aviso ? `<div class="text-[10px] font-black text-red-600 mt-1 uppercase">⚠️ ${row.aviso}</div>` : ''}
             `;
             list.appendChild(li);
         }
 
-        window.exportarCSV = function() {
-            let csv = "Address,CEP\n";
-            window.enderecosFinais.forEach(r => csv += `"${r.address}","${r.postal_code}"\n`);
+        function renderizarItemBloqueado(item) {
+            const list = document.getElementById('resultsBloqueadosList');
+            const li = document.createElement('li');
+            li.className = "p-3 bg-white border border-red-200 rounded-xl text-sm flex items-start gap-3 shadow-sm";
+            li.innerHTML = `
+                <div class="mt-0.5 shrink-0">
+                    <i class="fas fa-ban text-red-500 text-lg"></i>
+                </div>
+                <div class="w-full">
+                    <div class="text-red-900 font-bold leading-tight">
+                        ${item.rua}, ${item.numero}
+                    </div>
+                    <div class="text-red-600 text-xs mt-1">Bairro: ${item.bairro || 'N/A'}</div>
+                </div>
+            `;
+            list.appendChild(li);
+        }
+
+        window.removerItem = function(id) {
+            window.enderecosFinais = window.enderecosFinais.filter(e => e.id !== id);
+            const element = document.getElementById(id);
+            if (element) {
+                element.style.opacity = '0';
+                element.style.transform = 'scale(0.95)';
+                setTimeout(() => { element.remove(); atualizarContadores(); }, 200);
+            }
+        };
+
+        function atualizarContadores() {
+            document.getElementById('countLabel').innerText = `${window.enderecosFinais.length} endereços`;
+            document.getElementById('countBloqueadosLabel').innerText = `${window.enderecosBloqueadosEncontrados.length} pacotes retidos`;
+        }
+
+        async function consultarMapbox(query, token, ruaEsperada, bairroEsperado) {
+            const bbox = "-53.5350,-25.0250,-53.3750,-24.8950"; 
+            const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${token}&country=BR&bbox=${bbox}&language=pt&types=address`;
+            
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data.features && data.features.length > 0) {
+                    const melhorResultado = data.features[0];
+                    if (melhorResultado.relevance < 0.85) return null; 
+
+                    const nomeRetornado = melhorResultado.place_name.toLowerCase();
+                    const primeiraPalavraRua = ruaEsperada.split(' ')[1]?.toLowerCase(); 
+                    
+                    if (primeiraPalavraRua && !nomeRetornado.includes(primeiraPalavraRua)) {
+                        return null; 
+                    }
+                    return melhorResultado.place_name;
+                }
+                return null;
+            } catch (err) {
+                return null;
+            }
+        }
+
+        window.exportarCSV = async function() {
+            if (window.enderecosFinais.length === 0) {
+                alert("Nenhum endereço para exportar.");
+                return;
+            }
+
+            let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; 
+            csvContent += "Address Line 1,Address Line 2,City,State,Postal Code,Extra info (Optional)\n"; 
+
+            window.enderecosFinais.forEach(row => {
+                let addr1 = (row.address_line_1 || "").replace(/"/g, '""');
+                let addr2 = (row.address_line_2 || "").replace(/"/g, '""'); 
+                let city = (row.city || "").replace(/"/g, '""');
+                let state = (row.state || "").replace(/"/g, '""');
+                let zip = (row.postal_code || "").replace(/"/g, '""');
+                let extraInfo = ""; 
+
+                csvContent += `"${addr1}","${addr2}","${city}","${state}","${zip}","${extraInfo}"\n`;
+            });
+
             const link = document.createElement("a");
-            link.href = "data:text/csv;charset=utf-8,\uFEFF" + encodeURI(csv);
-            link.download = "lista_ordenada.csv";
+            link.setAttribute("href", encodeURI(csvContent));
+            link.setAttribute("download", `Rotas_Circuit_${new Date().toLocaleDateString().replace(/\//g,'-')}.csv`);
+            document.body.appendChild(link);
             link.click();
+            document.body.removeChild(link);
+
+            salvarHistoricoRotas(window.enderecosFinais);
         };
     </script>
 </body>
