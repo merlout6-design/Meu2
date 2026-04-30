@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entregas TikTok</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f4f4f9; margin: 0; padding: 15px; color: #333; }
+        .card { background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        h1, h2 { margin-top: 0; font-size: 22px; color: #111; }
+        label { display: block; margin-top: 15px; font-weight: 600; font-size: 14px; color: #555; }
+        input[type="text"], input[type="date"], input[type="number"] { 
+            width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 16px;
+        }
+        input[readonly] { background-color: #eee; color: #666; font-weight: bold; }
+        
+        .btn-group { display: flex; gap: 10px; margin-top: 20px; }
+        button { flex: 1; padding: 15px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }
+        .btn-salvar { background: #000; color: #fff; }
+        .btn-cancelar { background: #ddd; color: #333; display: none; }
+        
+        .bloco-periodo { background: #fff; padding: 15px; border-radius: 12px; margin-bottom: 15px; border-left: 5px solid #25d366; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .bloco-periodo.futuro { border-left-color: #ffc107; }
+        .dia-item { padding: 10px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        .dia-item:last-child { border-bottom: none; }
+        .btn-editar { background: #f0f0f0; color: #007bff; padding: 5px 10px; border-radius: 5px; font-size: 12px; margin-left: 10px; border: 1px solid #ddd; }
+        
+        .resumo { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 15px; font-size: 14px; }
+        .resumo strong { color: #000; font-size: 16px; }
+        .alerta-bonus { color: #d9534f; font-weight: bold; font-size: 12px; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h1 id="tituloForm">Nova Entrega</h1>
+        <form id="formEntrega">
+            <input type="hidden" id="editId">
+
+            <label>Data da Entrega</label>
+            <input type="date" id="data" required>
+
+            <label>Período (Calculado Auto)</label>
+            <input type="text" id="periodoStr" readonly>
+
+            <label>Qtd de Pacotes</label>
+            <input type="number" id="pacotes" placeholder="Ex: 40" min="1" required>
+
+            <label>Bônus Unitário (R$)</label>
+            <input type="number" id="bonusUnit" step="0.01" value="0.00" min="0" required>
+            <small style="color: #666; display: block; margin-top: 5px;">* Deixe 0.00 se não houver bônus neste dia.</small>
+
+            <div class="btn-group">
+                <button type="submit" class="btn-salvar" id="btnSalvar">Salvar Registro</button>
+                <button type="button" class="btn-cancelar" id="btnCancelar" onclick="resetarForm()">Cancelar</button>
+            </div>
+        </form>
+    </div>
+
+    <h2 style="margin-top: 30px;">Meus Pagamentos</h2>
+    <div id="listaDados">Carregando...</div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyBV9n0IpvcZHezI4qcmsXv12oBedw77bxk",
+            authDomain: "tiktok-3c6bb.firebaseapp.com",
+            projectId: "tiktok-3c6bb",
+            storageBucket: "tiktok-3c6bb.firebasestorage.app",
+            messagingSenderId: "481460140861",
+            appId: "1:481460140861:web:41162fc2e1deecb2bde354",
+            measurementId: "G-N5XG85FBTE"
+        };
+
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        const TAXA_BASE = 2.90;
+        const DIAS_CICLO = 9;
+        const DATA_REF = new Date(2026, 3, 22);
+
+        const inputData = document.getElementById('data');
+        const inputPeriodo = document.getElementById('periodoStr');
+        const inputPacotes = document.getElementById('pacotes');
+        const inputBonus = document.getElementById('bonusUnit');
+        const editId = document.getElementById('editId');
+        const lista = document.getElementById('listaDados');
+
+        window.onload = () => {
+            const hoje = new Date();
+            const offset = hoje.getTimezoneOffset() * 60000;
+            inputData.value = new Date(hoje.getTime() - offset).toISOString().split('T')[0];
+            calcularPeriodo(inputData.value);
+            carregarDados();
+        };
+
+        inputData.addEventListener('change', (e) => calcularPeriodo(e.target.value));
+
+        function calcularPeriodo(dataStr) {
+            const [ano, mes, dia] = dataStr.split('-');
+            const dataAlvo = new Date(ano, mes - 1, dia, 12, 0, 0);
+            const refMeioDia = new Date(DATA_REF.getFullYear(), DATA_REF.getMonth(), DATA_REF.getDate(), 12, 0, 0);
+            
+            const diffDias = Math.floor((dataAlvo - refMeioDia) / (1000 * 60 * 60 * 24));
+            const numCiclo = Math.floor(diffDias / DIAS_CICLO);
+            
+            const inicio = new Date(refMeioDia);
+            inicio.setDate(refMeioDia.getDate() + (numCiclo * DIAS_CICLO));
+            
+            const fim = new Date(inicio);
+            fim.setDate(inicio.getDate() + (DIAS_CICLO - 1));
+            
+            inputPeriodo.value = `${inicio.toLocaleDateString('pt-BR')} até ${fim.toLocaleDateString('pt-BR')}`;
+            
+            // CORREÇÃO: Chave manual blindada contra fuso horário do celular
+            const anoKey = inicio.getFullYear();
+            const mesKey = String(inicio.getMonth() + 1).padStart(2, '0');
+            const diaKey = String(inicio.getDate()).padStart(2, '0');
+            inputPeriodo.dataset.key = `${anoKey}-${mesKey}-${diaKey}`;
+        }
+
+        document.getElementById('formEntrega').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = editId.value;
+            const pacotes = parseInt(inputPacotes.value);
+            const bonusUnit = parseFloat(inputBonus.value);
+
+            const dados = {
+                data: inputData.value,
+                periodoKey: inputPeriodo.dataset.key,
+                periodoTexto: inputPeriodo.value,
+                pacotes: pacotes,
+                bonusUnit: bonusUnit,
+                valorBase: pacotes * TAXA_BASE,
+                valorBonus: pacotes * bonusUnit,
+                ts: firebase.firestore.FieldValue.serverTimestamp()
+            };
+
+            try {
+                if (id) {
+                    await db.collection("entregas").doc(id).update(dados);
+                } else {
+                    await db.collection("entregas").add(dados);
+                }
+                resetarForm();
+                carregarDados();
+            } catch (err) {
+                alert("Erro ao salvar! Erro: " + err.message);
+            }
+        });
+
+        async function carregarDados() {
+            lista.innerHTML = 'Buscando...';
+            try {
+                const snap = await db.collection("entregas").orderBy("data", "desc").get();
+                if (snap.empty) {
+                    lista.innerHTML = 'Nenhuma entrega registrada.';
+                    return;
+                }
+
+                const agrupado = {};
+                snap.forEach(doc => {
+                    const d = doc.data();
+                    d.id = doc.id;
+                    if (!agrupado[d.periodoKey]) {
+                        agrupado[d.periodoKey] = { texto: d.periodoTexto, dias: [], totalBase: 0, totalBonus: 0 };
+                    }
+                    agrupado[d.periodoKey].dias.push(d);
+                    agrupado[d.periodoKey].totalBase += d.valorBase;
+                    agrupado[d.periodoKey].totalBonus += d.valorBonus;
+                });
+
+                lista.innerHTML = '';
+                const chaves = Object.keys(agrupado).sort().reverse();
+
+                chaves.forEach((key, index) => {
+                    const g = agrupado[key];
+                    const chaveAnterior = chaves[index + 1];
+                    const bonusReceber = chaveAnterior ? agrupado[chaveAnterior].totalBonus : 0;
+
+                    let htmlDias = '';
+                    g.dias.forEach(d => {
+                        const dataBr = d.data.split('-').reverse().join('/');
+                        const txtBonus = d.bonusUnit > 0 ? `<br><span class="alerta-bonus">+ Bônus R$ ${d.bonusUnit.toFixed(2)}/pct</span>` : '';
+                        
+                        htmlDias += `
+                            <div class="dia-item">
+                                <div>
+                                    <b>${dataBr}</b> - ${d.pacotes} pac.
+                                    ${txtBonus}
+                                </div>
+                                <div style="text-align: right;">
+                                    R$ ${d.valorBase.toFixed(2)}
+                                    <br><button type="button" class="btn-editar" onclick="editar('${d.id}', '${d.data}', ${d.pacotes}, ${d.bonusUnit})">Editar</button>
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    lista.innerHTML += `
+                        <div class="bloco-periodo">
+                            <div style="color: #000; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 10px;">
+                                📅 ${g.texto}
+                            </div>
+                            ${htmlDias}
+                            <div class="resumo">
+                                <div>Base do Período: R$ ${g.totalBase.toFixed(2)}</div>
+                                <div style="color: #28a745;">+ Bônus do ciclo passado: R$ ${bonusReceber.toFixed(2)}</div>
+                                <div style="margin-top: 10px; border-top: 1px solid #ccc; padding-top: 10px;">
+                                    <strong>Total a Receber: R$ ${(g.totalBase + bonusReceber).toFixed(2)}</strong>
+                                </div>
+                                <div style="margin-top: 10px; color: #d9534f; font-size: 12px;">
+                                    * Bônus gerado AQUI para receber no próximo: R$ ${g.totalBonus.toFixed(2)}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+            } catch (err) {
+                lista.innerHTML = 'Erro: ' + err.message;
+            }
+        }
+
+        window.editar = function(id, data, pacotes, bonusUnit) {
+            editId.value = id;
+            inputData.value = data;
+            inputPacotes.value = pacotes;
+            inputBonus.value = bonusUnit;
+            calcularPeriodo(data);
+            
+            document.getElementById('tituloForm').innerText = "Editar Entrega";
+            document.getElementById('btnSalvar').innerText = "Atualizar";
+            document.getElementById('btnCancelar').style.display = "block";
+            window.scrollTo(0, 0);
+        };
+
+        window.resetarForm = function() {
+            document.getElementById('formEntrega').reset();
+            editId.value = "";
+            document.getElementById('tituloForm').innerText = "Nova Entrega";
+            document.getElementById('btnSalvar').innerText = "Salvar Registro";
+            document.getElementById('btnCancelar').style.display = "none";
+            
+            const hoje = new Date();
+            const offset = hoje.getTimezoneOffset() * 60000;
+            inputData.value = new Date(hoje.getTime() - offset).toISOString().split('T')[0];
+            calcularPeriodo(inputData.value);
+        };
+    </script>
+</body>
+</html>
