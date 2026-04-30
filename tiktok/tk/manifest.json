@@ -1,0 +1,17 @@
+{
+  "name": "Entregas TikTok",
+  "short_name": "TikTok Entregas",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#f4f4f9",
+  "theme_color": "#000000",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/7541/7541900.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
